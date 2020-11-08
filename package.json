@@ -1,0 +1,14 @@
+{
+  "name": "herald",
+  "version": "1.0.0",
+  "description": "This discord bot is going to read users roles and announce them someone asks who they or alternatively when they are @ed.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sean",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^12.3.1"
+  }
+}
