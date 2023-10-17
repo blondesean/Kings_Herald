@@ -17,24 +17,35 @@ const client = new Client({
     ]
 });
 
-//set the prefix, this lets the bot know when it is time to run a command
-const prefix = '!';
-
+/*
 //To use more files than index and neatly store commands we need to do the following
 //require node script to read files from our computer
 const fs = require('fs');
 
 //Read in the commands folder commands.js for all files that end in js, then create a command for each that requires that file to execute
-const folderPath = './commands/';
-const commandFiles = fs.readdirSync('./commands/').filter(file => file.endsWith('.js'))
+//const folderPath = './commands/';
+//const commandFiles = fs.readdirSync('./commands/').filter(file => file.endsWith('.js'))
 fs.readdir(folderPath, (err, files) => {
     files.forEach(file => {
-        console.log('Importing Command : ' + file);
+        if (file.endsWith('.js')) {
+            console.log('Importing Command : ' + file);
+            const command = require('./../commands/ping.js');
+            console.log(command() + ' from ' + command.name + ', ' + command);
 
-        const command = require(`./../commands/${file}`);
-        client.commands.set(command.name, command);
+        }
+        else {
+            console.log('Cannot require file - it is not javascript');
+        }
     });
-});
+})
+;
+*/
+
+const ping = require('./../commands/ping.js');
+console.log(ping())
+
+//set the prefix, this lets the bot know when it is time to run a command
+const prefix = '!';
 
 //Print in log that the client has come online
 client.on('ready', (c) => {
