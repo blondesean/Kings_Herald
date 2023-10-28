@@ -5,7 +5,7 @@
 
 
 //This will allow constact Discord to communicate with all of our node modules
-const { Client, GatewayIntentBits } = require('discord.js')
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
 
 //Create new client that will appear in discord
 const client = new Client({
@@ -17,32 +17,36 @@ const client = new Client({
     ]
 });
 
-/*
+
 //To use more files than index and neatly store commands we need to do the following
 //require node script to read files from our computer
 const fs = require('fs');
 
 //Read in the commands folder commands.js for all files that end in js, then create a command for each that requires that file to execute
-//const folderPath = './commands/';
-//const commandFiles = fs.readdirSync('./commands/').filter(file => file.endsWith('.js'))
+const folderPath = './commands/';
+const commandFiles = fs.readdirSync(folderPath).filter(file => file.endsWith('.js'))
+var commands = {};
 fs.readdir(folderPath, (err, files) => {
     files.forEach(file => {
         if (file.endsWith('.js')) {
             console.log('Importing Command : ' + file);
-            const command = require('./../commands/ping.js');
-            console.log(command() + ' from ' + command.name + ', ' + command);
+
+            const command = require('./../commands/'.concat(file));
+            const command_real_name = file.substring(0, file.length - 3); // ".js" = 3
+            commands[command_real_name] = command;
 
         }
         else {
             console.log('Cannot require file - it is not javascript');
         }
-    });
-})
-;
-*/
 
-const ping = require('./../commands/ping.js');
-console.log(ping())
+    });
+
+    console.log("Loaded the following modules");
+    console.log(commands);
+})
+
+//console.log(commands.ping());
 
 //set the prefix, this lets the bot know when it is time to run a command
 const prefix = '!';
@@ -56,29 +60,32 @@ client.on('ready', (c) => {
 client.on('messageCreate', message => {
 
     //show message was received
-    console.log('Message was : ' + message.content + ' : ' + message.author.username);
+    console.log('Message was : ' + message.content + ' from ' + message.author.username);
 
     //if the message does not start with prefix do nothing, OR ignore messages sent by bot
-    if (!message.content.startsWith(prefix) || message.author.bot) return;
+    if (!message.content.startsWith(prefix) || message.author.bot) {
+        return console.log("This is not an actionable message");
+    };
 
     //capture commands and split out, shift to lower case
     const args = message.content.slice(prefix.length).split(/ +/)
     const command = args.shift().toLowerCase();
-
+    
     //print the debug info to the console
     console.log('Message was :' + message.content)
-    console.log('command is ' + command);
-    console.log('args are ' + args);
+    console.log('\tcommand is ' + command);
+    console.log('\targs are ' + args);
 
     if (command === 'ping') {
-        client.commands.get('ping').execute(message);
+        //console.log("Executing Ping Command");
+        console.log(commands.ping());
     } else if (command === 'whois') {
-        client.commands.get('whois').execute(message, args);
+        console.log("Executing Whois Command");
     }
 
-    else (content.log(message.content + ' | This is not an actionable message'))
+   
 });
 
 
 //Login with Bot token
-client.login('NzU5NDgwMDg5MDE2MjcwODc5.GoSmyz.l9Y8v02GI_0pACEE2CWl5GuWl6HNQwIHZEXAsI');
+client.login('NzU5NDgwMDg5MDE2MjcwODc5.G0geTH.-hFI9dtby80RTGSk2peqlsDBR-FiTREiCxT5DM');
