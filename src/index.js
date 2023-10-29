@@ -59,42 +59,45 @@ client.on('ready', (c) => {
 //Client reacts whenever a message comes in 
 client.on('messageCreate', message => {
 
+    //Store original message for reference
+    const origMessage = message; 
+
     //show message was received
-    console.log("< ---------- \\/\\/  MESSAGE   PROCESSING  \\/\\/ ---------- >");
-    console.log('Message was : ' + message.content + ' from ' + message.author.username);
+    console.log("< ---------- \\/\\/  MESSAGE   DECISIONING  \\/\\/ ---------- >");
+    console.log("Message was : '" + message.content + "' from " + message.author.username);
 
     //if the message does not start with prefix do nothing, OR ignore messages sent by bot
     if (!message.content.startsWith(prefix) || message.author.bot) {
         console.log("\tThis is not an actionable message");
-        console.log("< ---------- /\\/\\ END MESSAGE PROCESSING /\\/\\ ---------- >");
+        console.log("< ---------- /\\/\\ END MESSAGE DECISIONING /\\/\\ ---------- >");
         return;
     };
 
     //capture commands and split out, shift to lower case
-    const args = message.content.slice(prefix.length).split(/ +/)
-    const command = args.shift().toLowerCase();
+    const previewArgs = message.content.slice(prefix.length).split(/ +/)
+    const command = previewArgs.shift().toLowerCase();
     
     //print the debug info to the console
     console.log('\tcommand is ' + command);
-    console.log('\targs are ' + args);
+    console.log('\targs are ' + previewArgs);
     console.log("RESPONSE : ");
 
-    if (command === 'ping') {
+    if (command === "ping") {
         console.log("Executing Ping Command");
         commands.ping(message);
-    } else if (command === 'test') {
+    } else if (command === "test") {
         console.log("Executing Test Command");
         message.reply(commands.test());
-    } else if (command === 'whois') {
+    } else if (command === "whois") {
         console.log("Executing Whois Command");
-        commands.whois(args);
+        commands.whois(prefix, origMessage);
     } else {
         console.log("Unrecognized command from user.");
         message.reply("This is not a valid command, sir.");
     }
 
     //End and reset for next message
-    console.log("< ---------- /\\/\\ END MESSAGE PROCESSING /\\/\\ ---------- >\n");
+    console.log("< ---------- /\\/\\ END MESSAGE DECISIONING /\\/\\ ---------- >\n");
    
 });
 
