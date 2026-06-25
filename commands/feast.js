@@ -2,7 +2,7 @@ const feast = function (prefix, message) {
     // Royal feast announcements with medieval flair
     const feastAnnouncements = [
         {
-            opening: "🍖 **HEAR YE! ROYAL FEAST DECLARED!** 🍖",
+            opening: "**HEAR YE! ROYAL FEAST DECLARED!**",
             announcement: "By royal decree, a grand banquet is hereby proclaimed! All nobles of the realm are cordially invited to partake in the magnificent feast!",
             details: [
                 "🍗 Roasted fowl and succulent meats await!",
@@ -11,10 +11,10 @@ const feast = function (prefix, message) {
                 "🧀 Aged cheeses from the royal cellars!",
                 "🍎 Sweet fruits from the castle orchards!"
             ],
-            closing: "Come one, come all! Let us dine as befits the noble court! 🏰✨"
+            closing: "Come one, come all! Let us dine as befits the noble court!"
         },
         {
-            opening: "🏰 **ROYAL BANQUET SUMMONED!** 🏰",
+            opening: "**ROYAL BANQUET SUMMONED!**",
             announcement: "Hark! The royal kitchens have prepared a feast most magnificent! All subjects of the realm are bidden to join the celebration!",
             details: [
                 "🥩 Prime cuts of beef and lamb!",
@@ -23,10 +23,10 @@ const feast = function (prefix, message) {
                 "🍯 Honeyed delicacies and sweets!",
                 "🥕 Fresh vegetables from the royal gardens!"
             ],
-            closing: "Gather 'round the great hall! Let merriment and good cheer reign! 🎭🍾"
+            closing: "Gather 'round the great hall! Let merriment and good cheer reign!"
         },
         {
-            opening: "⚔️ **VICTORY FEAST PROCLAIMED!** ⚔️",
+            opening: "**VICTORY FEAST PROCLAIMED!**",
             announcement: "Rejoice! In honor of our noble fellowship, a grand feast is called forth! Let all partake in this celebration of camaraderie!",
             details: [
                 "🍖 Hearty stews and roasted game!",
@@ -35,10 +35,10 @@ const feast = function (prefix, message) {
                 "🧄 Savory herbs and royal seasonings!",
                 "🍓 Berry tarts and cream delights!"
             ],
-            closing: "May this feast strengthen the bonds of our fellowship! Huzzah! 🎺👑"
+            closing: "May this feast strengthen the bonds of our fellowship! Huzzah!"
         },
         {
-            opening: "🎭 **GRAND CELEBRATION FEAST!** 🎭",
+            opening: "**GRAND CELEBRATION FEAST!**",
             announcement: "By the grace of the crown, a spectacular banquet is ordained! All members of our esteemed court shall feast like royalty!",
             details: [
                 "🦆 Roasted duck with royal stuffing!",
@@ -47,7 +47,7 @@ const feast = function (prefix, message) {
                 "🍇 Grapes and exotic delicacies!",
                 "🎂 Magnificent cakes and pastries!"
             ],
-            closing: "Let joy and abundance fill our hearts and bellies! Long live the feast! 🏆🍽️"
+            closing: "Let joy and abundance fill our hearts and bellies! Long live the feast!"
         }
     ];
 

@@ -26,7 +26,7 @@ const reactions = function (prefix, message) {
     }
 
     console.log(`Analyzing reactions for user: ${targetUser}`);
-    message.reply("🏰 Hark! I shall consult the royal scrolls to divine thy patterns of expression... Pray, grant me but a moment, good sir!");
+    message.reply("Hark! I shall consult the royal scrolls to divine thy patterns of expression... Pray, grant me but a moment, good sir!");
 
     // Find the target member
     guild.members.fetch().then(async (members) => {
@@ -147,16 +147,16 @@ const reactions = function (prefix, message) {
             }
 
             // Build the royal report
-            let report = `🏰 **ROYAL DECREE OF EXPRESSIONS** 🏰\n`;
+            let report = `**ROYAL DECREE OF EXPRESSIONS**\n`;
             report += `*Mine Herald's Chronicle of ${displayName}'s Marks of Favor*\n\n`;
-            report += `🎭 **Most Favored Symbols of Approval (This Past Moon):**\n`;
+            report += `**Most Favored Symbols of Approval (This Past Moon):**\n`;
 
             const rankTitles = [
-                "🏆 **Most Cherished Mark:**",
-                "⚔️ **Second in Favor:**", 
-                "🛡️ **Third Most Beloved:**",
-                "👑 **Fourth in Grace:**",
-                "✨ **Fifth in Esteem:**"
+                "**Most Cherished Mark:**",
+                "**Second in Favor:**", 
+                "**Third Most Beloved:**",
+                "**Fourth in Grace:**",
+                "**Fifth in Esteem:**"
             ];
             
             sortedEmojis.forEach((emoji, index) => {
@@ -166,9 +166,9 @@ const reactions = function (prefix, message) {
                 report += `${rankTitle} ${emojiName} - *Bestowed ${countText}*\n`;
             });
 
-            report += `\n⚡ **Total Marks of Favor Granted:** ${totalReactionsGiven}`;
-            report += `\n🏰 **Royal Chambers Surveyed:** ${channelsScanned}`;
-            report += `\n\n*"Behold! Such are the patterns of expression favored by the noble ${displayName}! May their gestures of approval continue to grace our realm!"* 🎺👑`;
+            report += `\n**Total Marks of Favor Granted:** ${totalReactionsGiven}`;
+            report += `\n**Royal Chambers Surveyed:** ${channelsScanned}`;
+            report += `\n\n*"Behold! Such are the patterns of expression favored by the noble ${displayName}! May their gestures of approval continue to grace our realm!"*`;
 
             message.reply(report);
 

@@ -120,7 +120,7 @@ const whois = function (prefix, message) {
                            );
 
             if (isAdmin) {
-                randomAnnouncement += "\n\n🛡️ **...and they're also an Admin, Milord!** 🛡️";
+                randomAnnouncement += "\n\n**...and they're also an Admin, Milord!**";
             }
 
             message.reply(randomAnnouncement);
@@ -153,34 +153,34 @@ const whois = function (prefix, message) {
         // Herald announcement templates
         const announcementTemplates = [
             {
-                opening: "🎺 HEAR YE, HEAR YE! 🎺",
+                opening: "HEAR YE, HEAR YE!",
                 intro: `Thou dost inquire about ${matchingUser.nickname}?`,
                 titles: [
                     "Behold! The {adj} {role}!",
                     "Witness! The {adj} {role}!",
                     "Marvel at the {adj} {role}!"
                 ],
-                closing: `Such is the {adj} ${matchingUser.nickname}, may their name echo through the ages! ⚔️`
+                closing: `Such is the {adj} ${matchingUser.nickname}, may their name echo through the ages!`
             },
             {
-                opening: "🏰 BY ROYAL DECREE! 🏰",
+                opening: "BY ROYAL DECREE!",
                 intro: `You seek knowledge of the esteemed ${matchingUser.nickname}?`,
                 titles: [
                     "Know them as the {adj} {role}!",
                     "They are called the {adj} {role}!",
                     "Renowned as the {adj} {role}!"
                 ],
-                closing: `Thus stands the {adj} ${matchingUser.nickname} before thee! 👑`
+                closing: `Thus stands the {adj} ${matchingUser.nickname} before thee!`
             },
             {
-                opening: "⚡ PROCLAMATION! ⚡",
+                opening: "PROCLAMATION!",
                 intro: `Ah! You would know of ${matchingUser.nickname}!`,
                 titles: [
                     "The realm knows them as the {adj} {role}!",
                     "Far and wide, they're hailed as the {adj} {role}!",
                     "In song and story, the {adj} {role}!"
                 ],
-                closing: `Verily, 'tis the {adj} ${matchingUser.nickname} of whom legends speak! ✨`
+                closing: `Verily, 'tis the {adj} ${matchingUser.nickname} of whom legends speak!`
             }
         ];
 
@@ -210,7 +210,7 @@ const whois = function (prefix, message) {
 
         // Add admin announcement if they're an admin
         if (isAdmin) {
-            announcement += "\n\n🛡️ **...and they're also an Admin, Milord!** 🛡️";
+            announcement += "\n\n**...and they're also an Admin, Milord!**";
         }
 
         console.log("Herald announcement:", announcement);

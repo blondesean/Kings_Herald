@@ -2,7 +2,7 @@ const pets = function (prefix, message) {
     // Royal pet adoration announcements with medieval flair
     const petAnnouncements = [
         {
-            opening: "🐾 **BEHOLD! NOBLE CREATURES OF THE REALM!** 🐾",
+            opening: "**BEHOLD! NOBLE CREATURES OF THE REALM!**",
             announcement: "By royal decree, we celebrate the magnificent beasts that grace our court! These loyal companions bring joy to all who dwell within these halls!",
             praises: [
                 "🐕 Such noble hounds, loyal and true!",
@@ -11,10 +11,10 @@ const pets = function (prefix, message) {
                 "🐰 Gentle rabbits, soft as royal silk!",
                 "🐹 Tiny creatures with hearts most grand!"
             ],
-            closing: "May these blessed companions bring endless joy to our realm! 🏰✨"
+            closing: "May these blessed companions bring endless joy to our realm!"
         },
         {
-            opening: "👑 **ROYAL MENAGERIE CELEBRATION!** 👑",
+            opening: "**ROYAL MENAGERIE CELEBRATION!**",
             announcement: "Hark! The royal court doth proclaim its love for all creatures great and small! These precious beings are treasures beyond gold!",
             praises: [
                 "🦮 Faithful guardians of hearth and home!",
@@ -23,10 +23,10 @@ const pets = function (prefix, message) {
                 "🐢 Ancient tortoises, wise beyond years!",
                 "🦔 Adorable hedgehogs, spiky yet sweet!"
             ],
-            closing: "Long may these cherished companions reign in our hearts! 🎭🐾"
+            closing: "Long may these cherished companions reign in our hearts!"
         },
         {
-            opening: "⚔️ **CHAMPIONS OF CUTENESS DECLARED!** ⚔️",
+            opening: "**CHAMPIONS OF CUTENESS DECLARED!**",
             announcement: "Forsooth! No knight nor noble can match the valor of these adorable creatures! They have conquered our hearts with their charm!",
             praises: [
                 "🐕‍🦺 Brave service hounds, heroes all!",
@@ -35,10 +35,10 @@ const pets = function (prefix, message) {
                 "🐰 Fluffy bunnies, soft as clouds!",
                 "🐾 All creatures, blessed and beloved!"
             ],
-            closing: "Victory to these champions of our affections! Huzzah! 🏆🐾"
+            closing: "Victory to these champions of our affections! Huzzah!"
         },
         {
-            opening: "🏰 **ROYAL BLESSING UPON ALL BEASTS!** 🏰",
+            opening: "**ROYAL BLESSING UPON ALL BEASTS!**",
             announcement: "By the grace of the crown, we bestow our highest honors upon these magnificent creatures! They are the true nobility of nature!",
             praises: [
                 "🐕 Loyal dogs, knights of companionship!",
@@ -47,7 +47,7 @@ const pets = function (prefix, message) {
                 "🐹 Tiny hamsters, jesters of delight!",
                 "🦎 Exotic reptiles, dragons in miniature!"
             ],
-            closing: "May their reign of adorableness be eternal! 🎺👑"
+            closing: "May their reign of adorableness be eternal!"
         }
     ];
 
