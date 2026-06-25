@@ -1,0 +1,28 @@
+{
+  "name": "kings-herald-infra",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AWS CDK app that provisions the Kings_Herald Discord bot on ECS Fargate.",
+  "bin": {
+    "kings-herald": "bin/kings-herald.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff",
+    "destroy": "cdk destroy"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.166.0",
+    "constructs": "^10.0.0",
+    "source-map-support": "^0.5.21"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "aws-cdk": "^2.166.0",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.6.3"
+  }
+}

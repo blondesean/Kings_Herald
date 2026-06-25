@@ -128,4 +128,95 @@ You should see `King's <bot-name> is online.` in the console. Type `!ping` in an
 
 ## Hosting on AWS
 
-*To be written.* The bot will run as a long-lived Node process on AWS. Deployment details, environment management, and log routing will be documented here once the infrastructure is in place.
+### Architecture
+
+The bot runs as a single long-lived [Fargate](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html) task on ECS:
+
+- **ECR** — private container registry holding the bot image (built from the repo's `Dockerfile`).
+- **ECS Fargate** — runs one task, 256 CPU / 512 MB. No load balancer; the bot has no inbound traffic, only an outbound WebSocket to Discord.
+- **SSM Parameter Store** — `SecureString` parameter `/kings-herald/discord-token` holds the bot token. The task definition references it; the token never lives in source or image.
+- **CloudWatch Logs** — `console.log` output ships to log group `/ecs/kings-herald`.
+- **AWS CDK** (TypeScript) — all of the above is defined in `infra/` and provisioned with `cdk deploy`.
+
+Day-to-day deploys are a single `cdk deploy` (or a GitHub Actions workflow that runs the same command on push to `master`).
+
+### Prerequisites: AWS account and CLI
+
+You need an AWS account with billing set up, the AWS CLI v2 installed locally, and an IAM user with credentials you've configured into the CLI. This section walks through that.
+
+#### 1. Install AWS CLI v2 (Windows)
+
+Download and run the official MSI installer:
+
+```powershell
+# In PowerShell — runs the silent installer
+msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
+```
+
+Open a new terminal and confirm:
+
+```powershell
+aws --version
+# expect: aws-cli/2.x.x Python/3.x.x Windows/...
+```
+
+#### 2. Enable MFA on the root user
+
+Sign in to the AWS console as the root user, go to **My Security Credentials → Multi-factor authentication**, and add an MFA device. After this, **don't use the root user for day-to-day work** — only for billing changes and account recovery.
+
+#### 3. Create an IAM user for deploys
+
+In the console: **IAM → Users → Create user**.
+
+- **User name:** `kings-herald-deploy` (or any name you like).
+- **Provide user access to the AWS Management Console:** off (programmatic-only is fine for now).
+- **Permissions:** attach the AWS-managed policy **`AdministratorAccess`**.
+
+> **Why Admin?** CDK touches many services during a first deploy (CloudFormation, ECR, ECS, IAM, EC2 for VPC, Logs, SSM). Locking down to a least-privilege policy is the correct long-term move, but doing it before you've ever deployed will eat hours debugging "AccessDenied" errors. Start permissive, tighten later. This is tracked as a follow-up.
+
+Create the user, then open it and go to **Security credentials → Access keys → Create access key**:
+
+- **Use case:** "Command Line Interface (CLI)".
+- Acknowledge the warning, click through to the access key page, and **copy both the Access Key ID and the Secret Access Key now** — Discord-style, AWS only shows the secret once.
+
+#### 4. Configure the CLI
+
+```powershell
+aws configure
+```
+
+Answer the four prompts:
+
+- **AWS Access Key ID:** *(paste from step 3)*
+- **AWS Secret Access Key:** *(paste from step 3)*
+- **Default region name:** `us-east-1`
+- **Default output format:** `json`
+
+This writes credentials to `%USERPROFILE%\.aws\credentials` and config to `%USERPROFILE%\.aws\config`. Keep both files out of git (they're outside the repo, so this is automatic — just don't copy-paste them in).
+
+#### 5. Verify
+
+```powershell
+aws sts get-caller-identity
+```
+
+Expected shape:
+
+```json
+{
+    "UserId": "AIDA...",
+    "Account": "123456789012",
+    "Arn": "arn:aws:iam::123456789012:user/kings-herald-deploy"
+}
+```
+
+If you see your account number and the `kings-herald-deploy` ARN, you're ready for the CDK phase.
+
+#### 6. Set up a billing alert
+
+Recommended even for hobby projects: **Billing → Billing preferences → enable "Receive Free Tier Usage Alerts" and "Receive Billing Alerts"**, then create a CloudWatch alarm on the `EstimatedCharges` metric (threshold $5 or whatever makes you nervous). The Fargate task this stack runs is cheap (~$10/mo), but a misconfiguration shouldn't be able to surprise you with a $400 bill.
+
+### Deploying with CDK
+
+*Coming next.* The CDK app, first deploy steps, secret seeding, and the GitHub Actions workflow will be documented here as we build them out.
+

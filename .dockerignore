@@ -1,0 +1,39 @@
+# Dependencies (we npm ci inside the image)
+node_modules/
+
+# Secrets / local config
+.env
+.env.*
+
+# Git metadata
+.git/
+.gitignore
+
+# Editors / IDEs / tool state
+.idea/
+.vs/
+.vscode/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs / dev notes (not needed at runtime)
+README.md
+test.txt
+
+# Retired commands (not loaded at runtime, no need to bake into the image)
+commands/retired/
+
+# Infra (don't ship the CDK app inside the bot image)
+infra/
+cdk.out/
+
+# CI
+.github/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
