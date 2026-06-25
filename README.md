@@ -2,6 +2,8 @@
 
 A Discord bot that plays the role of a medieval herald — announcing user titles, chronicling channel activity, and proclaiming popular posts.
 
+> **New contributor?** Start with [CONTRIBUTING.md](CONTRIBUTING.md) — it's a zero-to-running-locally walkthrough (install Node, clone the repo, create your own dev Discord application, populate `.env`, run, make a change, open a PR). The rest of this README is the maintainer-facing reference: how the bot is structured, how to add commands, and how the AWS infra works.
+
 ## How it works
 
 Kings_Herald is a Node.js process that connects to Discord's gateway using [discord.js](https://discord.js.org/) and a bot token. It listens for two kinds of events:
@@ -24,6 +26,7 @@ Kings_Herald is a Node.js process that connects to Discord's gateway using [disc
 | `!whois <name>` | Looks up a guild member (by username, nickname, or `@mention`) and announces their titles in herald style. |
 | `!reactions <name>` | Scans the past month of messages and reports the user's most-used reaction emojis. |
 | `!activity` | Scans the past 30 days of the current channel and reports top posters, repliers, reactors, and most-reacted-to. |
+| `!help` | Lists the available commands in the herald's voice. |
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
@@ -218,5 +221,123 @@ Recommended even for hobby projects: **Billing → Billing preferences → enabl
 
 ### Deploying with CDK
 
-*Coming next.* The CDK app, first deploy steps, secret seeding, and the GitHub Actions workflow will be documented here as we build them out.
+The infrastructure is defined in `infra/` as an AWS CDK app (TypeScript). A `cdk deploy` builds the Docker image from the repo root, pushes it to ECR, and creates or updates the CloudFormation stack `KingsHeraldStack`.
+
+#### Repo layout (`infra/`)
+
+```
+infra/
+├── bin/kings-herald.ts          CDK app entrypoint
+├── lib/kings-herald-stack.ts    Stack: VPC, ECS, log group, SSM ref, OIDC role
+├── cdk.json                     CDK config (also pins the GitHub repo for the OIDC trust policy)
+├── package.json                 CDK deps + CLI
+└── tsconfig.json
+```
+
+#### One-time bootstrap
+
+Required once per AWS account + region. Creates the `CDKToolkit` CloudFormation stack (S3 bucket and ECR repo for CDK assets, IAM roles).
+
+```powershell
+cd infra
+npm install
+npx cdk bootstrap
+```
+
+#### Seed the bot token in SSM
+
+The stack references `SecureString` parameter `/kings-herald/discord-token`. CDK does **not** create or update this — the value never lives in source. Put it there once with the AWS CLI (add `--overwrite` to update):
+
+```powershell
+aws ssm put-parameter `
+  --name /kings-herald/discord-token `
+  --type SecureString `
+  --value "<your-discord-bot-token>" `
+  --region us-east-1
+```
+
+#### Local deploy
+
+```powershell
+cd infra
+npx cdk deploy
+```
+
+Docker Desktop must be running — CDK builds the image locally before pushing to ECR.
+
+Useful sibling commands:
+
+| Command | What it does |
+| --- | --- |
+| `npx cdk diff` | Show what would change without deploying. |
+| `npx cdk synth` | Print the CloudFormation template the app would deploy. |
+| `npx cdk destroy` | Tear down the whole stack. The SSM parameter survives (created out-of-band). |
+
+#### CI deploys via GitHub Actions
+
+`.github/workflows/deploy.yml` runs `npx cdk deploy` on every push to `master`. It authenticates to AWS via **OIDC** (no long-lived access keys stored in GitHub secrets). The trust policy on the `KingsHeraldGitHubDeploy` IAM role only allows the workflow to assume the role when:
+
+- The OIDC token comes from `repo:blondesean/Kings_Herald`, AND
+- The ref is `refs/heads/master`.
+
+PRs from contributors don't deploy — only the merge to `master` does. Manual re-deploys are available from the **Actions** tab via "Run workflow."
+
+The `githubRepo` value in `infra/cdk.json` is what pins the trust policy. If you fork or rename the repo, update that value and re-run `npx cdk deploy` locally to regenerate the role's trust policy before the next CI deploy will succeed.
+
+### Operations
+
+#### Tail the live bot logs
+
+```powershell
+aws logs tail /ecs/kings-herald --follow --region us-east-1
+```
+
+#### Force the running task to restart (picks up a new SSM value, etc.)
+
+```powershell
+aws ecs update-service --cluster kings-herald --service kings-herald --force-new-deployment --region us-east-1
+```
+
+#### Rotate the bot token
+
+1. **Discord Developer Portal** → your app → **Bot** → **Reset Token**, copy the new value.
+2. Update local `.env` with the new token.
+3. Overwrite the SSM parameter:
+   ```powershell
+   aws ssm put-parameter --name /kings-herald/discord-token --type SecureString --value "<new-token>" --overwrite --region us-east-1
+   ```
+4. Force-restart the ECS service (command above) so the new task picks up the new value at boot.
+
+#### Tear it all down
+
+```powershell
+cd infra
+npx cdk destroy
+```
+
+Then manually delete the SSM parameter if you want a fully clean teardown:
+
+```powershell
+aws ssm delete-parameter --name /kings-herald/discord-token --region us-east-1
+```
+
+### Cost estimate
+
+Steady-state monthly cost for the running stack (us-east-1, on-demand prices):
+
+| Resource | ~$/month |
+| --- | --- |
+| Fargate task (256 CPU / 512 MB, 24×7) | ~$8 |
+| CloudWatch Logs (low volume + 1 mo retention) | <$1 |
+| ECR storage (one image) | <$1 |
+| Data transfer (Discord WebSocket out) | <$1 |
+| **Total** | **~$10** |
+
+No NAT gateway (would be ~$32/mo), no load balancer (~$16/mo) — both intentionally avoided. The Fargate task uses a public subnet with a public IP and only outbound traffic to Discord, which is the cheapest viable shape for a stateless bot.
+
+### Follow-ups (not blocking)
+
+- **Tighten IAM.** The deploy IAM user and the GitHub OIDC role both have `AdministratorAccess` for first-deploy reliability. Long-term, scope them down to the services this stack actually touches (CloudFormation, ECR, ECS, IAM, EC2 for VPC, Logs, SSM).
+- **Trim `package.json`.** The bot's `dependencies` block lists transitive deps (eslint, nodemon, ansi-styles, etc.) as direct deps, which bloats the image. A `npm prune` + reauthoring would shrink the image meaningfully.
+- **Add a PR-check workflow.** A second GitHub Actions workflow that runs `npx cdk synth` on PRs would catch CDK errors before merge without deploying anything.
 

@@ -110,6 +110,9 @@ client.on('messageCreate', message => {
     } else if (command === "activity") {
         console.log("Executing Activity Command");
         commands.activity(prefix, origMessage);
+    } else if (command === "help") {
+        console.log("Executing Help Command");
+        commands.help(prefix, origMessage);
     } else {
         console.log("Unrecognized command from user.");
         message.reply("This is not a valid command, sir.");
