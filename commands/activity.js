@@ -3,7 +3,7 @@ const activity = function (prefix, message) {
     const guild = message.guild;
 
     console.log(`Analyzing activity for channel: ${channel.name}`);
-    message.reply("🏰 Hark! I shall consult the royal ledgers to determine the most active nobles in this chamber... This may take a moment, good sir!");
+    message.reply("Hark! I shall consult the royal ledgers to determine the most active nobles in this chamber... This may take a moment, good sir!");
 
     // Calculate date 30 days ago
     const thirtyDaysAgo = new Date();
@@ -128,56 +128,50 @@ const activity = function (prefix, message) {
         const topReacted = [...userArray].sort((a, b) => b.reactionsReceived - a.reactionsReceived).slice(0, 3);
 
         // Build the royal report
-        let report = `🏰 **ROYAL ACTIVITY CHRONICLE** 🏰\n`;
+        const rankPrefix = (index) => `${index + 1}.`;
+
+        let report = `**ROYAL ACTIVITY CHRONICLE**\n`;
         report += `*Herald's Report on the Noble Activities of #${channel.name}*\n`;
         report += `*Past Thirty Days of Court Proceedings*\n\n`;
 
         // Most Posts
-        report += `📜 **CHAMPIONS OF DISCOURSE** 📜\n`;
+        report += `**CHAMPIONS OF DISCOURSE**\n`;
         report += `*Those who have graced us with the most proclamations:*\n`;
         topPosters.forEach((user, index) => {
-            const medals = ["🥇", "🥈", "🥉"];
-            const medal = medals[index] || "🏅";
             const postText = user.posts === 1 ? "proclamation" : "proclamations";
-            report += `${medal} **${user.displayName}** - ${user.posts} ${postText}\n`;
+            report += `${rankPrefix(index)} **${user.displayName}** - ${user.posts} ${postText}\n`;
         });
 
-        report += `\n⚔️ **MASTERS OF RESPONSE** ⚔️\n`;
+        report += `\n**MASTERS OF RESPONSE**\n`;
         report += `*Those most skilled in the art of discourse:*\n`;
         topRepliers.forEach((user, index) => {
-            const medals = ["🥇", "🥈", "🥉"];
-            const medal = medals[index] || "🏅";
             const replyText = user.replies === 1 ? "response" : "responses";
-            report += `${medal} **${user.displayName}** - ${user.replies} ${replyText}\n`;
+            report += `${rankPrefix(index)} **${user.displayName}** - ${user.replies} ${replyText}\n`;
         });
 
-        report += `\n🎭 **GENEROUS SOULS OF APPROVAL** 🎭\n`;
+        report += `\n**GENEROUS SOULS OF APPROVAL**\n`;
         report += `*Those most liberal with their marks of favor:*\n`;
         topReactors.forEach((user, index) => {
-            const medals = ["🥇", "🥈", "🥉"];
-            const medal = medals[index] || "🏅";
             const reactionText = user.reactionsGiven === 1 ? "mark of favor" : "marks of favor";
-            report += `${medal} **${user.displayName}** - ${user.reactionsGiven} ${reactionText} bestowed\n`;
+            report += `${rankPrefix(index)} **${user.displayName}** - ${user.reactionsGiven} ${reactionText} bestowed\n`;
         });
 
-        report += `\n👑 **BELOVED OF THE COURT** 👑\n`;
+        report += `\n**BELOVED OF THE COURT**\n`;
         report += `*Those whose words have earned the most acclaim:*\n`;
         topReacted.forEach((user, index) => {
-            const medals = ["🥇", "🥈", "🥉"];
-            const medal = medals[index] || "🏅";
             const reactionText = user.reactionsReceived === 1 ? "mark of approval" : "marks of approval";
-            report += `${medal} **${user.displayName}** - ${user.reactionsReceived} ${reactionText} received\n`;
+            report += `${rankPrefix(index)} **${user.displayName}** - ${user.reactionsReceived} ${reactionText} received\n`;
         });
 
         const totalMessages = userArray.reduce((sum, user) => sum + user.totalActivity, 0);
         const totalReactions = userArray.reduce((sum, user) => sum + user.reactionsGiven, 0);
 
-        report += `\n📊 **ROYAL STATISTICS** 📊\n`;
-        report += `⚡ Total Messages: ${totalMessages}\n`;
-        report += `🎭 Total Reactions: ${totalReactions}\n`;
-        report += `👥 Active Nobles: ${userStats.size}\n`;
-        report += `🏰 Chamber: #${channel.name}\n\n`;
-        report += `*"Such are the chronicles of activity in our noble court! May these statistics bring great joy to all who dwell herein!"* 🎺📜`;
+        report += `\n**ROYAL STATISTICS**\n`;
+        report += `Total Messages: ${totalMessages}\n`;
+        report += `Total Reactions: ${totalReactions}\n`;
+        report += `Active Nobles: ${userStats.size}\n`;
+        report += `Chamber: #${channel.name}\n\n`;
+        report += `*"Such are the chronicles of activity in our noble court! May these statistics bring great joy to all who dwell herein!"*`;
 
         message.reply(report);
     };

@@ -161,7 +161,7 @@ const reactions = function (prefix, message) {
             
             sortedEmojis.forEach((emoji, index) => {
                 const [emojiName, count] = emoji;
-                const rankTitle = rankTitles[index] || "📜 **Also Favored:**";
+                const rankTitle = rankTitles[index] || "**Also Favored:**";
                 const countText = count === 1 ? "once" : count === 2 ? "twice" : count === 3 ? "thrice" : `${count} times`;
                 report += `${rankTitle} ${emojiName} - *Bestowed ${countText}*\n`;
             });

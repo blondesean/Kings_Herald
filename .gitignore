@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Secrets / local config
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vs/
+.vscode/
+*.swp
+*.swo
+
+# Tool state
+.claude/
