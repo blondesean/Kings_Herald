@@ -150,8 +150,8 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
     console.log(`Message "${message.content?.substring(0, 50)}..." now has ${totalReactions} total reactions`);
 
-    // Celebrate when message hits 10 reactions
-    if (totalReactions >= 10) {
+    // Celebrate when message hits 50 reactions
+    if (totalReactions >= 50) {
         celebratedMessages.add(message.id);
 
         // Royal adjectives for celebrating popular posts
