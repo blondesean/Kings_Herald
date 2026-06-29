@@ -6,14 +6,15 @@ A Discord bot that plays the role of a medieval herald — announcing user title
 
 ## How it works
 
-Kings_Herald is a Node.js process that connects to Discord's gateway using [discord.js](https://discord.js.org/) and a bot token. It listens for two kinds of events:
+Kings_Herald is a Node.js process that connects to Discord's gateway using [discord.js](https://discord.js.org/) and a bot token. It responds to two gateway events and runs one scheduled job:
 
-1. **`messageCreate`** — every message in a channel the bot can see. If a message starts with the command prefix (`!`), the bot routes it to a handler in `commands/`.
-2. **`messageReactionAdd`** — every reaction on a message the bot can see. When a non-bot message hits 10 total reactions, the herald replies with a celebratory proclamation and pins it.
+1. **`messageCreate`** — every message in a channel the bot can see. If a message starts with the command prefix (`!`), the bot routes it to a handler in `commands/prompts/`.
+2. **`messageReactionAdd`** — every reaction on a message the bot can see. When a non-bot message hits 50 total reactions, the herald replies with a celebratory proclamation and pins it (`commands/passive/celebrate.js`).
+3. **Weekly recap** — every Sunday at noon Eastern the herald posts in `#general` celebrating the week's three most-reacted posts (linked, with their authors pinged) plus a running points leaderboard (5/3/1 for first/second/third place). Points persist in DynamoDB (`commands/passive/weeklyRecap.js`, `src/pointsStore.js`).
 
 `src/index.js` is the entry point. On startup it:
 
-- Reads every `.js` file in `./commands/` and `require`s it into a `commands` object keyed by filename (`commands/ping.js` → `commands.ping`). Subdirectories like `commands/retired/` are skipped because they don't end in `.js`.
+- Reads every `.js` file in `./commands/prompts/` and `require`s it into a `commands` object keyed by filename (`commands/prompts/ping.js` → `commands.ping`). Passive behaviors in `commands/passive/` are wired into client events and schedules directly; `commands/retired/` is not loaded.
 - Logs in with `DISCORD_BOT_TOKEN` from a local `.env` file.
 - Dispatches incoming commands by name in a simple `if/else` chain.
 
@@ -26,13 +27,14 @@ Kings_Herald is a Node.js process that connects to Discord's gateway using [disc
 | `!whois <name>` | Looks up a guild member (by username, nickname, or `@mention`) and announces their titles in herald style. |
 | `!reactions <name>` | Scans the past month of messages and reports the user's most-used reaction emojis. |
 | `!activity` | Scans the past 30 days of the current channel and reports top posters, repliers, reactors, and most-reacted-to. |
+| `!recap` | Previews the weekly recap (top 3 most-reacted posts of the past week + the points leaderboard) in the current channel, without awarding points. |
 | `!help` | Lists the available commands in the herald's voice. |
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
 ## Adding a new command
 
-1. Create a new file at `commands/<name>.js`. The filename (minus `.js`) becomes the command keyword the user types after the `!` prefix.
+1. Create a new file at `commands/prompts/<name>.js`. The filename (minus `.js`) becomes the command keyword the user types after the `!` prefix. (Automatic, non-`!` behaviors go in `commands/passive/` instead and are wired up directly in `src/index.js`.)
 2. Export a single function. Two signatures are supported by the existing dispatcher:
    - **No-arg, returns a string** (like `test.js`) — the dispatcher will `message.reply(commands.<name>())`.
    - **`(prefix, message)`** (like `whois.js`, `reactions.js`, `activity.js`) — the command owns the reply and can do async work, fetch members, scan history, etc.
@@ -41,7 +43,7 @@ Commands that aren't currently in use live in `commands/retired/` for reference.
 Minimal template:
 
 ```js
-// commands/greet.js
+// commands/prompts/greet.js
 const greet = function (prefix, message) {
     const name = message.member?.displayName || message.author.username;
     message.reply(`Well met, ${name}!`);
@@ -93,6 +95,11 @@ After `cp .env.example .env`, open `.env` and fill it in. The complete file shou
 ```ini
 DISCORD_BOT_TOKEN=MTEzNDU2Nzg5MDEyMzQ1Njc4OQ.AbCdEf.your-real-token-here
 ```
+
+`DISCORD_BOT_TOKEN` is the only required variable. The weekly recap's points leaderboard lives in DynamoDB, configured by two variables that are set automatically in production by the CDK stack:
+
+- `POINTS_TABLE_NAME` — the DynamoDB table name. If unset (the default locally), the recap still runs and posts the top 3, but the leaderboard is skipped — so you can develop without AWS.
+- `AWS_REGION` — set this (plus AWS credentials) only if you want to exercise the DynamoDB path locally.
 
 Rules of the format:
 
@@ -228,7 +235,7 @@ The infrastructure is defined in `infra/` as an AWS CDK app (TypeScript). A `cdk
 ```
 infra/
 ├── bin/kings-herald.ts          CDK app entrypoint
-├── lib/kings-herald-stack.ts    Stack: VPC, ECS, log group, SSM ref, OIDC role
+├── lib/kings-herald-stack.ts    Stack: VPC, ECS, log group, SSM ref, DynamoDB table, OIDC role
 ├── cdk.json                     CDK config (also pins the GitHub repo for the OIDC trust policy)
 ├── package.json                 CDK deps + CLI
 └── tsconfig.json
@@ -331,9 +338,10 @@ Steady-state monthly cost for the running stack (us-east-1, on-demand prices):
 | CloudWatch Logs (low volume + 1 mo retention) | <$1 |
 | ECR storage (one image) | <$1 |
 | Data transfer (Discord WebSocket out) | <$1 |
+| DynamoDB (on-demand, weekly-recap leaderboard) | <$1 (well within free tier) |
 | **Total** | **~$10** |
 
-No NAT gateway (would be ~$32/mo), no load balancer (~$16/mo) — both intentionally avoided. The Fargate task uses a public subnet with a public IP and only outbound traffic to Discord, which is the cheapest viable shape for a stateless bot.
+No NAT gateway (would be ~$32/mo), no load balancer (~$16/mo) — both intentionally avoided. The Fargate task uses a public subnet with a public IP and only outbound traffic to Discord, which is the cheapest viable shape. The bot's only persistent state is the weekly-recap points leaderboard, kept in a small DynamoDB table so it survives restarts and redeploys; everything else is stateless.
 
 ### Follow-ups (not blocking)
 

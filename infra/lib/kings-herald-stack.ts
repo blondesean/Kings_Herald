@@ -7,6 +7,7 @@ import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
 const TOKEN_PARAMETER_NAME = '/kings-herald/discord-token';
 
@@ -41,6 +42,16 @@ export class KingsHeraldStack extends cdk.Stack {
       parameterName: TOKEN_PARAMETER_NAME,
     });
 
+    // Persistent leaderboard for the weekly recap. Keyed (guildId, userId) so
+    // multiple servers stay separate. On-demand billing is free-tier friendly at
+    // this volume; RETAIN keeps the standings if the stack is ever destroyed.
+    const pointsTable = new dynamodb.Table(this, 'PointsTable', {
+      partitionKey: { name: 'guildId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     // Builds the bot image from the repo's Dockerfile at deploy time and uploads
     // it to a CDK-managed ECR repository.
     const image = new ecr_assets.DockerImageAsset(this, 'Image', {
@@ -54,6 +65,10 @@ export class KingsHeraldStack extends cdk.Stack {
 
     taskDefinition.addContainer('Bot', {
       image: ecs.ContainerImage.fromDockerImageAsset(image),
+      environment: {
+        POINTS_TABLE_NAME: pointsTable.tableName,
+        AWS_REGION: this.region,
+      },
       secrets: {
         DISCORD_BOT_TOKEN: ecs.Secret.fromSsmParameter(tokenParam),
       },
@@ -62,6 +77,9 @@ export class KingsHeraldStack extends cdk.Stack {
         logGroup,
       }),
     });
+
+    // Let the task read and write the weekly-recap leaderboard.
+    pointsTable.grantReadWriteData(taskDefinition.taskRole);
 
     new ecs.FargateService(this, 'Service', {
       cluster,
@@ -75,6 +93,7 @@ export class KingsHeraldStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ClusterName', { value: cluster.clusterName });
     new cdk.CfnOutput(this, 'LogGroupName', { value: logGroup.logGroupName });
     new cdk.CfnOutput(this, 'TokenParameterName', { value: TOKEN_PARAMETER_NAME });
+    new cdk.CfnOutput(this, 'PointsTableName', { value: pointsTable.tableName });
 
     // GitHub Actions OIDC deploy role.
     // Skipped if no githubRepo context is set, so a fresh local clone can deploy

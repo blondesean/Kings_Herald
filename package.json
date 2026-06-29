@@ -4,6 +4,8 @@
   "description": "Discord bot that announces things about a user when they are @'ed",
   "main": "src/index.js",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1075.0",
+    "@aws-sdk/lib-dynamodb": "^3.1075.0",
     "abbrev": "^1.1.1",
     "abort-controller": "^3.0.0",
     "acorn": "^8.10.0",
@@ -83,6 +85,7 @@
     "minimatch": "^3.1.2",
     "ms": "^2.1.2",
     "natural-compare": "^1.4.0",
+    "node-cron": "^4.5.0",
     "node-fetch": "^2.6.1",
     "nodemon": "^3.0.1",
     "nopt": "^1.0.10",
