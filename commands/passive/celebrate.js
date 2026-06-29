@@ -5,7 +5,7 @@
  */
 
 // Number of total reactions a message needs before the Herald celebrates it.
-const REACTION_THRESHOLD = 50;
+const REACTION_THRESHOLD = 25;
 
 // Track messages that have already been celebrated to avoid spam.
 const celebratedMessages = new Set();
@@ -31,7 +31,7 @@ const celebrate = async function (reaction, user) {
     // Count total reactions on the message
     const totalReactions = message.reactions.cache.reduce((total, r) => total + r.count, 0);
 
-    console.log(`Message "${message.content?.substring(0, 50)}..." now has ${totalReactions} total reactions`);
+    console.log(`Message "${message.content?.substring(0, 25)}..." now has ${totalReactions} total reactions`);
 
     // Celebrate when message hits the threshold
     if (totalReactions >= REACTION_THRESHOLD) {
