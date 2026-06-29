@@ -14,6 +14,7 @@ const help = function (prefix, message) {
 
         `**UTILITY**\n` +
         `\`${prefix}ping\` - *Confirm the herald yet draws breath*\n` +
+        `\`${prefix}complain [grievance]\` - *Petition the crown; thy words are inscribed in the royal ledger*\n` +
         `\`${prefix}help\` - *Repeat this scroll of services*\n\n` +
 
         `**AUTOMATIC ROYAL SERVICES**\n` +

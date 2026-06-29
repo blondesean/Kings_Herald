@@ -10,6 +10,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
 const TOKEN_PARAMETER_NAME = '/kings-herald/discord-token';
+const GITHUB_TOKEN_PARAMETER_NAME = '/kings-herald/github-token';
 
 export class KingsHeraldStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -42,6 +43,13 @@ export class KingsHeraldStack extends cdk.Stack {
       parameterName: TOKEN_PARAMETER_NAME,
     });
 
+    // GitHub token for the !complain command (a fine-grained PAT scoped to
+    // Issues:write). Seeded out-of-band like the Discord token; CDK only
+    // references it by name.
+    const githubTokenParam = ssm.StringParameter.fromSecureStringParameterAttributes(this, 'GitHubToken', {
+      parameterName: GITHUB_TOKEN_PARAMETER_NAME,
+    });
+
     // Persistent leaderboard for the weekly recap. Keyed (guildId, userId) so
     // multiple servers stay separate. On-demand billing is free-tier friendly at
     // this volume; RETAIN keeps the standings if the stack is ever destroyed.
@@ -68,9 +76,11 @@ export class KingsHeraldStack extends cdk.Stack {
       environment: {
         POINTS_TABLE_NAME: pointsTable.tableName,
         AWS_REGION: this.region,
+        GITHUB_REPO: (this.node.tryGetContext('githubRepo') as string) || 'blondesean/Kings_Herald',
       },
       secrets: {
         DISCORD_BOT_TOKEN: ecs.Secret.fromSsmParameter(tokenParam),
+        GITHUB_TOKEN: ecs.Secret.fromSsmParameter(githubTokenParam),
       },
       logging: ecs.LogDriver.awsLogs({
         streamPrefix: 'bot',
@@ -93,6 +103,7 @@ export class KingsHeraldStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ClusterName', { value: cluster.clusterName });
     new cdk.CfnOutput(this, 'LogGroupName', { value: logGroup.logGroupName });
     new cdk.CfnOutput(this, 'TokenParameterName', { value: TOKEN_PARAMETER_NAME });
+    new cdk.CfnOutput(this, 'GitHubTokenParameterName', { value: GITHUB_TOKEN_PARAMETER_NAME });
     new cdk.CfnOutput(this, 'PointsTableName', { value: pointsTable.tableName });
 
     // GitHub Actions OIDC deploy role.

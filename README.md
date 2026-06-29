@@ -28,6 +28,7 @@ Kings_Herald is a Node.js process that connects to Discord's gateway using [disc
 | `!reactions <name>` | Scans the past month of messages and reports the user's most-used reaction emojis. |
 | `!activity` | Scans the past 30 days of the current channel and reports top posters, repliers, reactors, and most-reacted-to. |
 | `!recap` | Previews the weekly recap (top 3 most-reacted posts of the past week + the points leaderboard) in the current channel, without awarding points. |
+| `!complain <text>` | Files the message verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
 | `!help` | Lists the available commands in the herald's voice. |
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
@@ -94,10 +95,12 @@ After `cp .env.example .env`, open `.env` and fill it in. The complete file shou
 
 ```ini
 DISCORD_BOT_TOKEN=MTEzNDU2Nzg5MDEyMzQ1Njc4OQ.AbCdEf.your-real-token-here
+GITHUB_TOKEN=github_pat_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-`DISCORD_BOT_TOKEN` is the only required variable. The weekly recap's points leaderboard lives in DynamoDB, configured by two variables that are set automatically in production by the CDK stack:
+`DISCORD_BOT_TOKEN` is required. `GITHUB_TOKEN` is required for the `!complain` command — a fine-grained personal access token scoped to **Issues: write** on `blondesean/Kings_Herald` (issues are authored by whoever owns the token). The remaining variables are optional and set automatically in production by the CDK stack:
 
+- `GITHUB_REPO` — the `owner/repo` to file complaints into. Defaults to `blondesean/Kings_Herald`.
 - `POINTS_TABLE_NAME` — the DynamoDB table name. If unset (the default locally), the recap still runs and posts the top 3, but the leaderboard is skipped — so you can develop without AWS.
 - `AWS_REGION` — set this (plus AWS credentials) only if you want to exercise the DynamoDB path locally.
 
@@ -144,7 +147,7 @@ The bot runs as a single long-lived [Fargate](https://docs.aws.amazon.com/Amazon
 
 - **ECR** — private container registry holding the bot image (built from the repo's `Dockerfile`).
 - **ECS Fargate** — runs one task, 256 CPU / 512 MB. No load balancer; the bot has no inbound traffic, only an outbound WebSocket to Discord.
-- **SSM Parameter Store** — `SecureString` parameter `/kings-herald/discord-token` holds the bot token. The task definition references it; the token never lives in source or image.
+- **SSM Parameter Store** — `SecureString` parameters `/kings-herald/discord-token` (Discord bot token) and `/kings-herald/github-token` (GitHub PAT for `!complain`) hold the secrets. The task definition references them; the values never live in source or image.
 - **CloudWatch Logs** — `console.log` output ships to log group `/ecs/kings-herald`.
 - **AWS CDK** (TypeScript) — all of the above is defined in `infra/` and provisioned with `cdk deploy`.
 
@@ -263,6 +266,16 @@ aws ssm put-parameter `
   --region us-east-1
 ```
 
+The `!complain` command also needs a GitHub token in `SecureString` parameter `/kings-herald/github-token` — a fine-grained PAT with **Issues: write** on the repo. Seed it the same way (add `--overwrite` to update):
+
+```powershell
+aws ssm put-parameter `
+  --name /kings-herald/github-token `
+  --type SecureString `
+  --value "<your-github-pat>" `
+  --region us-east-1
+```
+
 #### Local deploy
 
 ```powershell
@@ -326,6 +339,7 @@ Then manually delete the SSM parameter if you want a fully clean teardown:
 
 ```powershell
 aws ssm delete-parameter --name /kings-herald/discord-token --region us-east-1
+aws ssm delete-parameter --name /kings-herald/github-token --region us-east-1
 ```
 
 ### Cost estimate

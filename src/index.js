@@ -125,6 +125,9 @@ client.on('messageCreate', message => {
     } else if (command === "recap") {
         console.log("Executing Recap Command");
         commands.recap(prefix, origMessage);
+    } else if (command === "complain") {
+        console.log("Executing Complain Command");
+        commands.complain(prefix, origMessage);
     } else if (command === "help") {
         console.log("Executing Help Command");
         commands.help(prefix, origMessage);
