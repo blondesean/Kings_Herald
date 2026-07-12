@@ -98,6 +98,12 @@ export class KingsHeraldStack extends cdk.Stack {
       assignPublicIp: true,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
       serviceName: 'kings-herald',
+      // Run on Fargate Spot (~70% cheaper). If AWS reclaims the task it gets a
+      // 2-minute warning and is restarted; the bot just reconnects to the
+      // Discord gateway, so a rare short blip is acceptable for this workload.
+      capacityProviderStrategies: [
+        { capacityProvider: 'FARGATE_SPOT', weight: 1 },
+      ],
     });
 
     new cdk.CfnOutput(this, 'ClusterName', { value: cluster.clusterName });
