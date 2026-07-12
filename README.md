@@ -67,6 +67,7 @@ Then in `src/index.js`:
 - Keep responses in the herald's medieval voice for consistency.
 - Do not use emojis in bot output. Plain Markdown formatting (`**bold**`, `*italics*`) is fine.
 - Log what the command is doing to `console.log` — those logs are how you'll debug in production.
+- Bulky flavor text lives in `flavor_text/` — one function per set (e.g. `celebrationTemplates(adj, author)`, `royalAdjectives()`, `rankTitles()`). Commands pull from it via `const flavor = require('../../flavor_text')` (or require a single file directly) instead of inlining large string arrays.
 
 ## Running locally
 

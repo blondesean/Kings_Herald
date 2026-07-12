@@ -1,3 +1,5 @@
+const flavor = require('../../flavor_text');
+
 // Simple rate limiting - track last fetch time per guild
 const lastFetchTimes = new Map();
 
@@ -79,11 +81,7 @@ const whois = function (prefix, message) {
 
         // Handle user not found
         if (!matchingUser) {
-            const heraldResponses = [
-                `Alas! The name "${targetUser}" is unknown to me, good sir. Perhaps they have fled the realm?`,
-                `By my troth! No soul by the name "${targetUser}" dwells in these halls, my lord.`,
-                `Forsooth! "${targetUser}" remains a mystery to this humble herald. Mayhap check thy spelling?`
-            ];
+            const heraldResponses = flavor.heraldResponses(targetUser);
             const randomResponse = heraldResponses[Math.floor(Math.random() * heraldResponses.length)];
             message.reply(randomResponse);
             return;
@@ -104,12 +102,7 @@ const whois = function (prefix, message) {
 
         // If no meaningful roles, give a basic announcement
         if (userRoles.length === 0) {
-            const basicAnnouncements = [
-                `Ah yes, I know of ${matchingUser.nickname}... though they appear quite unremarkable, my lord.`,
-                `Indeed, ${matchingUser.nickname} dwells among us, but they appear rather unremarkable, good sir.`,
-                `Verily, I am acquainted with ${matchingUser.nickname}, yet they seem most unremarkable to these eyes.`,
-                `'Tis true, ${matchingUser.nickname} walks these halls, though they appear unremarkable in deed and title.`
-            ];
+            const basicAnnouncements = flavor.basicAnnouncements(matchingUser.nickname);
             let randomAnnouncement = basicAnnouncements[Math.floor(Math.random() * basicAnnouncements.length)];
             
             // Check if user has admin permissions even with no visible roles
@@ -141,48 +134,10 @@ const whois = function (prefix, message) {
         }
 
         // Royal adjectives for flair
-        const royalAdjectives = [
-            "magnificent", "illustrious", "noble", "distinguished", "esteemed", "renowned", 
-            "celebrated", "exalted", "glorious", "majestic", "splendid", "resplendent",
-            "venerable", "honorable", "acclaimed", "revered", "legendary", "fabled",
-            "mighty", "valiant", "gallant", "stalwart", "steadfast", "unwavering",
-            "gracious", "benevolent", "wise", "learned", "scholarly", "astute",
-            "radiant", "luminous", "brilliant", "dazzling", "extraordinary", "remarkable"
-        ];
+        const royalAdjectives = flavor.royalAdjectives();
 
         // Herald announcement templates
-        const announcementTemplates = [
-            {
-                opening: "HEAR YE, HEAR YE!",
-                intro: `Thou dost inquire about ${matchingUser.nickname}?`,
-                titles: [
-                    "Behold! The {adj} {role}!",
-                    "Witness! The {adj} {role}!",
-                    "Marvel at the {adj} {role}!"
-                ],
-                closing: `Such is the {adj} ${matchingUser.nickname}, may their name echo through the ages!`
-            },
-            {
-                opening: "BY ROYAL DECREE!",
-                intro: `You seek knowledge of the esteemed ${matchingUser.nickname}?`,
-                titles: [
-                    "Know them as the {adj} {role}!",
-                    "They are called the {adj} {role}!",
-                    "Renowned as the {adj} {role}!"
-                ],
-                closing: `Thus stands the {adj} ${matchingUser.nickname} before thee!`
-            },
-            {
-                opening: "PROCLAMATION!",
-                intro: `Ah! You would know of ${matchingUser.nickname}!`,
-                titles: [
-                    "The realm knows them as the {adj} {role}!",
-                    "Far and wide, they're hailed as the {adj} {role}!",
-                    "In song and story, the {adj} {role}!"
-                ],
-                closing: `Verily, 'tis the {adj} ${matchingUser.nickname} of whom legends speak!`
-            }
-        ];
+        const announcementTemplates = flavor.announcementTemplates(matchingUser.nickname);
 
         // Select random template
         const template = announcementTemplates[Math.floor(Math.random() * announcementTemplates.length)];

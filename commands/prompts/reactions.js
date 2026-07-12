@@ -1,3 +1,5 @@
+const flavor = require('../../flavor_text');
+
 const reactions = function (prefix, message) {
     const guild = message.guild;
     
@@ -135,12 +137,7 @@ const reactions = function (prefix, message) {
 
             // Create the herald's response
             if (sortedEmojis.length === 0) {
-                const noReactionsResponses = [
-                    `By my troth! ${displayName} doth keep their expressions of favor most private, Milord. Nary a mark of approval have they left upon the scrolls.`,
-                    `Verily! ${displayName} appears most reserved in their gestures of acclaim this past moon, good sir.`,
-                    `Forsooth! The esteemed ${displayName} hath chosen silence over symbols of approval in these recent days, my lord.`,
-                    `'Tis most curious! ${displayName} seems to favor the spoken word over marks of expression, Milord.`
-                ];
+                const noReactionsResponses = flavor.noReactionsResponses(displayName);
                 const randomResponse = noReactionsResponses[Math.floor(Math.random() * noReactionsResponses.length)];
                 message.reply(randomResponse);
                 return;
@@ -151,13 +148,7 @@ const reactions = function (prefix, message) {
             report += `*Mine Herald's Chronicle of ${displayName}'s Marks of Favor*\n\n`;
             report += `**Most Favored Symbols of Approval (This Past Moon):**\n`;
 
-            const rankTitles = [
-                "**Most Cherished Mark:**",
-                "**Second in Favor:**", 
-                "**Third Most Beloved:**",
-                "**Fourth in Grace:**",
-                "**Fifth in Esteem:**"
-            ];
+            const rankTitles = flavor.rankTitles();
             
             sortedEmojis.forEach((emoji, index) => {
                 const [emojiName, count] = emoji;

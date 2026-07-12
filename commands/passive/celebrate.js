@@ -4,6 +4,8 @@
  * event in src/index.js.
  */
 
+const flavor = require('../../flavor_text');
+
 // Number of total reactions a message needs before the Herald celebrates it.
 const REACTION_THRESHOLD = 25;
 
@@ -37,29 +39,12 @@ const celebrate = async function (reaction, user) {
     if (totalReactions >= REACTION_THRESHOLD) {
         celebratedMessages.add(message.id);
 
-        // Royal adjectives for celebrating popular posts
-        const celebrationAdjectives = [
-            "clever", "insightful", "intriguing", "witty", "profound", "brilliant",
-            "astute", "wise", "eloquent", "thoughtful", "remarkable", "splendid",
-            "marvelous", "excellent", "superb", "magnificent", "delightful", "charming"
-        ];
-
-        const randomAdjective = celebrationAdjectives[Math.floor(Math.random() * celebrationAdjectives.length)];
+        const adjectives = flavor.celebrationAdjectives();
+        const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
         const authorName = message.member?.displayName || message.author.username;
 
-        // Multiple celebration message templates for variety
-        const celebrationTemplates = [
-            `Very ${randomAdjective}, Milord! Your patrons adore this comment and I tell tale of your wisdom!`,
-            `Hark! Most ${randomAdjective} words, ${authorName}! The realm celebrates your eloquence!`,
-            `By my troth! Such ${randomAdjective} discourse has won the hearts of many! Well spoken, good sir!`,
-            `Behold! The ${randomAdjective} wisdom of ${authorName} has stirred the masses! Truly remarkable!`,
-            `Magnificent! Your ${randomAdjective} words have earned great favor, Milord! The court is impressed!`,
-            `Splendid! Most ${randomAdjective} indeed! Your wit has captured the admiration of all!`,
-            `Verily! Such ${randomAdjective} insight deserves recognition! The people have spoken!`,
-            `Forsooth! Your ${randomAdjective} commentary has won acclaim throughout the realm!`
-        ];
-
-        const celebrationMessage = celebrationTemplates[Math.floor(Math.random() * celebrationTemplates.length)];
+        const templates = flavor.celebrationTemplates(randomAdjective, authorName);
+        const celebrationMessage = templates[Math.floor(Math.random() * templates.length)];
 
         try {
             // Reply to the popular message
