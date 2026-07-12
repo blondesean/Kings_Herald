@@ -9,12 +9,50 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
-const TOKEN_PARAMETER_NAME = '/kings-herald/discord-token';
-const GITHUB_TOKEN_PARAMETER_NAME = '/kings-herald/github-token';
+export interface KingsHeraldStackProps extends cdk.StackProps {
+  /**
+   * Short environment name. Drives all resource names so prod and beta never
+   * collide: 'kings-herald' for prod, 'kings-herald-beta' for beta.
+   */
+  readonly resourceName: string;
+
+  /**
+   * How many bot tasks to run. Prod runs 1 (always on). Beta runs 0 by default
+   * (on-demand): the service exists but costs nothing until you scale it to 1
+   * for a test, then back to 0.
+   */
+  readonly desiredCount: number;
+
+  /**
+   * What happens to the DynamoDB leaderboard if the stack is destroyed. Prod
+   * RETAINs (never lose real standings); beta DESTROYs (throwaway data).
+   */
+  readonly tableRemovalPolicy: cdk.RemovalPolicy;
+
+  /**
+   * Whether this stack creates the account-scoped GitHub OIDC provider and the
+   * shared deploy role. Only ONE stack per account may do this (prod). Beta
+   * reuses the same role, so it passes false.
+   */
+  readonly createDeployRole: boolean;
+
+  /**
+   * owner/repo the deploy role trusts, and the default target for `!complain`.
+   */
+  readonly githubRepo?: string;
+}
 
 export class KingsHeraldStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: KingsHeraldStackProps) {
     super(scope, id, props);
+
+    const { resourceName, desiredCount, tableRemovalPolicy, createDeployRole } = props;
+
+    // SecureString parameters holding the secrets for THIS environment. Prod
+    // reads /kings-herald/*, beta reads /kings-herald-beta/*, so the two bots
+    // use different Discord applications and never answer for each other.
+    const tokenParameterName = `/${resourceName}/discord-token`;
+    const githubTokenParameterName = `/${resourceName}/github-token`;
 
     // Public-only VPC with no NAT gateway. Fargate task gets a public IP for
     // outbound traffic to Discord; security group has no ingress rules.
@@ -28,36 +66,36 @@ export class KingsHeraldStack extends cdk.Stack {
 
     const cluster = new ecs.Cluster(this, 'Cluster', {
       vpc,
-      clusterName: 'kings-herald',
+      clusterName: resourceName,
     });
 
     const logGroup = new logs.LogGroup(this, 'LogGroup', {
-      logGroupName: '/ecs/kings-herald',
+      logGroupName: `/ecs/${resourceName}`,
       retention: logs.RetentionDays.ONE_MONTH,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // SecureString parameter is created out-of-band via `aws ssm put-parameter`.
-    // CDK references it by name; the actual value never lives in source.
+    // SecureString parameters are created out-of-band via `aws ssm put-parameter`.
+    // CDK references them by name; the actual values never live in source.
     const tokenParam = ssm.StringParameter.fromSecureStringParameterAttributes(this, 'BotToken', {
-      parameterName: TOKEN_PARAMETER_NAME,
+      parameterName: tokenParameterName,
     });
 
     // GitHub token for the !complain command (a fine-grained PAT scoped to
     // Issues:write). Seeded out-of-band like the Discord token; CDK only
     // references it by name.
     const githubTokenParam = ssm.StringParameter.fromSecureStringParameterAttributes(this, 'GitHubToken', {
-      parameterName: GITHUB_TOKEN_PARAMETER_NAME,
+      parameterName: githubTokenParameterName,
     });
 
     // Persistent leaderboard for the weekly recap. Keyed (guildId, userId) so
     // multiple servers stay separate. On-demand billing is free-tier friendly at
-    // this volume; RETAIN keeps the standings if the stack is ever destroyed.
+    // this volume. Prod RETAINs the standings; beta is disposable.
     const pointsTable = new dynamodb.Table(this, 'PointsTable', {
       partitionKey: { name: 'guildId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: tableRemovalPolicy,
     });
 
     // Builds the bot image from the repo's Dockerfile at deploy time and uploads
@@ -76,7 +114,7 @@ export class KingsHeraldStack extends cdk.Stack {
       environment: {
         POINTS_TABLE_NAME: pointsTable.tableName,
         AWS_REGION: this.region,
-        GITHUB_REPO: (this.node.tryGetContext('githubRepo') as string) || 'blondesean/Kings_Herald',
+        GITHUB_REPO: props.githubRepo || 'blondesean/Kings_Herald',
       },
       secrets: {
         DISCORD_BOT_TOKEN: ecs.Secret.fromSsmParameter(tokenParam),
@@ -94,10 +132,10 @@ export class KingsHeraldStack extends cdk.Stack {
     new ecs.FargateService(this, 'Service', {
       cluster,
       taskDefinition,
-      desiredCount: 1,
+      desiredCount,
       assignPublicIp: true,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      serviceName: 'kings-herald',
+      serviceName: resourceName,
       // Run on Fargate Spot (~70% cheaper). If AWS reclaims the task it gets a
       // 2-minute warning and is restarted; the bot just reconnects to the
       // Discord gateway, so a rare short blip is acceptable for this workload.
@@ -107,16 +145,18 @@ export class KingsHeraldStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'ClusterName', { value: cluster.clusterName });
+    new cdk.CfnOutput(this, 'ServiceName', { value: resourceName });
     new cdk.CfnOutput(this, 'LogGroupName', { value: logGroup.logGroupName });
-    new cdk.CfnOutput(this, 'TokenParameterName', { value: TOKEN_PARAMETER_NAME });
-    new cdk.CfnOutput(this, 'GitHubTokenParameterName', { value: GITHUB_TOKEN_PARAMETER_NAME });
+    new cdk.CfnOutput(this, 'TokenParameterName', { value: tokenParameterName });
+    new cdk.CfnOutput(this, 'GitHubTokenParameterName', { value: githubTokenParameterName });
     new cdk.CfnOutput(this, 'PointsTableName', { value: pointsTable.tableName });
 
-    // GitHub Actions OIDC deploy role.
-    // Skipped if no githubRepo context is set, so a fresh local clone can deploy
-    // without depending on a GitHub repo identity.
-    const githubRepo = this.node.tryGetContext('githubRepo') as string | undefined;
-    if (githubRepo) {
+    // GitHub Actions OIDC deploy role. Account-scoped, so only the prod stack
+    // creates it; the beta stack is deployed by the same role.
+    // Skipped entirely if no githubRepo is set, so a fresh local clone can
+    // deploy without depending on a GitHub repo identity.
+    const githubRepo = props.githubRepo;
+    if (createDeployRole && githubRepo) {
       // Account-scoped: only one of these can exist per AWS account. If you
       // already have one from another project, swap this for:
       //   iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(this, 'GitHubOidc', existingArn)
@@ -127,15 +167,20 @@ export class KingsHeraldStack extends cdk.Stack {
 
       const deployRole = new iam.Role(this, 'GitHubDeployRole', {
         roleName: 'KingsHeraldGitHubDeploy',
-        description: 'Assumed by GitHub Actions on push to master to run cdk deploy.',
+        description: 'Assumed by GitHub Actions to run cdk deploy (master->prod, develop->beta).',
         assumedBy: new iam.FederatedPrincipal(
           githubOidc.openIdConnectProviderArn,
           {
             StringEquals: {
               'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
             },
+            // Allow the workflow to assume the role from either branch: master
+            // deploys prod, develop deploys beta. Nothing else can assume it.
             StringLike: {
-              'token.actions.githubusercontent.com:sub': `repo:${githubRepo}:ref:refs/heads/master`,
+              'token.actions.githubusercontent.com:sub': [
+                `repo:${githubRepo}:ref:refs/heads/master`,
+                `repo:${githubRepo}:ref:refs/heads/develop`,
+              ],
             },
           },
           'sts:AssumeRoleWithWebIdentity'

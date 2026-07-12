@@ -18,6 +18,15 @@ Kings_Herald is a Node.js process that connects to Discord's gateway using [disc
 - Logs in with `DISCORD_BOT_TOKEN` from a local `.env` file.
 - Dispatches incoming commands by name in a simple `if/else` chain.
 
+### Passive vs prompt commands
+
+The bot has two distinct command styles, kept in separate folders:
+
+- **Prompt commands** (`commands/prompts/`) are *pull*: a human explicitly types `!<name>` and the bot replies. They are auto-loaded by filename into the `!` dispatcher in `src/index.js` — drop in a file, add a dispatcher branch, done. Everything in the [command table](#current-commands) below is one of these.
+- **Passive behaviors** (`commands/passive/`) are *push*: nobody types anything — the bot acts on its own in response to a gateway event or a schedule. Two exist today: `celebrate.js` (fires when a message crosses the reaction threshold) and `weeklyRecap.js` (the Sunday-noon recap). These are **not** auto-loaded; each is `require`d and wired to a specific client event or schedule by hand in `src/index.js`.
+
+Rule of thumb: if a human triggers it with `!`, it's a prompt command; if the bot decides to act on its own, it's a passive behavior.
+
 ### Current commands
 
 | Command | What it does |
@@ -70,6 +79,13 @@ Then in `src/index.js`:
 - Bulky flavor text lives in `flavor_text/` — one function per set (e.g. `celebrationTemplates(adj, author)`, `royalAdjectives()`, `rankTitles()`). Commands pull from it via `const flavor = require('../../flavor_text')` (or require a single file directly) instead of inlining large string arrays.
 
 ## Running locally
+
+You have two ways to try changes without touching the live bot, both using a **separate "dev" Discord application** in a private test server:
+
+1. **Run it on your machine** (this section) — fastest inner loop; `node src/index.js` with a dev token in `.env`. No AWS needed.
+2. **Deploy to the beta stack** — push to `develop` and CI deploys the on-demand beta environment; scale it up to test in the cloud exactly as prod runs. See [Environments](#environments-production-and-beta).
+
+Either way, create the dev bot once as below; local dev reads its token from `.env`, beta reads the same token from SSM (`/kings-herald-beta/discord-token`). Because the dev bot is a different application only in your test server, it never responds alongside prod.
 
 ### Prerequisites
 
@@ -144,15 +160,70 @@ You should see `King's <bot-name> is online.` in the console. Type `!ping` in an
 
 ### Architecture
 
-The bot runs as a single long-lived [Fargate](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html) task on ECS:
+The bot runs as a long-lived [Fargate](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html) task on ECS. The services involved:
 
 - **ECR** — private container registry holding the bot image (built from the repo's `Dockerfile`).
-- **ECS Fargate** — runs one task, 256 CPU / 512 MB. No load balancer; the bot has no inbound traffic, only an outbound WebSocket to Discord.
-- **SSM Parameter Store** — `SecureString` parameters `/kings-herald/discord-token` (Discord bot token) and `/kings-herald/github-token` (GitHub PAT for `!complain`) hold the secrets. The task definition references them; the values never live in source or image.
-- **CloudWatch Logs** — `console.log` output ships to log group `/ecs/kings-herald`.
+- **ECS Fargate** — runs the bot task, 256 CPU / 512 MB, on **Fargate Spot** (~70% cheaper; a reclaimed task just restarts and reconnects). No load balancer; the bot has no inbound traffic, only an outbound WebSocket to Discord.
+- **SSM Parameter Store** — `SecureString` parameters hold the secrets (Discord bot token + GitHub PAT for `!complain`). The task definition references them by name; the values never live in source or image.
+- **DynamoDB** — a small on-demand table holds the weekly-recap points leaderboard, the bot's only persistent state, so standings survive restarts and redeploys.
+- **CloudWatch Logs** — `console.log` output ships to the environment's log group.
+- **VPC** — a public-only VPC (no NAT gateway); the task gets a public IP for outbound Discord traffic and no inbound rules.
 - **AWS CDK** (TypeScript) — all of the above is defined in `infra/` and provisioned with `cdk deploy`.
 
-Day-to-day deploys are a single `cdk deploy` (or a GitHub Actions workflow that runs the same command on push to `master`).
+This stack is deployed as **two environments** — an always-on `prod` and an on-demand `beta` — described in [Environments](#environments-production-and-beta) below. Every resource above is named per environment (`kings-herald` vs `kings-herald-beta`), so the two never collide and each bot reads its own secrets.
+
+Day-to-day deploys are a single `cdk deploy <stack>` (or the GitHub Actions workflow: push to `develop` deploys beta, merge to `master` deploys prod).
+
+### Environments: production and beta
+
+The CDK app (`infra/bin/kings-herald.ts`) defines the same stack twice, from one parameterized class (`infra/lib/kings-herald-stack.ts`):
+
+| | **Production** | **Beta** |
+| --- | --- | --- |
+| Stack name | `KingsHeraldStack` | `KingsHeraldStack-Beta` |
+| Discord app | the real bot | a separate "dev" bot |
+| Secrets (SSM) | `/kings-herald/*` | `/kings-herald-beta/*` |
+| Resources | `kings-herald`, `/ecs/kings-herald` | `kings-herald-beta`, `/ecs/kings-herald-beta` |
+| Running tasks | 1 (always on) | **0 by default** (on-demand) |
+| Points table | RETAINed on destroy | DESTROYed on destroy |
+| Deploy trigger | push/merge to `master` | push to `develop` |
+
+The two stacks are fully isolated: different Discord applications, secrets, tables, log groups, and clusters. The **beta bot only lives in your test server** and reads its own token, so it never answers alongside prod.
+
+The account-scoped GitHub OIDC provider and the `KingsHeraldGitHubDeploy` role are created **only** by the prod stack (the same role deploys both). So on a brand-new account, deploy prod first — see [Deploying](#deploying-with-cdk).
+
+#### Promotion flow
+
+```
+feature branch ──PR──▶ develop ──(CI)──▶ beta stack   ← test here
+                          │
+                          merge
+                          ▼
+                        master ──(CI)──▶ prod stack    ← goes live
+```
+
+Push to `develop` and CI deploys the beta stack (new image + task definition) but leaves it at **0 running tasks**. To actually try it, scale beta up, test in your dev server, then scale it back down:
+
+```powershell
+# Start the beta bot (it comes online in your test server within ~1 min)
+aws ecs update-service --cluster kings-herald-beta --service kings-herald-beta --desired-count 1 --region us-east-1
+
+# ... test your change ...
+
+# Stop it again so beta costs nothing at rest
+aws ecs update-service --cluster kings-herald-beta --service kings-herald-beta --desired-count 0 --region us-east-1
+```
+
+> **Note:** a fresh `develop` deploy resets beta back to 0 tasks, so the order is always *deploy, then scale up*. When the change looks good in beta, merge `develop` into `master` and CI promotes it to prod automatically.
+
+#### Seed the beta bot's secrets (one-time)
+
+Beta reads its own SSM parameters. Create a second Discord application for the dev bot (see [Running locally](#prerequisites) for how), then seed its token and a GitHub PAT — same as prod but under the `-beta` prefix:
+
+```powershell
+aws ssm put-parameter --name /kings-herald-beta/discord-token --type SecureString --value "<dev-bot-token>" --region us-east-1
+aws ssm put-parameter --name /kings-herald-beta/github-token  --type SecureString --value "<github-pat>"    --region us-east-1
+```
 
 ### Prerequisites: AWS account and CLI
 
@@ -279,31 +350,35 @@ aws ssm put-parameter `
 
 #### Local deploy
 
+The app now holds two stacks, so name the one you want (a bare `cdk deploy` would try both). Deploy **prod first** on a new account — it creates the shared deploy role that CI needs:
+
 ```powershell
 cd infra
-npx cdk deploy
+npx cdk deploy KingsHeraldStack        # prod
+npx cdk deploy KingsHeraldStack-Beta   # beta (optional; CI handles it from develop)
 ```
 
 Docker Desktop must be running — CDK builds the image locally before pushing to ECR.
 
-Useful sibling commands:
+Useful sibling commands (append a stack name to scope them; omit it and CDK acts on all stacks):
 
 | Command | What it does |
 | --- | --- |
-| `npx cdk diff` | Show what would change without deploying. |
-| `npx cdk synth` | Print the CloudFormation template the app would deploy. |
-| `npx cdk destroy` | Tear down the whole stack. The SSM parameter survives (created out-of-band). |
+| `npx cdk list` | List the stacks in the app. |
+| `npx cdk diff KingsHeraldStack` | Show what would change without deploying. |
+| `npx cdk synth KingsHeraldStack` | Print the CloudFormation template the app would deploy. |
+| `npx cdk destroy KingsHeraldStack-Beta` | Tear down a stack. SSM parameters survive (created out-of-band). |
 
 #### CI deploys via GitHub Actions
 
-`.github/workflows/deploy.yml` runs `npx cdk deploy` on every push to `master`. It authenticates to AWS via **OIDC** (no long-lived access keys stored in GitHub secrets). The trust policy on the `KingsHeraldGitHubDeploy` IAM role only allows the workflow to assume the role when:
+`.github/workflows/deploy.yml` picks a target stack from the branch and runs `npx cdk deploy <stack>`: push to `develop` deploys `KingsHeraldStack-Beta`, push/merge to `master` deploys `KingsHeraldStack`. It authenticates to AWS via **OIDC** (no long-lived access keys stored in GitHub secrets). The trust policy on the `KingsHeraldGitHubDeploy` IAM role only allows the workflow to assume the role when:
 
 - The OIDC token comes from `repo:blondesean/Kings_Herald`, AND
-- The ref is `refs/heads/master`.
+- The ref is `refs/heads/master` **or** `refs/heads/develop`.
 
-PRs from contributors don't deploy — only the merge to `master` does. Manual re-deploys are available from the **Actions** tab via "Run workflow."
+PRs from contributors don't deploy — only pushes to those two branches do. Manual re-deploys are available from the **Actions** tab via "Run workflow" (on the branch whose stack you want).
 
-The `githubRepo` value in `infra/cdk.json` is what pins the trust policy. If you fork or rename the repo, update that value and re-run `npx cdk deploy` locally to regenerate the role's trust policy before the next CI deploy will succeed.
+The `githubRepo` value in `infra/cdk.json` is what pins the trust policy. If you fork or rename the repo, update that value and re-run `npx cdk deploy KingsHeraldStack` locally to regenerate the role's trust policy before the next CI deploy will succeed.
 
 ### Operations
 
@@ -333,30 +408,38 @@ aws ecs update-service --cluster kings-herald --service kings-herald --force-new
 
 ```powershell
 cd infra
-npx cdk destroy
+npx cdk destroy KingsHeraldStack-Beta   # beta first (it doesn't own the deploy role)
+npx cdk destroy KingsHeraldStack        # prod (also removes the shared OIDC role)
 ```
 
-Then manually delete the SSM parameter if you want a fully clean teardown:
+Then manually delete the SSM parameters if you want a fully clean teardown:
 
 ```powershell
 aws ssm delete-parameter --name /kings-herald/discord-token --region us-east-1
 aws ssm delete-parameter --name /kings-herald/github-token --region us-east-1
+aws ssm delete-parameter --name /kings-herald-beta/discord-token --region us-east-1
+aws ssm delete-parameter --name /kings-herald-beta/github-token --region us-east-1
 ```
+
+The prod points table is `RETAIN`, so it survives `cdk destroy` — delete it by hand from the DynamoDB console if you truly want it gone. The beta table is `DESTROY` and goes with the stack.
 
 ### Cost estimate
 
-Steady-state monthly cost for the running stack (us-east-1, on-demand prices):
+Steady-state monthly cost for **production** (us-east-1):
 
 | Resource | ~$/month |
 | --- | --- |
-| Fargate task (256 CPU / 512 MB, 24×7) | ~$8 |
+| Fargate task (256 CPU / 512 MB, 24×7, **Spot**) | ~$3 |
+| Public IPv4 address (hourly charge on the task's IP) | ~$3.60 |
 | CloudWatch Logs (low volume + 1 mo retention) | <$1 |
 | ECR storage (one image) | <$1 |
 | Data transfer (Discord WebSocket out) | <$1 |
 | DynamoDB (on-demand, weekly-recap leaderboard) | <$1 (well within free tier) |
-| **Total** | **~$10** |
+| **Total** | **~$8** |
 
-No NAT gateway (would be ~$32/mo), no load balancer (~$16/mo) — both intentionally avoided. The Fargate task uses a public subnet with a public IP and only outbound traffic to Discord, which is the cheapest viable shape. The bot's only persistent state is the weekly-recap points leaderboard, kept in a small DynamoDB table so it survives restarts and redeploys; everything else is stateless.
+Fargate Spot cuts compute ~70% versus on-demand (was ~$8/mo). The **beta** stack adds effectively **$0** at rest — it runs 0 tasks by default, so it only bills for the minutes you scale it to 1 to test (plus a few cents of ECR storage for its image).
+
+No NAT gateway (would be ~$32/mo), no load balancer (~$16/mo) — both intentionally avoided. The task uses a public subnet with a public IP and only outbound traffic to Discord, which is the cheapest viable shape; the public IPv4 charge is unavoidable without a far pricier NAT gateway. The bot's only persistent state is the weekly-recap points leaderboard, kept in a small DynamoDB table so it survives restarts and redeploys; everything else is stateless.
 
 ### Follow-ups (not blocking)
 

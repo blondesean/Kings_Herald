@@ -2,7 +2,7 @@ name: Deploy to AWS
 
 on:
   push:
-    branches: [master]
+    branches: [master, develop]
   workflow_dispatch:
 
 permissions:
@@ -29,6 +29,19 @@ jobs:
         working-directory: infra
         run: npm ci
 
+      # master -> production stack, develop -> beta stack. workflow_dispatch on a
+      # branch follows that same rule; anything else deploys nothing.
+      - name: Pick target stack
+        id: target
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "stack=KingsHeraldStack" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "stack=KingsHeraldStack-Beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "No deploy target for ${{ github.ref }}"; exit 1
+          fi
+
       - name: cdk deploy
         working-directory: infra
-        run: npx cdk deploy --require-approval never
+        run: npx cdk deploy ${{ steps.target.outputs.stack }} --require-approval never
