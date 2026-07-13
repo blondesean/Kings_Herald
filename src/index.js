@@ -28,28 +28,19 @@ require('dotenv').config();
 client.login(process.env.DISCORD_BOT_TOKEN);
 
 //To use more files than index and neatly store commands we need to do the following
-//require node scripts to read files from our computer
+//require node script to read files from our computer
 const fs = require('fs');
-const path = require('path');
 
-//Passive behaviors live in commands/passive and are wired into client events directly (not the ! dispatcher).
-const celebrate = require('./../commands/passive/celebrate');
-const { scheduleWeeklyRecap } = require('./../commands/passive/weeklyRecap');
-
-//Read in the commands/prompts folder for all files that end in js, then create a command for each that requires that file to execute.
-//Prompt commands are the ones triggered by a "!" message. Passive behaviors (commands/passive) and retired commands (commands/retired) are not loaded here.
-const promptsPath = path.join(__dirname, '..', 'commands', 'prompts');
+//Read in the commands folder for all files that end in js, then create a command for each that requires that file to execute.
+//Subdirectories (e.g., commands/retired) are skipped because they do not end in .js.
+const folderPath = './commands/';
 var commands = {};
-fs.readdir(promptsPath, (err, files) => {
-    if (err) {
-        console.error('Could not read prompt commands folder:', err);
-        return;
-    }
+fs.readdir(folderPath, (err, files) => {
     files.forEach(file => {
         if (file.endsWith('.js')) {
             console.log('Importing Command : ' + file);
 
-            const command = require(path.join(promptsPath, file));
+            const command = require('./../commands/'.concat(file));
             const command_real_name = file.substring(0, file.length - 3); // ".js" = 3
             commands[command_real_name] = command;
 
@@ -70,9 +61,6 @@ const prefix = '!';
 //Print in log that the client has come online
 client.on('ready', (c) => {
     console.log(`King's ${client.user.tag} is online.`);
-
-    // Schedule the weekly recap now that the bot is connected.
-    scheduleWeeklyRecap(client);
 });
 
 //Client reacts whenever a message comes in
@@ -122,9 +110,6 @@ client.on('messageCreate', message => {
     } else if (command === "activity") {
         console.log("Executing Activity Command");
         commands.activity(prefix, origMessage);
-    } else if (command === "recap") {
-        console.log("Executing Recap Command");
-        commands.recap(prefix, origMessage);
     } else if (command === "help") {
         console.log("Executing Help Command");
         commands.help(prefix, origMessage);
@@ -138,8 +123,81 @@ client.on('messageCreate', message => {
 
 });
 
-// Herald celebrates popular messages (logic in commands/passive/celebrate.js)
-client.on('messageReactionAdd', celebrate);
+// Track messages that have already been celebrated to avoid spam
+const celebratedMessages = new Set();
+
+// Herald celebrates popular messages with 10+ reactions
+client.on('messageReactionAdd', async (reaction, user) => {
+    // Handle partial reactions
+    if (reaction.partial) {
+        try {
+            await reaction.fetch();
+        } catch (error) {
+            console.error('Something went wrong when fetching the message:', error);
+            return;
+        }
+    }
+
+    const message = reaction.message;
+
+    // Don't celebrate bot messages or messages we've already celebrated
+    if (message.author.bot || celebratedMessages.has(message.id)) {
+        return;
+    }
+
+    // Count total reactions on the message
+    const totalReactions = message.reactions.cache.reduce((total, r) => total + r.count, 0);
+
+    console.log(`Message "${message.content?.substring(0, 25)}..." now has ${totalReactions} total reactions`);
+
+    // Celebrate when message hits 25 reactions
+    if (totalReactions >= 25) {
+        celebratedMessages.add(message.id);
+
+        // Royal adjectives for celebrating popular posts
+        const celebrationAdjectives = [
+            "clever", "insightful", "intriguing", "witty", "profound", "brilliant",
+            "astute", "wise", "eloquent", "thoughtful", "remarkable", "splendid",
+            "marvelous", "excellent", "superb", "magnificent", "delightful", "charming"
+        ];
+
+        const randomAdjective = celebrationAdjectives[Math.floor(Math.random() * celebrationAdjectives.length)];
+        const authorName = message.member?.displayName || message.author.username;
+
+        // Multiple celebration message templates for variety
+        const celebrationTemplates = [
+            `Very ${randomAdjective}, Milord! Your patrons adore this comment and I tell tale of your wisdom!`,
+            `Hark! Most ${randomAdjective} words, ${authorName}! The realm celebrates your eloquence!`,
+            `By my troth! Such ${randomAdjective} discourse has won the hearts of many! Well spoken, good sir!`,
+            `Behold! The ${randomAdjective} wisdom of ${authorName} has stirred the masses! Truly remarkable!`,
+            `Magnificent! Your ${randomAdjective} words have earned great favor, Milord! The court is impressed!`,
+            `Splendid! Most ${randomAdjective} indeed! Your wit has captured the admiration of all!`,
+            `Verily! Such ${randomAdjective} insight deserves recognition! The people have spoken!`,
+            `Forsooth! Your ${randomAdjective} commentary has won acclaim throughout the realm!`
+        ];
+
+        const celebrationMessage = celebrationTemplates[Math.floor(Math.random() * celebrationTemplates.length)];
+
+        try {
+            // Reply to the popular message
+            await message.reply(celebrationMessage);
+
+            // Try to pin the message (requires manage messages permission)
+            await message.pin();
+            console.log(`Celebrated and pinned popular message from ${authorName} with ${totalReactions} reactions`);
+
+        } catch (error) {
+            console.error('Error celebrating message:', error);
+            // If pinning fails, still send the celebration
+            try {
+                await message.reply(celebrationMessage);
+                console.log(`Celebrated popular message from ${authorName} (pinning failed)`);
+            } catch (replyError) {
+                console.error('Error sending celebration message:', replyError);
+            }
+        }
+    }
+});
 
 
 
