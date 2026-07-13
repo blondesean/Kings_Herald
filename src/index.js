@@ -32,117 +32,121 @@ client.login(process.env.DISCORD_BOT_TOKEN);
 const fs = require('fs');
 const path = require('path');
 
-//Passive behaviors live in commands/passive and are wired into client events directly (not the ! dispatcher).
+//Passive behaviors live in commands/passive and are wired into client events directly (not slash commands).
 const celebrate = require('./../commands/passive/celebrate');
 const { scheduleWeeklyRecap } = require('./../commands/passive/weeklyRecap');
 
-//Read in the commands/prompts folder for all files that end in js, then create a command for each that requires that file to execute.
-//Prompt commands are the ones triggered by a "!" message. Passive behaviors (commands/passive) and retired commands (commands/retired) are not loaded here.
+//Slash commands are auto-loaded by filename from commands/prompts (user-facing)
+//and commands/passive/preview (manual triggers for scheduled passive behaviors,
+//admin-only in Discord). Retired commands (commands/retired) are not loaded.
 const promptsPath = path.join(__dirname, '..', 'commands', 'prompts');
+const previewPath = path.join(__dirname, '..', 'commands', 'passive', 'preview');
 var commands = {};
-fs.readdir(promptsPath, (err, files) => {
-    if (err) {
-        console.error('Could not read prompt commands folder:', err);
+
+//Loaded synchronously so the command definitions are complete before the
+//client's ready event registers them with Discord.
+const loadCommandsFrom = (dir, label) => {
+    let files;
+    try {
+        files = fs.readdirSync(dir);
+    } catch (err) {
+        console.error(`Could not read ${label} folder (${dir}):`, err);
         return;
     }
     files.forEach(file => {
         if (file.endsWith('.js')) {
-            console.log('Importing Command : ' + file);
+            console.log(`Importing ${label} : ` + file);
 
-            const command = require(path.join(promptsPath, file));
+            const command = require(path.join(dir, file));
             const command_real_name = file.substring(0, file.length - 3); // ".js" = 3
+
+            //Every command module must export { description, category, hidden?, options?, run }.
+            //The run function is the dispatch target; the rest builds the Discord
+            //registration payload and the generated /help.
+            if (typeof command.run !== 'function') {
+                console.error(`Skipping ${file}: module does not export a run function.`);
+                return;
+            }
             commands[command_real_name] = command;
 
         }
         else {
             console.log('Skipping non-javascript entry: ' + file);
         }
-
     });
+};
 
-    console.log("Loaded the following modules");
-    console.log(commands);
-})
+loadCommandsFrom(promptsPath, 'Command');
+loadCommandsFrom(previewPath, 'Preview Command');
 
-//set the prefix, this lets the bot know when it is time to run a command
-const prefix = '!';
+//Build the slash-command registration payload from the loaded metadata.
+//hidden commands register with no member permissions, so only admins see them.
+const commandDefinitions = () =>
+    Object.entries(commands).map(([name, cmd]) => ({
+        name,
+        description: cmd.description.slice(0, 100), // Discord caps descriptions at 100 chars
+        options: cmd.options || [],
+        defaultMemberPermissions: cmd.hidden ? '0' : null,
+    }));
+
+//Register the commands with one guild, replacing whatever was there before.
+const registerCommands = (guild) => {
+    const definitions = commandDefinitions();
+    return guild.commands.set(definitions)
+        .then(() => console.log(`Registered ${definitions.length} slash commands in "${guild.name}"`))
+        .catch((error) => console.error(`Failed to register commands in "${guild.name}":`, error));
+};
 
 //Print in log that the client has come online
 client.on('ready', (c) => {
     console.log(`King's ${client.user.tag} is online.`);
 
+    //Guild-scoped registration: updates show up in Discord immediately (global
+    //registration can take up to an hour to propagate). Runs on every startup
+    //so a deploy refreshes the definitions.
+    client.guilds.cache.forEach(registerCommands);
+
     // Schedule the weekly recap now that the bot is connected.
     scheduleWeeklyRecap(client);
 });
 
-//Client reacts whenever a message comes in
-client.on('messageCreate', message => {
+//Register commands when the bot is invited to a new server.
+client.on('guildCreate', registerCommands);
 
-    //Store original message for reference
-    const origMessage = message;
+//Client reacts whenever a slash command comes in
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
 
-    //show message was received
-    console.log("< ---------- \\/\\/  MESSAGE   DECISIONING  \\/\\/ ---------- >");
-    console.log("Message was : '" + message.content + "' from " + message.author.username);
+    console.log("< ---------- \\/\\/  COMMAND   DECISIONING  \\/\\/ ---------- >");
+    console.log(`Command /${interaction.commandName} from ${interaction.user.username}`);
 
-    //if the message does not start with prefix, ignore it
-    if (!message.content.startsWith(prefix)) {
-        console.log("\tThis is not an actionable message");
-        console.log("< ---------- /\\/\\ END MESSAGE DECISIONING /\\/\\ ---------- >");
-        return;
-    }
-
-    if (message.author.bot) {
-        console.log("\tIgnoring bot message");
-        console.log("< ---------- /\\/\\ END MESSAGE DECISIONING /\\/\\ ---------- >");
-        return;
-    }
-
-    //capture commands and split out, shift to lower case
-    const previewArgs = message.content.slice(prefix.length).split(/ +/)
-    const command = previewArgs.shift().toLowerCase();
-
-    //print the debug info to the console
-    console.log('\tcommand is ' + command);
-    console.log('\targs are ' + previewArgs);
-    console.log("RESPONSE : ");
-
-    if (command === "ping") {
-        console.log("Executing Ping Command");
-        commands.ping(message);
-    } else if (command === "test") {
-        console.log("Executing Test Command");
-        message.reply(commands.test());
-    } else if (command === "whois") {
-        console.log("Executing Whois Command");
-        commands.whois(prefix, origMessage);
-    } else if (command === "reactions") {
-        console.log("Executing Reactions Command");
-        commands.reactions(prefix, origMessage);
-    } else if (command === "activity") {
-        console.log("Executing Activity Command");
-        commands.activity(prefix, origMessage);
-    } else if (command === "recap") {
-        console.log("Executing Recap Command");
-        commands.recap(prefix, origMessage);
-    } else if (command === "complain") {
-        console.log("Executing Complain Command");
-        commands.complain(prefix, origMessage);
-    } else if (command === "help") {
-        console.log("Executing Help Command");
-        commands.help(prefix, origMessage);
-    } else {
+    const cmd = commands[interaction.commandName];
+    if (!cmd) {
+        //Shouldn't happen (Discord only offers registered commands), but a
+        //stale registration after a rename could get here.
         console.log("Unrecognized command from user.");
-        message.reply("This is not a valid command, sir.");
+        await interaction.reply("This is not a valid command, sir.").catch(() => {});
+        return;
     }
 
-    //End and reset for next message
-    console.log("< ---------- /\\/\\ END MESSAGE DECISIONING /\\/\\ ---------- >\n");
+    try {
+        //Acknowledge immediately: Discord requires a response within 3 seconds,
+        //and several commands scan history for far longer. Commands send their
+        //real answer with editReply (first message) and followUp (subsequent).
+        await interaction.deferReply();
+        await cmd.run(interaction, commands);
+    } catch (error) {
+        console.error(`Command ${interaction.commandName} threw:`, error);
+        const apology = "Alack! Some misfortune befell that command, Milord. Pray try again anon!";
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(apology).catch(() => {});
+        } else {
+            await interaction.reply(apology).catch(() => {});
+        }
+    }
 
+    console.log("< ---------- /\\/\\ END COMMAND DECISIONING /\\/\\ ---------- >\n");
 });
 
 // Herald celebrates popular messages (logic in commands/passive/celebrate.js)
 client.on('messageReactionAdd', celebrate);
-
-
-

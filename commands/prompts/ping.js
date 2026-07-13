@@ -1,9 +1,10 @@
- const ping = function (message) {
-    
-     message.reply("Pong!");
-     console.log("Replied with 'Pong!'");
-     return;
+const ping = async function (interaction) {
+    await interaction.editReply("Pong!");
+    console.log("Replied with 'Pong!'");
 };
 
-module.exports = ping;
-
+module.exports = {
+    description: 'Confirm the herald yet draws breath',
+    category: 'UTILITY',
+    run: ping,
+};

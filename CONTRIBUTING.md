@@ -86,7 +86,7 @@ Even an empty server with just you in it is fine.
 ## Step 5: Invite your dev bot to your test server
 
 1. Back in the developer portal for your dev application, go to **OAuth2** → **URL Generator**.
-2. Under **Scopes**, tick **bot**.
+2. Under **Scopes**, tick **bot** *and* **applications.commands** (the second lets the bot register its slash commands).
 3. Under **Bot Permissions**, tick: View Channels, Send Messages, Read Message History, Add Reactions, Manage Messages, Embed Links.
 4. Copy the URL at the bottom of the page, paste it into a browser, choose your test server from Step 4, and authorize.
 
@@ -120,7 +120,7 @@ You should see:
 King's HeraldDev<YourName>#1234 is online.
 ```
 
-In your test server, type `!ping` in any channel. The bot replies `Pong!`. You're live.
+In your test server, type `/ping` in any channel (the console also logs a `Registered N slash commands` line on startup). The bot replies `Pong!`. You're live.
 
 `Ctrl+C` to stop. For auto-restart whenever you save a file during dev:
 
@@ -130,10 +130,10 @@ npx nodemon src/index.js
 
 ## Step 8: Make a change
 
-1. Open `commands/ping.js`. Change the reply string from `"Pong!"` to something like `"Pong! (from my dev branch)"`.
+1. Open `commands/prompts/ping.js`. Change the reply string from `"Pong!"` to something like `"Pong! (from my dev branch)"`.
 2. Save the file.
 3. Restart the bot (`Ctrl+C` then re-run, or let `nodemon` do it).
-4. Type `!ping` in your test server again. You see your edited reply.
+4. Type `/ping` in your test server again. You see your edited reply.
 
 That's the inner loop: edit → restart → test. Repeat until happy.
 
@@ -141,7 +141,7 @@ That's the inner loop: edit → restart → test. Repeat until happy.
 
 ```powershell
 git checkout -b your-feature-name
-git add commands/ping.js
+git add commands/prompts/ping.js
 git commit -m "Make ping reply more cheerful"
 git push -u origin your-feature-name
 ```
@@ -161,15 +161,15 @@ Within ~3 minutes of merge, the change is live in the friends' production server
 ## Troubleshooting
 
 - **Bot logs `King's ... is online` but doesn't respond to commands.** Message Content Intent isn't enabled in the developer portal, or the bot lacks View Channels / Send Messages perms in the channel you're testing in.
-- **`!whois` or `!reactions` says it can't find users.** Server Members Intent isn't enabled.
+- **Slash commands don't show up in the picker.** The bot was invited without the **applications.commands** scope — re-run the invite URL from Step 5 with both scopes ticked.
 - **`Invalid token` on startup.** Re-copy the token from the dev portal. Tokens change every time you click "Reset Token."
 - **PR merged but production didn't change.** Look at the **Actions** tab in GitHub for a failed workflow. Most common cause is something in the build that didn't exist locally — fix it on a new branch and PR again.
-- **Bot was responding to `!ping` and now isn't.** Make sure only one process is running with your dev token. Check Task Manager for stray `node.exe` processes, or run `Get-Process node` in PowerShell.
+- **Bot was responding to `/ping` and now isn't.** Make sure only one process is running with your dev token. Check Task Manager for stray `node.exe` processes, or run `Get-Process node` in PowerShell.
 
 ## Style notes (please read before your first PR)
 
 - **No emojis anywhere.** Not in bot replies, not in `README`, not in code comments, not in commit messages. We have a no-emoji rule and reviewers will ask you to remove them.
-- **Match the herald voice.** Bot replies should sound like a medieval town crier — "Hark!", "Forsooth!", "By my troth!", and so on. See `commands/whois.js` for the tone.
+- **Match the herald voice.** Bot replies should sound like a medieval town crier — "Hark!", "Forsooth!", "By my troth!", and so on. See `commands/prompts/whois.js` for the tone.
 - **Log generously.** `console.log` what your command is doing. Those logs are what we use to debug production issues in CloudWatch.
 - **One PR, one focused change.** Easier to review, easier to revert if it breaks something.
 
@@ -178,7 +178,7 @@ Within ~3 minutes of merge, the change is live in the friends' production server
 For a quick mental model — full details in the main [README](README.md):
 
 - **The bot** is a Node.js / `discord.js` process maintaining a WebSocket connection to Discord's gateway.
-- **Commands** live in `commands/*.js`. The dispatcher in `src/index.js` routes `!commandname` to `commands.commandname`.
+- **Commands** live in `commands/prompts/*.js` (plus admin-only previews in `commands/passive/preview/`). `src/index.js` auto-loads them by filename, registers them as slash commands with Discord on startup, and routes `/commandname` to the file's exported `run`. See the README's "Adding a new command" for the module shape.
 - **In production**, the bot runs as a single Fargate task on AWS ECS, with the token in SSM Parameter Store and logs in CloudWatch.
 - **Infrastructure** is defined as AWS CDK code in `infra/` (TypeScript).
 - **Deploys** happen automatically on merge to `master` via GitHub Actions, authenticated to AWS via OIDC.

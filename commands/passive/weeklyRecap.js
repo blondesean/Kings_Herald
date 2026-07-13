@@ -1,9 +1,13 @@
 /* Passive behavior: the Herald's weekly recap.
  *
- * Every Sunday at noon Eastern the Herald posts in #general celebrating the
+ * Every Sunday at noon Eastern the Herald posts in #general (or the best
+ * fallback channel — see findRecapChannel) celebrating the
  * three most-reacted messages of the past week. It links each post, pings its
- * author, and awards points toward a running leaderboard (5 for first, 3 for
- * second, 1 for third). Points persist in DynamoDB via ../../src/pointsStore.
+ * author, and awards points toward a running leaderboard on three independent
+ * scales: podium points (5/3/1 for the top posts), reaction points (1 per
+ * REACTIONS_PER_POINT total reactions received across the week), and chatter
+ * points (5/3/1 for the most messages sent). Points persist in DynamoDB via
+ * ../../src/pointsStore.
  *
  * Exposes:
  *   scheduleWeeklyRecap(client) - registers the cron job (call once, on ready)
@@ -20,32 +24,58 @@ const CRON_EXPRESSION = '0 12 * * 0';
 const TIMEZONE = 'America/New_York';
 
 const WINDOW_DAYS = 7;
-const MAX_MESSAGES_PER_CHANNEL = 500;
 const LEADERBOARD_SIZE = 10;
 
 // Points awarded to the authors of the 1st / 2nd / 3rd most-reacted posts.
 const POINTS_BY_RANK = [5, 3, 1];
 const RANK_WORDS = ['First', 'Second', 'Third'];
 
+// Second, independent points scale: 1 point per this many total reactions
+// received on a member's posts during the week (floored, remainder discarded).
+// Stacks with the podium points above; both feed the same leaderboard.
+const REACTIONS_PER_POINT = 10;
+
+// Third, independent points scale: podium points for the members who sent the
+// most messages during the week. Same shape as the reactions podium.
+const MESSAGE_POINTS_BY_RANK = [5, 3, 1];
+
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 
 // ---- helpers ---------------------------------------------------------------
 
-// A text channel literally named "general" that the bot can read and post in.
-const findGeneralChannel = (guild) => {
-    return guild.channels.cache.find((channel) => {
-        if (channel.type !== 0 || channel.name.toLowerCase() !== 'general') {
-            return false;
-        }
+// Where the scheduled recap posts, in order of preference:
+//   1. a text channel literally named "general",
+//   2. the guild's system channel (where Discord posts join messages),
+//   3. the topmost text channel the bot can post in.
+// Returns null only if the bot can't post anywhere in the guild.
+const findRecapChannel = (guild) => {
+    const canPost = (channel) => {
+        if (!channel || channel.type !== 0) return false;
         const perms = channel.permissionsFor(guild.members.me);
-        return perms && perms.has('ViewChannel') && perms.has('SendMessages');
-    });
+        return Boolean(perms && perms.has('ViewChannel') && perms.has('SendMessages'));
+    };
+
+    const general = guild.channels.cache.find(
+        (channel) => channel.type === 0 && channel.name.toLowerCase() === 'general' && canPost(channel)
+    );
+    if (general) return general;
+
+    if (canPost(guild.systemChannel)) return guild.systemChannel;
+
+    let topmost = null;
+    for (const channel of guild.channels.cache.values()) {
+        if (!canPost(channel)) continue;
+        if (!topmost || channel.rawPosition < topmost.rawPosition) topmost = channel;
+    }
+    return topmost;
 };
 
-// Scan the guild's readable text channels and return the top posts (by total
-// reaction count) created on or after `sinceDate`. Mirrors the batch-fetch
-// pattern used by commands/activity.js and commands/reactions.js.
-const collectTopPosts = async (guild, sinceDate) => {
+// Scan the guild's readable text channels for messages created on or after
+// `sinceDate` and return the top posts (by total reaction count), each author's
+// total reactions received, and each author's message count across the window.
+// Mirrors the batch-fetch pattern used by commands/activity.js and
+// commands/reactions.js.
+const collectWeeklyStats = async (guild, sinceDate) => {
     const channels = guild.channels.cache.filter((channel) =>
         channel.type === 0 &&
         channel.permissionsFor(guild.members.me)?.has('ViewChannel') &&
@@ -53,13 +83,20 @@ const collectTopPosts = async (guild, sinceDate) => {
     );
 
     const candidates = [];
+    // userId -> { userId, displayName, count }: every non-bot message counts.
+    const messagesByAuthor = new Map();
 
     for (const [, channel] of channels) {
         try {
             let lastMessageId = null;
             let messagesScanned = 0;
 
-            while (messagesScanned < MAX_MESSAGES_PER_CHANNEL) {
+            // No message cap: the recap must cover the full week, so the only
+            // bounds are the time window (pagination walks strictly backward,
+            // so the window edge is always reached) and channel history running
+            // out. Cost is 1 API call per 100 messages; discord.js queues
+            // through rate limits, and the scheduled job has no deadline.
+            for (;;) {
                 const fetchOptions = { limit: 100 };
                 if (lastMessageId) {
                     fetchOptions.before = lastMessageId;
@@ -76,10 +113,23 @@ const collectTopPosts = async (guild, sinceDate) => {
                         break;
                     }
 
-                    if (!msg.author.bot && msg.reactions.cache.size > 0) {
-                        const totalReactions = msg.reactions.cache.reduce((sum, r) => sum + r.count, 0);
-                        if (totalReactions > 0) {
-                            candidates.push({ message: msg, channel, totalReactions });
+                    if (!msg.author.bot) {
+                        // Message-count scale: every message counts.
+                        const authorId = msg.author.id;
+                        const counter = messagesByAuthor.get(authorId) || {
+                            userId: authorId,
+                            displayName: displayNameOf(msg),
+                            count: 0,
+                        };
+                        counter.count += 1;
+                        messagesByAuthor.set(authorId, counter);
+
+                        // Reaction scales: only reacted posts matter.
+                        if (msg.reactions.cache.size > 0) {
+                            const totalReactions = msg.reactions.cache.reduce((sum, r) => sum + r.count, 0);
+                            if (totalReactions > 0) {
+                                candidates.push({ message: msg, channel, totalReactions });
+                            }
                         }
                     }
 
@@ -89,6 +139,8 @@ const collectTopPosts = async (guild, sinceDate) => {
 
                 if (reachedWindowEdge) break;
             }
+
+            console.log(`Weekly recap: scanned ${messagesScanned} messages in #${channel.name}.`);
         } catch (channelError) {
             console.error(`Weekly recap: error scanning #${channel.name}:`, channelError.message);
         }
@@ -101,20 +153,65 @@ const collectTopPosts = async (guild, sinceDate) => {
         return a.message.createdTimestamp - b.message.createdTimestamp;
     });
 
-    return candidates.slice(0, POINTS_BY_RANK.length);
+    // Total reactions received per author across the whole window (not just
+    // the podium posts) — feeds the second points scale.
+    const reactionsByAuthor = new Map();
+    for (const candidate of candidates) {
+        const authorId = candidate.message.author.id;
+        const entry = reactionsByAuthor.get(authorId) || {
+            userId: authorId,
+            displayName: displayNameOf(candidate.message),
+            reactions: 0,
+        };
+        entry.reactions += candidate.totalReactions;
+        reactionsByAuthor.set(authorId, entry);
+    }
+
+    return {
+        topPosts: candidates.slice(0, POINTS_BY_RANK.length),
+        reactionsByAuthor,
+        messagesByAuthor,
+    };
 };
+
+// The week's top message senders, most first, capped to the podium size.
+const topChattersOf = (messagesByAuthor) =>
+    [...messagesByAuthor.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, MESSAGE_POINTS_BY_RANK.length);
 
 const displayNameOf = (message) => message.member?.displayName || message.author.username;
 
-// Map the ranked posts to point awards. The same author can appear twice (e.g.
-// they hold both first and second place); pointsStore adds atomically so the
-// totals stack correctly.
-const buildAwards = (topPosts) =>
-    topPosts.map((post, index) => ({
-        userId: post.message.author.id,
-        displayName: displayNameOf(post.message),
-        points: POINTS_BY_RANK[index],
-    }));
+/* Merge the three independent points scales into one award per member:
+ *   - podium points (5/3/1) for authoring the week's most-reacted posts,
+ *   - reaction points: floor(total reactions received / REACTIONS_PER_POINT),
+ *   - chatter points (5/3/1) for sending the most messages.
+ * A member can earn from all three (or hold two podium spots); everything sums.
+ * Members whose combined award is 0 are dropped. Exported for the tests.
+ */
+const computeAwards = (topPosts, reactionsByAuthor, messagesByAuthor = new Map()) => {
+    const awards = new Map();
+
+    const addAward = (userId, displayName, points) => {
+        const entry = awards.get(userId) || { userId, displayName, points: 0 };
+        entry.points += points;
+        awards.set(userId, entry);
+    };
+
+    topPosts.forEach((post, index) => {
+        addAward(post.message.author.id, displayNameOf(post.message), POINTS_BY_RANK[index]);
+    });
+
+    for (const entry of reactionsByAuthor.values()) {
+        addAward(entry.userId, entry.displayName, Math.floor(entry.reactions / REACTIONS_PER_POINT));
+    }
+
+    topChattersOf(messagesByAuthor).forEach((entry, index) => {
+        addAward(entry.userId, entry.displayName, MESSAGE_POINTS_BY_RANK[index]);
+    });
+
+    return [...awards.values()].filter((award) => award.points > 0);
+};
 
 const joinMentions = (ids) => {
     const mentions = ids.map((id) => `<@${id}>`);
@@ -133,7 +230,7 @@ const snippetOf = (message) => {
     return raw.length > 60 ? `${raw.slice(0, 57)}...` : raw;
 };
 
-const buildRecapPost = (topPosts, leaderboard) => {
+const buildRecapPost = (topPosts, leaderboard, topChatters = []) => {
     const winnerIds = [...new Set(topPosts.map((post) => post.message.author.id))];
 
     const content = winnerIds.length
@@ -150,6 +247,16 @@ const buildRecapPost = (topPosts, leaderboard) => {
               .join('\n')
         : 'No proclamation earned the people\'s favor this past sennight.';
 
+    const chattersText = topChatters.length
+        ? topChatters
+              .map((entry, index) => {
+                  const rank = RANK_WORDS[index] || `Rank ${index + 1}`;
+                  const messages = entry.count === 1 ? 'proclamation' : 'proclamations';
+                  return `**${rank}:** ${entry.displayName} — ${entry.count} ${messages}`;
+              })
+              .join('\n')
+        : 'The court sat silent this past sennight.';
+
     const boardText = leaderboard.length
         ? leaderboard
               .map((entry, index) => {
@@ -165,9 +272,10 @@ const buildRecapPost = (topPosts, leaderboard) => {
         .setDescription('A chronicle of the realm\'s most celebrated words this past sennight, and the standings of honor.')
         .addFields(
             { name: 'Most Celebrated Proclamations', value: postsText },
+            { name: 'Most Prolific Voices', value: chattersText },
             { name: 'Running Tally of Honor', value: boardText }
         )
-        .setFooter({ text: 'Points: 5 for first, 3 for second, 1 for third. Awarded each Sunday.' })
+        .setFooter({ text: `Points each Sunday: 5/3/1 for the top proclamations, 5/3/1 for the most messages, plus 1 per ${REACTIONS_PER_POINT} marks of favor received.` })
         .setTimestamp();
 
     return {
@@ -182,7 +290,7 @@ const buildRecapPost = (topPosts, leaderboard) => {
 /* Run one recap.
  * options:
  *   guild         - a single guild to process (default: all guilds)
- *   targetChannel - where to post (default: each guild's #general)
+ *   targetChannel - where to post (default: each guild's #general or fallback)
  *   persist       - whether to write points to DynamoDB (default: false)
  */
 const runWeeklyRecap = async function (client, options = {}) {
@@ -193,19 +301,24 @@ const runWeeklyRecap = async function (client, options = {}) {
 
     for (const g of guilds) {
         try {
-            const channel = targetChannel || findGeneralChannel(g);
+            const channel = targetChannel || findRecapChannel(g);
             if (!channel) {
-                console.log(`Weekly recap: no #general channel found in "${g.name}"; skipping.`);
+                console.log(`Weekly recap: no channel the herald can post in found in "${g.name}"; skipping.`);
                 continue;
             }
 
-            const topPosts = await collectTopPosts(g, sinceDate);
+            const { topPosts, reactionsByAuthor, messagesByAuthor } = await collectWeeklyStats(g, sinceDate);
+            const topChatters = topChattersOf(messagesByAuthor);
 
-            if (persist && topPosts.length) {
-                try {
-                    await pointsStore.addPoints(g.id, buildAwards(topPosts));
-                } catch (storeError) {
-                    console.error('Weekly recap: failed to persist points:', storeError.message);
+            if (persist) {
+                const awards = computeAwards(topPosts, reactionsByAuthor, messagesByAuthor);
+                if (awards.length) {
+                    try {
+                        await pointsStore.addPoints(g.id, awards);
+                        console.log(`Weekly recap awards: ${awards.map((a) => `${a.displayName}+${a.points}`).join(', ')}`);
+                    } catch (storeError) {
+                        console.error('Weekly recap: failed to persist points:', storeError.message);
+                    }
                 }
             }
 
@@ -216,7 +329,7 @@ const runWeeklyRecap = async function (client, options = {}) {
                 console.error('Weekly recap: failed to load leaderboard:', storeError.message);
             }
 
-            await channel.send(buildRecapPost(topPosts, leaderboard));
+            await channel.send(buildRecapPost(topPosts, leaderboard, topChatters));
             console.log(`Weekly recap posted to #${channel.name} in "${g.name}" (${topPosts.length} honored, persist=${persist}).`);
         } catch (guildError) {
             console.error(`Weekly recap failed for guild "${g.name}":`, guildError);
@@ -245,4 +358,4 @@ const scheduleWeeklyRecap = function (client) {
     console.log(`Weekly recap scheduled: "${CRON_EXPRESSION}" (${TIMEZONE}) — Sundays at noon Eastern.`);
 };
 
-module.exports = { scheduleWeeklyRecap, runWeeklyRecap };
+module.exports = { scheduleWeeklyRecap, runWeeklyRecap, computeAwards, findRecapChannel };

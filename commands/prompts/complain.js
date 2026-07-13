@@ -1,6 +1,6 @@
-/* !complain <grievance> - records a user's comment as a GitHub issue.
+/* /complain <grievance> - records a user's comment as a GitHub issue.
  *
- * The Herald takes the message verbatim and files it as an issue in the repo,
+ * The Herald takes the grievance verbatim and files it as an issue in the repo,
  * titled "Request from <Discord tag> on <YYYY-MM-DD>", then replies in character
  * with a link to the issue.
  *
@@ -8,6 +8,8 @@
  * on the repo). The issue is authored by whoever owns that token. Repo defaults
  * to blondesean/Kings_Herald and can be overridden with GITHUB_REPO.
  */
+
+const { ApplicationCommandOptionType } = require('discord.js');
 
 const REPO = process.env.GITHUB_REPO || 'blondesean/Kings_Herald';
 
@@ -28,42 +30,43 @@ const handleFor = (author) =>
         ? `${author.username}#${author.discriminator}`
         : `@${author.username}`;
 
-const complain = async function (prefix, message) {
-    const grievance = message.content.slice(`${prefix}complain`.length).trim();
+const complain = async function (interaction) {
+    // Required slash option, so it's always present; length is still ours to police.
+    const grievance = interaction.options.getString('grievance').trim();
 
     if (!grievance) {
-        message.reply('Pray, good sir, speak thy grievance! Usage: `!complain <thy complaint>`');
+        await interaction.editReply('Pray, good sir, speak thy grievance!');
         return;
     }
 
     if (grievance.length > MAX_LENGTH) {
-        message.reply(`Forsooth, thy petition is most verbose! Pray shorten it beneath ${MAX_LENGTH} characters, Milord.`);
+        await interaction.editReply(`Forsooth, thy petition is most verbose! Pray shorten it beneath ${MAX_LENGTH} characters, Milord.`);
         return;
     }
 
     if (!process.env.GITHUB_TOKEN) {
         console.error('GITHUB_TOKEN not set; cannot file complaint.');
-        message.reply('Alack! The royal seal is missing and I cannot inscribe thy grievance in the ledger at this time.');
+        await interaction.editReply('Alack! The royal seal is missing and I cannot inscribe thy grievance in the ledger at this time.');
         return;
     }
 
     // Cooldown check
     const now = Date.now();
-    const last = lastComplaintAt.get(message.author.id) || 0;
+    const last = lastComplaintAt.get(interaction.user.id) || 0;
     if (now - last < COOLDOWN_MS) {
         const wait = Math.ceil((COOLDOWN_MS - (now - last)) / 1000);
-        message.reply(`Patience, good sir! Thou must wait ${wait} more second(s) ere lodging another grievance.`);
+        await interaction.editReply(`Patience, good sir! Thou must wait ${wait} more second(s) ere lodging another grievance.`);
         return;
     }
 
-    const tag = handleFor(message.author);
+    const tag = handleFor(interaction.user);
     const title = `Request from ${tag} on ${easternDate()}`;
 
     // Body: an in-character preamble, the user's words verbatim in a blockquote,
     // then a small attribution footer for traceability.
     const quoted = grievance.split('\n').map((line) => `> ${line}`).join('\n');
-    const guildName = message.guild?.name || 'the realm';
-    const channelName = message.channel?.name ? `#${message.channel.name}` : 'the court';
+    const guildName = interaction.guild?.name || 'the realm';
+    const channelName = interaction.channel?.name ? `#${interaction.channel.name}` : 'the court';
     const body = [
         'Hear ye! A petition from the realm, transcribed faithfully by thy Herald:',
         '',
@@ -74,7 +77,7 @@ const complain = async function (prefix, message) {
     ].join('\n');
 
     // Mark the cooldown before the request so rapid double-sends are blocked.
-    lastComplaintAt.set(message.author.id, now);
+    lastComplaintAt.set(interaction.user.id, now);
 
     try {
         const response = await fetch(`https://api.github.com/repos/${REPO}/issues`, {
@@ -93,19 +96,31 @@ const complain = async function (prefix, message) {
         if (!response.ok) {
             const errText = await response.text();
             console.error(`GitHub issue creation failed (${response.status}): ${errText}`);
-            lastComplaintAt.delete(message.author.id); // let them retry on our failure
-            message.reply('Alack! The royal scribes could not record thy grievance at this time. Pray try again anon, Milord.');
+            lastComplaintAt.delete(interaction.user.id); // let them retry on our failure
+            await interaction.editReply('Alack! The royal scribes could not record thy grievance at this time. Pray try again anon, Milord.');
             return;
         }
 
         const issue = await response.json();
         console.log(`Filed complaint as issue #${issue.number} for ${tag}`);
-        message.reply(`Thy grievance hath been recorded in the royal ledger, good sir! Behold: ${issue.html_url}`);
+        await interaction.editReply(`Thy grievance hath been recorded in the royal ledger, good sir! Behold: ${issue.html_url}`);
     } catch (error) {
         console.error('Error filing complaint:', error);
-        lastComplaintAt.delete(message.author.id);
-        message.reply('By my troth! Some misfortune befell the royal post and thy grievance was not delivered. Pray try again, Milord.');
+        lastComplaintAt.delete(interaction.user.id);
+        await interaction.editReply('By my troth! Some misfortune befell the royal post and thy grievance was not delivered. Pray try again, Milord.');
     }
 };
 
-module.exports = complain;
+module.exports = {
+    description: 'Petition the crown; thy words are inscribed in the royal ledger',
+    category: 'UTILITY',
+    options: [
+        {
+            name: 'grievance',
+            description: 'Thy complaint, recorded verbatim in the royal ledger',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+        },
+    ],
+    run: complain,
+};

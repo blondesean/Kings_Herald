@@ -1,9 +1,9 @@
-const activity = function (prefix, message) {
-    const channel = message.channel;
-    const guild = message.guild;
+const activity = function (interaction) {
+    const channel = interaction.channel;
+    const guild = interaction.guild;
 
     console.log(`Analyzing activity for channel: ${channel.name}`);
-    message.reply("Hark! I shall consult the royal ledgers to determine the most active nobles in this chamber... This may take a moment, good sir!");
+    interaction.editReply("Hark! I shall consult the royal ledgers to determine the most active nobles in this chamber... This may take a moment, good sir!");
 
     // Calculate date 30 days ago
     const thirtyDaysAgo = new Date();
@@ -105,13 +105,13 @@ const activity = function (prefix, message) {
 
         } catch (error) {
             console.error('Error analyzing channel activity:', error);
-            message.reply("Alack! The royal scribes have encountered difficulties reading the ancient scrolls. Pray try again later, Milord!");
+            interaction.followUp("Alack! The royal scribes have encountered difficulties reading the ancient scrolls. Pray try again later, Milord!");
         }
     };
 
     const generateActivityReport = () => {
         if (userStats.size === 0) {
-            message.reply("Forsooth! This chamber appears to have been most quiet these past thirty days, good sir. Nary a soul has stirred!");
+            interaction.followUp("Forsooth! This chamber appears to have been most quiet these past thirty days, good sir. Nary a soul has stirred!");
             return;
         }
 
@@ -173,11 +173,15 @@ const activity = function (prefix, message) {
         report += `Chamber: #${channel.name}\n\n`;
         report += `*"Such are the chronicles of activity in our noble court! May these statistics bring great joy to all who dwell herein!"*`;
 
-        message.reply(report);
+        interaction.followUp(report);
     };
 
     // Start the analysis
-    analyzeChannel();
+    return analyzeChannel();
 };
 
-module.exports = activity;
+module.exports = {
+    description: 'Report the most active nobles in this chamber',
+    category: 'ROYAL CHRONICLES',
+    run: activity,
+};

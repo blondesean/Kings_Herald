@@ -8,68 +8,84 @@ A Discord bot that plays the role of a medieval herald — announcing user title
 
 Kings_Herald is a Node.js process that connects to Discord's gateway using [discord.js](https://discord.js.org/) and a bot token. It responds to two gateway events and runs one scheduled job:
 
-1. **`messageCreate`** — every message in a channel the bot can see. If a message starts with the command prefix (`!`), the bot routes it to a handler in `commands/prompts/`.
+1. **`interactionCreate`** — slash-command invocations (`/ping`, `/whois`, ...). The bot immediately defers the reply (Discord requires an acknowledgment within 3 seconds; several commands scan history for longer) and routes to the handler in `commands/prompts/` or `commands/passive/preview/`.
 2. **`messageReactionAdd`** — every reaction on a message the bot can see. When a non-bot message hits 50 total reactions, the herald replies with a celebratory proclamation and pins it (`commands/passive/celebrate.js`).
-3. **Weekly recap** — every Sunday at noon Eastern the herald posts in `#general` celebrating the week's three most-reacted posts (linked, with their authors pinged) plus a running points leaderboard (5/3/1 for first/second/third place). Points persist in DynamoDB (`commands/passive/weeklyRecap.js`, `src/pointsStore.js`).
+3. **Weekly recap** — every Sunday at noon Eastern the herald posts in `#general` (falling back to the guild's system channel, then the topmost channel it can post in) celebrating the week's three most-reacted posts (linked, with their authors pinged) plus a running points leaderboard. Points come from three independent scales: 5/3/1 for the podium posts, 5/3/1 for the most messages sent, plus 1 point per 10 total reactions received across the week. Points persist in DynamoDB (`commands/passive/weeklyRecap.js`, `src/pointsStore.js`).
 
 `src/index.js` is the entry point. On startup it:
 
-- Reads every `.js` file in `./commands/prompts/` and `require`s it into a `commands` object keyed by filename (`commands/prompts/ping.js` → `commands.ping`). Passive behaviors in `commands/passive/` are wired into client events and schedules directly; `commands/retired/` is not loaded.
+- Reads every `.js` file in `./commands/prompts/` **and** `./commands/passive/preview/` and `require`s each into a `commands` object keyed by filename (`commands/prompts/ping.js` → `/ping`). Passive behaviors in `commands/passive/` are wired into client events and schedules directly; `commands/retired/` is not loaded.
 - Logs in with `DISCORD_BOT_TOKEN` from a local `.env` file.
-- Dispatches incoming commands by name in a simple `if/else` chain.
+- **Registers the slash commands with every guild it's in** (and any it later joins), built from each command's exported metadata. Registration is guild-scoped, so changes appear in Discord immediately after a restart — no propagation delay.
+- Dispatches interactions by registry lookup: `commands[name].run(interaction, commands)`. There is no hand-written dispatch chain — a command file is routable the moment it exists, and `/help` generates its listing from the same metadata.
 
 ### Passive vs prompt commands
 
 The bot has two distinct command styles, kept in separate folders:
 
-- **Prompt commands** (`commands/prompts/`) are *pull*: a human explicitly types `!<name>` and the bot replies. They are auto-loaded by filename into the `!` dispatcher in `src/index.js` — drop in a file, add a dispatcher branch, done. Everything in the [command table](#current-commands) below is one of these.
+- **Prompt commands** (`commands/prompts/`) are *pull*: a human explicitly invokes `/<name>` and the bot replies. They are auto-loaded by filename, registered with Discord, and dispatched from `src/index.js` — drop in a file, done. Everything in the [command table](#current-commands) below is one of these.
 - **Passive behaviors** (`commands/passive/`) are *push*: nobody types anything — the bot acts on its own in response to a gateway event or a schedule. Two exist today: `celebrate.js` (fires when a message crosses the reaction threshold) and `weeklyRecap.js` (the Sunday-noon recap). These are **not** auto-loaded; each is `require`d and wired to a specific client event or schedule by hand in `src/index.js`.
 
-Rule of thumb: if a human triggers it with `!`, it's a prompt command; if the bot decides to act on its own, it's a passive behavior.
+Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bot decides to act on its own, it's a passive behavior.
+
+**Preview commands** (`commands/passive/preview/`) bridge the two: a manual `/` trigger that fires a *scheduled* passive behavior on demand, so you can see its output without waiting for the schedule. Each scheduled passive behavior gets one, named to match. Today that's `recap.js` — `/recap` previews `weeklyRecap` in the current channel without awarding points. They dispatch exactly like prompt commands but live beside the behavior they preview and set `hidden: true`, which registers them as **admin-only in Discord** (`default_member_permissions: 0` — regular members don't even see them in the picker) and keeps them out of the generated `/help`. (Event-driven passives like `celebrate` aren't scheduled, so they have no preview.)
 
 ### Current commands
 
 | Command | What it does |
 | --- | --- |
-| `!ping` | Health check — replies "Pong!". |
-| `!test` | Returns a fixed string; used to verify the dispatcher. |
-| `!whois <name>` | Looks up a guild member (by username, nickname, or `@mention`) and announces their titles in herald style. |
-| `!reactions <name>` | Scans the past month of messages and reports the user's most-used reaction emojis. |
-| `!activity` | Scans the past 30 days of the current channel and reports top posters, repliers, reactors, and most-reacted-to. |
-| `!recap` | Previews the weekly recap (top 3 most-reacted posts of the past week + the points leaderboard) in the current channel, without awarding points. |
-| `!complain <text>` | Files the message verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
-| `!help` | Lists the available commands in the herald's voice. |
+| `/ping` | Health check — replies "Pong!". |
+| `/whois <member>` | Announces a member's titles (roles) in herald style. The member is picked from Discord's user selector. |
+| `/nobility` | Lists everyone with weekly-recap points, top to bottom, with the noble title their points have earned (a new rank every 5 points from 5 up — see `flavor_text/nobilityRanks.js` for the ladder). |
+| `/reactions [member]` | Scans the past month of messages and reports the member's most-used reaction emojis (defaults to whoever ran it). |
+| `/activity` | Scans the past 30 days of the current channel and reports top posters, repliers, reactors, and most-reacted-to. |
+| `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
+| `/help` | Lists the available commands in the herald's voice. |
+
+Two admin-only commands round it out (visible only to server admins in the picker): `/recap` — the [preview command](#passive-vs-prompt-commands) for the weekly recap — and `/test`, a dispatcher check.
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
 ## Adding a new command
 
-1. Create a new file at `commands/prompts/<name>.js`. The filename (minus `.js`) becomes the command keyword the user types after the `!` prefix. (Automatic, non-`!` behaviors go in `commands/passive/` instead and are wired up directly in `src/index.js`.)
-2. Export a single function. Two signatures are supported by the existing dispatcher:
-   - **No-arg, returns a string** (like `test.js`) — the dispatcher will `message.reply(commands.<name>())`.
-   - **`(prefix, message)`** (like `whois.js`, `reactions.js`, `activity.js`) — the command owns the reply and can do async work, fetch members, scan history, etc.
-3. Wire it into the dispatcher in `src/index.js` by adding a new `else if (command === "<name>")` branch.
+One step: create a file at `commands/prompts/<name>.js`. The filename (minus `.js`) becomes the slash-command name, the loader registers it with Discord on the next startup, and `/help` lists it from its metadata — **no dispatcher edit, no help edit, no manual registration.** (Automatic, non-`/` behaviors go in `commands/passive/` instead and are wired up directly in `src/index.js`.)
 
-Minimal template:
+Every command module exports the same shape:
 
 ```js
 // commands/prompts/greet.js
-const greet = function (prefix, message) {
-    const name = message.member?.displayName || message.author.username;
-    message.reply(`Well met, ${name}!`);
+const { ApplicationCommandOptionType } = require('discord.js');
+
+const greet = async function (interaction, commands) {
+    const member = interaction.options.getMember('member') || interaction.member;
+    await interaction.editReply(`Well met, ${member.displayName}!`);
 };
 
-module.exports = greet;
+module.exports = {
+    description: 'Offer a courtly greeting',   // shown in Discord's picker and /help (max 100 chars)
+    category: 'UTILITY',                       // /help group: NOBLE ANNOUNCEMENTS | ROYAL CHRONICLES | UTILITY
+    // hidden: true,                           // admin-only in Discord + omitted from /help
+    options: [                                 // slash-command arguments (optional)
+        {
+            name: 'member',
+            description: 'Whom to greet',
+            type: ApplicationCommandOptionType.User,  // .String, .Integer, .Boolean, ...
+            required: false,
+        },
+    ],
+    run: greet,
+};
 ```
 
-Then in `src/index.js`:
+Conventions the dispatcher establishes:
 
-```js
-} else if (command === "greet") {
-    console.log("Executing Greet Command");
-    commands.greet(prefix, origMessage);
-}
-```
+- `run` receives `(interaction, commands)` — `commands` is the loaded registry, which most commands ignore (`/help` uses it to generate its scroll).
+- The dispatcher has **already called `deferReply()`** before `run` executes, so the 3-second acknowledgment deadline is handled. Send your first response with `interaction.editReply(...)` and any additional messages with `interaction.followUp(...)`.
+- Read arguments from typed options (`interaction.options.getMember('member')`, `.getString('grievance')`, ...) — there is no string parsing.
+- The loader skips any module without a `run` function and logs an error, so a malformed file can't break dispatch. If `run` throws, the dispatcher catches it and apologizes in character.
+- Command names must be Discord-valid: lowercase letters, digits, `-`, `_`.
+
+**Adding a preview for a scheduled passive behavior:** if you add a new scheduled behavior in `commands/passive/`, give it a matching preview command in `commands/passive/preview/<name>.js` — same module shape, calling the behavior's exported runner with `persist: false`, and set `hidden: true` so it registers admin-only and stays out of `/help`. See `commands/passive/preview/recap.js` for the pattern.
 
 ### Style notes
 
@@ -93,7 +109,7 @@ Either way, create the dev bot once as below; local dev reads its token from `.e
 - A Discord application + bot user. Create one at <https://discord.com/developers/applications>, then:
   - Under **Bot**, copy the token.
   - Enable the **Message Content**, **Server Members**, and **Presence** privileged intents.
-  - Under **OAuth2 → URL Generator**, select the `bot` scope and the permissions the bot needs (Read Messages, Send Messages, Read Message History, Add Reactions, Manage Messages for pinning). Use the generated URL to invite the bot to a test server.
+  - Under **OAuth2 → URL Generator**, select **both** the `bot` and `applications.commands` scopes (the second is what allows slash commands to register), plus the permissions the bot needs (Read Messages, Send Messages, Read Message History, Add Reactions, Manage Messages for pinning). Use the generated URL to invite the bot to a test server. If you invited the bot before slash commands existed, re-run the invite URL with both scopes — no need to kick it first.
 
 ### Setup
 
@@ -115,7 +131,7 @@ DISCORD_BOT_TOKEN=MTEzNDU2Nzg5MDEyMzQ1Njc4OQ.AbCdEf.your-real-token-here
 GITHUB_TOKEN=github_pat_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-`DISCORD_BOT_TOKEN` is required. `GITHUB_TOKEN` is required for the `!complain` command — a fine-grained personal access token scoped to **Issues: write** on `blondesean/Kings_Herald` (issues are authored by whoever owns the token). The remaining variables are optional and set automatically in production by the CDK stack:
+`DISCORD_BOT_TOKEN` is required. `GITHUB_TOKEN` is required for the `/complain` command — a fine-grained personal access token scoped to **Issues: write** on `blondesean/Kings_Herald` (issues are authored by whoever owns the token). The remaining variables are optional and set automatically in production by the CDK stack:
 
 - `GITHUB_REPO` — the `owner/repo` to file complaints into. Defaults to `blondesean/Kings_Herald`.
 - `POINTS_TABLE_NAME` — the DynamoDB table name. If unset (the default locally), the recap still runs and posts the top 3, but the leaderboard is skipped — so you can develop without AWS.
@@ -148,12 +164,14 @@ Or, for auto-reload during development:
 npx nodemon src/index.js
 ```
 
-You should see `King's <bot-name> is online.` in the console. Type `!ping` in any channel the bot can see and it should reply `Pong!`.
+You should see `King's <bot-name> is online.` followed by `Registered N slash commands in "<server>"` in the console. Type `/ping` in any channel the bot can see and it should reply `Pong!`.
 
 ### Troubleshooting
 
-- **Bot logs in but doesn't respond to commands** — make sure the **Message Content Intent** is enabled in the Discord developer portal *and* that the bot has Read Messages + Send Messages permissions in the channel.
-- **`!whois` / `!reactions` can't find members** — the **Server Members Intent** must be enabled in the developer portal.
+- **Slash commands don't appear in the picker** — the bot was invited without the `applications.commands` scope. Re-run the OAuth2 invite URL with both `bot` and `applications.commands` checked. Also confirm the console showed the `Registered N slash commands` line — registration happens on startup.
+- **Commands appear but fail or hang** — make sure the **Message Content Intent** is enabled in the developer portal (the history-scanning commands need it) and the bot has Read Messages + Send Messages permissions in the channel.
+- **`Used disallowed intents` on startup** — enable all three privileged intents (**Presence**, **Server Members**, **Message Content**) under Bot in the developer portal.
+- **`/recap` and `/test` are missing** — they're admin-only (`hidden: true`); only server admins see them in the picker.
 - **`Invalid token`** — re-copy from the developer portal; tokens reset whenever you click "Reset Token".
 
 ## Hosting on AWS
@@ -164,7 +182,7 @@ The bot runs as a long-lived [Fargate](https://docs.aws.amazon.com/AmazonECS/lat
 
 - **ECR** — private container registry holding the bot image (built from the repo's `Dockerfile`).
 - **ECS Fargate** — runs the bot task, 256 CPU / 512 MB, on **Fargate Spot** (~70% cheaper; a reclaimed task just restarts and reconnects). No load balancer; the bot has no inbound traffic, only an outbound WebSocket to Discord.
-- **SSM Parameter Store** — `SecureString` parameters hold the secrets (Discord bot token + GitHub PAT for `!complain`). The task definition references them by name; the values never live in source or image.
+- **SSM Parameter Store** — `SecureString` parameters hold the secrets (Discord bot token + GitHub PAT for `/complain`). The task definition references them by name; the values never live in source or image.
 - **DynamoDB** — a small on-demand table holds the weekly-recap points leaderboard, the bot's only persistent state, so standings survive restarts and redeploys.
 - **CloudWatch Logs** — `console.log` output ships to the environment's log group.
 - **VPC** — a public-only VPC (no NAT gateway); the task gets a public IP for outbound Discord traffic and no inbound rules.
@@ -338,7 +356,7 @@ aws ssm put-parameter `
   --region us-east-1
 ```
 
-The `!complain` command also needs a GitHub token in `SecureString` parameter `/kings-herald/github-token` — a fine-grained PAT with **Issues: write** on the repo. Seed it the same way (add `--overwrite` to update):
+The `/complain` command also needs a GitHub token in `SecureString` parameter `/kings-herald/github-token` — a fine-grained PAT with **Issues: write** on the repo. Seed it the same way (add `--overwrite` to update):
 
 ```powershell
 aws ssm put-parameter `

@@ -13,6 +13,7 @@ module.exports = {
     celebrationAdjectives: require('./celebrationAdjectives'),
     celebrationTemplates: require('./celebrationTemplates'),
     rankTitles: require('./rankTitles'),
+    nobilityRanks: require('./nobilityRanks'),
     noReactionsResponses: require('./noReactionsResponses'),
     royalAdjectives: require('./royalAdjectives'),
     heraldResponses: require('./heraldResponses'),
