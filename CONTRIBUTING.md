@@ -87,7 +87,7 @@ Even an empty server with just you in it is fine.
 
 1. Back in the developer portal for your dev application, go to **OAuth2** → **URL Generator**.
 2. Under **Scopes**, tick **bot** *and* **applications.commands** (the second lets the bot register its slash commands).
-3. Under **Bot Permissions**, tick: View Channels, Send Messages, Read Message History, Add Reactions, Manage Messages, Embed Links.
+3. Under **Bot Permissions**, tick: View Channels, Send Messages, Read Message History, Embed Links, Manage Messages. (The README's "Discord access reference" section explains what each one is for.)
 4. Copy the URL at the bottom of the page, paste it into a browser, choose your test server from Step 4, and authorize.
 
 Your dev bot will now appear in your test server's member list (showing as offline until you start the code).

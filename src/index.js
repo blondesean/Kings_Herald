@@ -80,14 +80,16 @@ loadCommandsFrom(promptsPath, 'Command');
 loadCommandsFrom(previewPath, 'Preview Command');
 
 //Build the slash-command registration payload from the loaded metadata.
-//hidden commands register with no member permissions, so only admins see them.
+//hidden commands (preview, test utilities) are excluded entirely — they don't
+//appear in the picker for anyone, including admins.
 const commandDefinitions = () =>
-    Object.entries(commands).map(([name, cmd]) => ({
-        name,
-        description: cmd.description.slice(0, 100), // Discord caps descriptions at 100 chars
-        options: cmd.options || [],
-        defaultMemberPermissions: cmd.hidden ? '0' : null,
-    }));
+    Object.entries(commands)
+        .filter(([, cmd]) => !cmd.hidden)
+        .map(([name, cmd]) => ({
+            name,
+            description: cmd.description.slice(0, 100), // Discord caps descriptions at 100 chars
+            options: cmd.options || [],
+        }));
 
 //Register the commands with one guild, replacing whatever was there before.
 const registerCommands = (guild) => {

@@ -47,7 +47,7 @@ const help = async function (interaction, commands) {
         sections.join('\n\n') + `\n\n` +
 
         `**AUTOMATIC ROYAL SERVICES**\n` +
-        `*Royal acclaim for messages with fifty or more marks of favor*\n` +
+        `*Royal acclaim for messages with five-and-twenty or more marks of favor*\n` +
         `*Each Sunday at noon, a chronicle of the week's most-celebrated posts and the standings of honor, proclaimed in the town square*\n\n` +
 
         `*"I remain thy humble servant, ready to herald thy greatness throughout the realm!"*`;

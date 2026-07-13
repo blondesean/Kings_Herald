@@ -11,7 +11,7 @@ A Discord bot that plays the role of a medieval herald — announcing user title
 Kings_Herald is a Node.js process that connects to Discord's gateway using [discord.js](https://discord.js.org/) and a bot token. It responds to two gateway events and runs one scheduled job:
 
 1. **`interactionCreate`** — slash-command invocations (`/ping`, `/whois`, ...). The bot immediately defers the reply (Discord requires an acknowledgment within 3 seconds; several commands scan history for longer) and routes to the handler in `commands/prompts/` or `commands/passive/preview/`.
-2. **`messageReactionAdd`** — every reaction on a message the bot can see. When a non-bot message hits 50 total reactions, the herald replies with a celebratory proclamation and pins it (`commands/passive/celebrate.js`).
+2. **`messageReactionAdd`** — every reaction on a message the bot can see. When a non-bot message hits 25 total reactions, the herald replies with a celebratory proclamation and pins it (`commands/passive/celebrate.js`).
 3. **Weekly recap** — every Sunday at noon Eastern the herald posts in `#general` (falling back to the guild's system channel, then the topmost channel it can post in) celebrating the week's three most-reacted posts (linked, with their authors pinged) plus a running points leaderboard. Points come from three independent scales: 5/3/1 for the podium posts, 5/3/1 for the most messages sent, plus 1 point per 10 total reactions received across the week. Points persist in DynamoDB (`commands/passive/weeklyRecap.js`, `src/pointsStore.js`).
 
 `src/index.js` is the entry point. On startup it:
@@ -19,7 +19,7 @@ Kings_Herald is a Node.js process that connects to Discord's gateway using [disc
 - Reads every `.js` file in `./commands/prompts/` **and** `./commands/passive/preview/` and `require`s each into a `commands` object keyed by filename (`commands/prompts/ping.js` → `/ping`). Passive behaviors in `commands/passive/` are wired into client events and schedules directly; `commands/retired/` is not loaded.
 - Logs in with `DISCORD_BOT_TOKEN` from a local `.env` file.
 - **Registers the slash commands with every guild it's in** (and any it later joins), built from each command's exported metadata. Registration is guild-scoped, so changes appear in Discord immediately after a restart — no propagation delay.
-- Dispatches interactions by registry lookup: `commands[name].run(interaction, commands)`. There is no hand-written dispatch chain — a command file is routable the moment it exists, and `/help` generates its listing from the same metadata.
+- Dispatches interactions by registry lookup: `commands[name].run(interaction, commands)`. There is no hand-written dispatch chain — a command file is routable the moment it exists.
 
 ### Passive vs prompt commands
 
@@ -30,7 +30,7 @@ The bot has two distinct command styles, kept in separate folders:
 
 Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bot decides to act on its own, it's a passive behavior.
 
-**Preview commands** (`commands/passive/preview/`) bridge the two: a manual `/` trigger that fires a *scheduled* passive behavior on demand, so you can see its output without waiting for the schedule. Each scheduled passive behavior gets one, named to match. Today that's `recap.js` — `/recap` previews `weeklyRecap` in the current channel without awarding points. They dispatch exactly like prompt commands but live beside the behavior they preview and set `hidden: true`, which registers them as **admin-only in Discord** (`default_member_permissions: 0` — regular members don't even see them in the picker) and keeps them out of the generated `/help`. (Event-driven passives like `celebrate` aren't scheduled, so they have no preview.)
+**Preview commands** (`commands/passive/preview/`) bridge the two: a manual `/` trigger that fires a *scheduled* passive behavior on demand, so you can see its output without waiting for the schedule. Each scheduled passive behavior gets one, named to match. Today that's `recap.js` — `/recap` previews `weeklyRecap` in the current channel without awarding points. They dispatch exactly like prompt commands but live beside the behavior they preview and set `hidden: true`, which **excludes them from Discord registration entirely** — nobody sees them in the picker, including admins — and keeps them out of the generated `/help`. To manually trigger one, call its exported runner directly from a test script or the Node REPL. (Event-driven passives like `celebrate` aren't scheduled, so they have no preview.)
 
 ### Current commands
 
@@ -42,15 +42,14 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/reactions [member]` | Scans the past month of messages and reports the member's most-used reaction emojis (defaults to whoever ran it). |
 | `/activity` | Scans the past 30 days of the current channel and reports top posters, repliers, reactors, and most-reacted-to. |
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
-| `/help` | Lists the available commands in the herald's voice. |
 
-Two admin-only commands round it out (visible only to server admins in the picker): `/recap` — the [preview command](#passive-vs-prompt-commands) for the weekly recap — and `/test`, a dispatcher check.
+Two [preview commands](#passive-vs-prompt-commands) exist (`/recap` for the weekly recap and `/test` for dispatch) but are not registered with Discord — they are not visible in the picker for anyone. The weekly recap still fires on its Sunday cron schedule regardless.
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
 ## Adding a new command
 
-One step: create a file at `commands/prompts/<name>.js`. The filename (minus `.js`) becomes the slash-command name, the loader registers it with Discord on the next startup, and `/help` lists it from its metadata — **no dispatcher edit, no help edit, no manual registration.** (Automatic, non-`/` behaviors go in `commands/passive/` instead and are wired up directly in `src/index.js`.)
+One step: create a file at `commands/prompts/<name>.js`. The filename (minus `.js`) becomes the slash-command name, the loader registers it with Discord on the next startup — **no dispatcher edit, no manual registration.** (Automatic, non-`/` behaviors go in `commands/passive/` instead and are wired up directly in `src/index.js`.)
 
 Every command module exports the same shape:
 
@@ -64,9 +63,9 @@ const greet = async function (interaction, commands) {
 };
 
 module.exports = {
-    description: 'Offer a courtly greeting',   // shown in Discord's picker and /help (max 100 chars)
-    category: 'UTILITY',                       // /help group: NOBLE ANNOUNCEMENTS | ROYAL CHRONICLES | UTILITY
-    // hidden: true,                           // admin-only in Discord + omitted from /help
+    description: 'Offer a courtly greeting',   // shown in Discord's command picker (max 100 chars)
+    category: 'UTILITY',                       // NOBLE ANNOUNCEMENTS | ROYAL CHRONICLES | UTILITY
+    // hidden: true,                           // excludes from Discord registration entirely
     options: [                                 // slash-command arguments (optional)
         {
             name: 'member',
@@ -81,13 +80,13 @@ module.exports = {
 
 Conventions the dispatcher establishes:
 
-- `run` receives `(interaction, commands)` — `commands` is the loaded registry, which most commands ignore (`/help` uses it to generate its scroll).
+- `run` receives `(interaction, commands)` — `commands` is the loaded registry (available to commands that need to inspect siblings; most ignore it).
 - The dispatcher has **already called `deferReply()`** before `run` executes, so the 3-second acknowledgment deadline is handled. Send your first response with `interaction.editReply(...)` and any additional messages with `interaction.followUp(...)`.
 - Read arguments from typed options (`interaction.options.getMember('member')`, `.getString('grievance')`, ...) — there is no string parsing.
 - The loader skips any module without a `run` function and logs an error, so a malformed file can't break dispatch. If `run` throws, the dispatcher catches it and apologizes in character.
 - Command names must be Discord-valid: lowercase letters, digits, `-`, `_`.
 
-**Adding a preview for a scheduled passive behavior:** if you add a new scheduled behavior in `commands/passive/`, give it a matching preview command in `commands/passive/preview/<name>.js` — same module shape, calling the behavior's exported runner with `persist: false`, and set `hidden: true` so it registers admin-only and stays out of `/help`. See `commands/passive/preview/recap.js` for the pattern.
+**Adding a preview for a scheduled passive behavior:** if you add a new scheduled behavior in `commands/passive/`, give it a matching preview command in `commands/passive/preview/<name>.js` — same module shape, calling the behavior's exported runner with `persist: false`, and set `hidden: true` so it is excluded from Discord registration. See `commands/passive/preview/recap.js` for the pattern.
 
 ### Style notes
 
@@ -110,8 +109,54 @@ Either way, create the dev bot once as below; local dev reads its token from `.e
 - Node.js 18 or newer.
 - A Discord application + bot user. Create one at <https://discord.com/developers/applications>, then:
   - Under **Bot**, copy the token.
-  - Enable the **Message Content**, **Server Members**, and **Presence** privileged intents.
-  - Under **OAuth2 → URL Generator**, select **both** the `bot` and `applications.commands` scopes (the second is what allows slash commands to register), plus the permissions the bot needs (Read Messages, Send Messages, Read Message History, Add Reactions, Manage Messages for pinning). Use the generated URL to invite the bot to a test server. If you invited the bot before slash commands existed, re-run the invite URL with both scopes — no need to kick it first.
+  - Enable the privileged intents and invite the bot per the [Discord access reference](#discord-access-reference) below. If you invited the bot before slash commands existed, re-run the invite URL with both scopes — no need to kick it first.
+
+### Discord access reference
+
+The single source of truth for everything the bot needs from Discord. Three separate kinds of access, configured in different places:
+
+**OAuth scopes** (chosen in the invite URL — OAuth2 → URL Generator):
+
+| Scope | Why |
+| --- | --- |
+| `bot` | Adds the bot user to the server. Without it, the bot never appears in the member list. |
+| `applications.commands` | Lets the bot register slash commands in the server. Without it, `/` commands never appear in the picker. |
+
+**Privileged gateway intents** (toggled in the developer portal under Bot — these are app-wide, not per-server):
+
+| Intent | Why |
+| --- | --- |
+| Message Content | The history-scanning features (`/activity`, `/reactions`, weekly recap) read message text and reactions. |
+| Server Members | Member lookups and display names (`/whois`, recap author names). |
+| Presence | Currently unused by the code, but enabled historically; safe to leave on. |
+
+Missing intents fail loudly: the bot exits with `Used disallowed intents` at startup.
+
+**Bot permissions** (chosen in the invite URL; can also be fixed later via a server role):
+
+| Permission | Used by |
+| --- | --- |
+| View Channels | Everything. |
+| Send Messages | Every reply and proclamation. |
+| Read Message History | `/activity`, `/reactions`, weekly recap scans. |
+| Embed Links | The weekly recap's rich embed (without this the embed silently fails to render). |
+| Manage Messages | Pinning celebrated posts (`celebrate.js`). |
+
+Add Reactions is **not** currently needed — nothing in the code adds reactions.
+
+Ready-made invite URLs (`93184` encodes exactly the five permissions above):
+
+**Production bot:**
+```
+https://discord.com/oauth2/authorize?client_id=759480089016270879&scope=bot+applications.commands&permissions=93184
+```
+
+**Dev bot:**
+```
+https://discord.com/oauth2/authorize?client_id=1525947821746946139&scope=bot+applications.commands&permissions=93184
+```
+
+Missing permissions fail quietly (no embed, failed pin, silent bot), so if a feature half-works, check this table first.
 
 ### Setup
 
@@ -173,7 +218,7 @@ You should see `King's <bot-name> is online.` followed by `Registered N slash co
 - **Slash commands don't appear in the picker** — the bot was invited without the `applications.commands` scope. Re-run the OAuth2 invite URL with both `bot` and `applications.commands` checked. Also confirm the console showed the `Registered N slash commands` line — registration happens on startup.
 - **Commands appear but fail or hang** — make sure the **Message Content Intent** is enabled in the developer portal (the history-scanning commands need it) and the bot has Read Messages + Send Messages permissions in the channel.
 - **`Used disallowed intents` on startup** — enable all three privileged intents (**Presence**, **Server Members**, **Message Content**) under Bot in the developer portal.
-- **`/recap` and `/test` are missing** — they're admin-only (`hidden: true`); only server admins see them in the picker.
+- **`/recap` and `/test` are missing** — expected. Preview commands (`hidden: true`) are not registered with Discord at all; they don't appear in the picker for anyone. The cron still fires the recap on schedule.
 - **`Invalid token`** — re-copy from the developer portal; tokens reset whenever you click "Reset Token".
 
 ## Hosting on AWS

@@ -7,16 +7,21 @@ Regenerate after committing and commit the refreshed file.*
 
 ## 2026-07-12
 
-- New nobility feature system (`1f3fb89`)
-- QoL Documentation (`1eb84cd`)
-- cost savings to fargate spot (`11c74be`)
-- Organizing commands (`0bc1807`)
+- Update Log Added (`dc2cfdd`)
+- New nobility feature system (`a9a7c61`)
+- QoL Documentation (`d2fe31b`)
+- cost savings to fargate spot (`44b353d`)
+- Organizing commands (`160a34c`)
 
 ## 2026-06-28
 
-- complain command added (`6d0962c`)
-- added pasive commands directory, dynamo DB message point storage (`f37e087`)
+- complain command added (`7c4d1f0`)
+- added pasive commands directory, dynamo DB message point storage (`5d91494`)
 - reduced sensitivity 5x on pinning reaction emoji posts (`46abf05`)
+
+## 2026-07-03
+
+- Loosen pin reaction a bit (`93be75e`)
 
 ## 2026-06-24
 
