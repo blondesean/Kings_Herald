@@ -2,6 +2,8 @@
 
 A Discord bot that plays the role of a medieval herald — announcing user titles, chronicling channel activity, and proclaiming popular posts.
 
+> **What's changed lately?** [UPDATELOG.md](UPDATELOG.md) chronicles every change by date, generated from git history (`npm run updatelog` to refresh).
+
 > **New contributor?** Start with [CONTRIBUTING.md](CONTRIBUTING.md) — it's a zero-to-running-locally walkthrough (install Node, clone the repo, create your own dev Discord application, populate `.env`, run, make a change, open a PR). The rest of this README is the maintainer-facing reference: how the bot is structured, how to add commands, and how the AWS infra works.
 
 ## How it works
