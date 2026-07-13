@@ -19,7 +19,7 @@ Kings_Herald is a Node.js process that connects to Discord's gateway using [disc
 - Reads every `.js` file in `./commands/prompts/` **and** `./commands/passive/preview/` and `require`s each into a `commands` object keyed by filename (`commands/prompts/ping.js` → `/ping`). Passive behaviors in `commands/passive/` are wired into client events and schedules directly; `commands/retired/` is not loaded.
 - Logs in with `DISCORD_BOT_TOKEN` from a local `.env` file.
 - **Registers the slash commands with every guild it's in** (and any it later joins), built from each command's exported metadata. Registration is guild-scoped, so changes appear in Discord immediately after a restart — no propagation delay.
-- Dispatches interactions by registry lookup: `commands[name].run(interaction, commands)`. There is no hand-written dispatch chain — a command file is routable the moment it exists.
+- Dispatches interactions by registry lookup: `commands[name].run(interaction, commands)`. There is no hand-written dispatch chain — a command file is routable the moment it exists, and `/help` generates its listing from the same metadata.
 
 ### Passive vs prompt commands
 
@@ -42,14 +42,15 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/reactions [member]` | Scans the past month of messages and reports the member's most-used reaction emojis (defaults to whoever ran it). |
 | `/activity` | Scans the past 30 days of the current channel and reports top posters, repliers, reactors, and most-reacted-to. |
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
+| `/help` | Lists the available commands in the herald's voice. |
 
-Two [preview commands](#passive-vs-prompt-commands) exist (`/recap` for the weekly recap and `/test` for dispatch) but are not registered with Discord — they are not visible in the picker for anyone. The weekly recap still fires on its Sunday cron schedule regardless.
+One [preview command](#passive-vs-prompt-commands) exists (`/recap`, for the weekly recap) but is not registered with Discord — it is not visible in the picker for anyone. The weekly recap still fires on its Sunday cron schedule regardless.
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
 ## Adding a new command
 
-One step: create a file at `commands/prompts/<name>.js`. The filename (minus `.js`) becomes the slash-command name, the loader registers it with Discord on the next startup — **no dispatcher edit, no manual registration.** (Automatic, non-`/` behaviors go in `commands/passive/` instead and are wired up directly in `src/index.js`.)
+One step: create a file at `commands/prompts/<name>.js`. The filename (minus `.js`) becomes the slash-command name, the loader registers it with Discord on the next startup, and `/help` lists it from its metadata — **no dispatcher edit, no help edit, no manual registration.** (Automatic, non-`/` behaviors go in `commands/passive/` instead and are wired up directly in `src/index.js`.)
 
 Every command module exports the same shape:
 
@@ -63,8 +64,8 @@ const greet = async function (interaction, commands) {
 };
 
 module.exports = {
-    description: 'Offer a courtly greeting',   // shown in Discord's command picker (max 100 chars)
-    category: 'UTILITY',                       // NOBLE ANNOUNCEMENTS | ROYAL CHRONICLES | UTILITY
+    description: 'Offer a courtly greeting',   // shown in Discord's picker and /help (max 100 chars)
+    category: 'UTILITY',                       // /help group: NOBLE ANNOUNCEMENTS | ROYAL CHRONICLES | UTILITY
     // hidden: true,                           // excludes from Discord registration entirely
     options: [                                 // slash-command arguments (optional)
         {
@@ -80,7 +81,7 @@ module.exports = {
 
 Conventions the dispatcher establishes:
 
-- `run` receives `(interaction, commands)` — `commands` is the loaded registry (available to commands that need to inspect siblings; most ignore it).
+- `run` receives `(interaction, commands)` — `commands` is the loaded registry, which most commands ignore (`/help` uses it to generate its scroll).
 - The dispatcher has **already called `deferReply()`** before `run` executes, so the 3-second acknowledgment deadline is handled. Send your first response with `interaction.editReply(...)` and any additional messages with `interaction.followUp(...)`.
 - Read arguments from typed options (`interaction.options.getMember('member')`, `.getString('grievance')`, ...) — there is no string parsing.
 - The loader skips any module without a `run` function and logs an error, so a malformed file can't break dispatch. If `run` throws, the dispatcher catches it and apologizes in character.
@@ -218,7 +219,7 @@ You should see `King's <bot-name> is online.` followed by `Registered N slash co
 - **Slash commands don't appear in the picker** — the bot was invited without the `applications.commands` scope. Re-run the OAuth2 invite URL with both `bot` and `applications.commands` checked. Also confirm the console showed the `Registered N slash commands` line — registration happens on startup.
 - **Commands appear but fail or hang** — make sure the **Message Content Intent** is enabled in the developer portal (the history-scanning commands need it) and the bot has Read Messages + Send Messages permissions in the channel.
 - **`Used disallowed intents` on startup** — enable all three privileged intents (**Presence**, **Server Members**, **Message Content**) under Bot in the developer portal.
-- **`/recap` and `/test` are missing** — expected. Preview commands (`hidden: true`) are not registered with Discord at all; they don't appear in the picker for anyone. The cron still fires the recap on schedule.
+- **`/recap` is missing** — expected. Preview commands (`hidden: true`) are not registered with Discord at all; they don't appear in the picker for anyone. The cron still fires the recap on schedule.
 - **`Invalid token`** — re-copy from the developer portal; tokens reset whenever you click "Reset Token".
 
 ## Hosting on AWS

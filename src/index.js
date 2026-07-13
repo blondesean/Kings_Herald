@@ -80,7 +80,7 @@ loadCommandsFrom(promptsPath, 'Command');
 loadCommandsFrom(previewPath, 'Preview Command');
 
 //Build the slash-command registration payload from the loaded metadata.
-//hidden commands (preview, test utilities) are excluded entirely — they don't
+//hidden commands (preview commands) are excluded entirely — they don't
 //appear in the picker for anyone, including admins.
 const commandDefinitions = () =>
     Object.entries(commands)
