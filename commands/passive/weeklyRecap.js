@@ -192,25 +192,72 @@ const displayNameOf = (message) => message.member?.displayName || message.author
 const computeAwards = (topPosts, reactionsByAuthor, messagesByAuthor = new Map()) => {
     const awards = new Map();
 
-    const addAward = (userId, displayName, points) => {
-        const entry = awards.get(userId) || { userId, displayName, points: 0 };
+    // breakdown entries record *why* each point was awarded so the run can be
+    // logged and audited later (see logAwardBreakdown) — the source scale,
+    // the points from that scale alone, and a human-readable detail.
+    const addAward = (userId, displayName, points, source, detail) => {
+        if (points <= 0) return;
+        const entry = awards.get(userId) || { userId, displayName, points: 0, breakdown: [] };
         entry.points += points;
+        entry.breakdown.push({ source, points, detail });
         awards.set(userId, entry);
     };
 
     topPosts.forEach((post, index) => {
-        addAward(post.message.author.id, displayNameOf(post.message), POINTS_BY_RANK[index]);
+        addAward(
+            post.message.author.id,
+            displayNameOf(post.message),
+            POINTS_BY_RANK[index],
+            'podium',
+            `rank ${index + 1} of ${POINTS_BY_RANK.length} most-reacted posts`
+        );
     });
 
     for (const entry of reactionsByAuthor.values()) {
-        addAward(entry.userId, entry.displayName, Math.floor(entry.reactions / REACTIONS_PER_POINT));
+        addAward(
+            entry.userId,
+            entry.displayName,
+            Math.floor(entry.reactions / REACTIONS_PER_POINT),
+            'reactions',
+            `${entry.reactions} total marks of favor across the week`
+        );
     }
 
     topChattersOf(messagesByAuthor).forEach((entry, index) => {
-        addAward(entry.userId, entry.displayName, MESSAGE_POINTS_BY_RANK[index]);
+        addAward(
+            entry.userId,
+            entry.displayName,
+            MESSAGE_POINTS_BY_RANK[index],
+            'chatter',
+            `rank ${index + 1} of ${MESSAGE_POINTS_BY_RANK.length} most messages (${entry.count} sent)`
+        );
     });
 
     return [...awards.values()].filter((award) => award.points > 0);
+};
+
+// Log exactly how each member's points for this run were derived — one line
+// per source (podium / reactions / chatter) — so a run can be audited in
+// CloudWatch after the fact without re-deriving it from Discord history.
+// Called on every run, persisted or not, so `/recap` previews can be used to
+// verify a week's math ad hoc without touching the stored leaderboard.
+// `runLabel` (e.g. "scheduled" vs "preview") tags every line so the two are
+// distinguishable in CloudWatch — both write to the same log stream, since
+// scheduled runs and manual /recap previews happen inside the same task.
+const logAwardBreakdown = (guildId, awards, runLabel) => {
+    const tag = `[${runLabel}] guild ${guildId}`;
+    if (!awards.length) {
+        console.log(`Weekly recap breakdown (${tag}): no points awarded this run.`);
+        return;
+    }
+
+    console.log(`Weekly recap breakdown (${tag}):`);
+    for (const award of awards) {
+        console.log(`  ${award.displayName} (${award.userId}): ${award.points} total`);
+        for (const line of award.breakdown) {
+            console.log(`    +${line.points} ${line.source} — ${line.detail}`);
+        }
+    }
 };
 
 const joinMentions = (ids) => {
@@ -292,9 +339,12 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = []) => {
  *   guild         - a single guild to process (default: all guilds)
  *   targetChannel - where to post (default: each guild's #general or fallback)
  *   persist       - whether to write points to DynamoDB (default: false)
+ *   runLabel      - tags CloudWatch log lines so scheduled runs and manual
+ *                   /recap previews are distinguishable in the same log
+ *                   stream (default: "scheduled" if persist, else "preview")
  */
 const runWeeklyRecap = async function (client, options = {}) {
-    const { guild, targetChannel, persist = false } = options;
+    const { guild, targetChannel, persist = false, runLabel = persist ? 'scheduled' : 'preview' } = options;
     const guilds = guild ? [guild] : Array.from(client.guilds.cache.values());
 
     const sinceDate = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -310,15 +360,15 @@ const runWeeklyRecap = async function (client, options = {}) {
             const { topPosts, reactionsByAuthor, messagesByAuthor } = await collectWeeklyStats(g, sinceDate);
             const topChatters = topChattersOf(messagesByAuthor);
 
-            if (persist) {
-                const awards = computeAwards(topPosts, reactionsByAuthor, messagesByAuthor);
-                if (awards.length) {
-                    try {
-                        await pointsStore.addPoints(g.id, awards);
-                        console.log(`Weekly recap awards: ${awards.map((a) => `${a.displayName}+${a.points}`).join(', ')}`);
-                    } catch (storeError) {
-                        console.error('Weekly recap: failed to persist points:', storeError.message);
-                    }
+            const awards = computeAwards(topPosts, reactionsByAuthor, messagesByAuthor);
+            logAwardBreakdown(g.id, awards, runLabel);
+
+            if (persist && awards.length) {
+                try {
+                    await pointsStore.addPoints(g.id, awards);
+                    console.log(`Weekly recap: persisted awards for guild ${g.id}.`);
+                } catch (storeError) {
+                    console.error('Weekly recap: failed to persist points:', storeError.message);
                 }
             }
 
@@ -330,7 +380,7 @@ const runWeeklyRecap = async function (client, options = {}) {
             }
 
             await channel.send(buildRecapPost(topPosts, leaderboard, topChatters));
-            console.log(`Weekly recap posted to #${channel.name} in "${g.name}" (${topPosts.length} honored, persist=${persist}).`);
+            console.log(`Weekly recap posted to #${channel.name} in "${g.name}" [${runLabel}] (${topPosts.length} honored, persist=${persist}).`);
         } catch (guildError) {
             console.error(`Weekly recap failed for guild "${g.name}":`, guildError);
         }
