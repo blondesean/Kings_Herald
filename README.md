@@ -30,7 +30,7 @@ The bot has two distinct command styles, kept in separate folders:
 
 Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bot decides to act on its own, it's a passive behavior.
 
-**Preview commands** (`commands/passive/preview/`) bridge the two: a manual `/` trigger that fires a *scheduled* passive behavior on demand, so you can see its output without waiting for the schedule. Each scheduled passive behavior gets one, named to match. Today that's `recap.js` — `/recap` previews `weeklyRecap` in the current channel without awarding points. They dispatch exactly like prompt commands but live beside the behavior they preview and set `hidden: true`, which **excludes them from Discord registration entirely** — nobody sees them in the picker, including admins — and keeps them out of the generated `/help`. To manually trigger one, call its exported runner directly from a test script or the Node REPL. (Event-driven passives like `celebrate` aren't scheduled, so they have no preview.)
+**Preview commands** (`commands/passive/preview/`) bridge the two: a manual `/` trigger that fires a *scheduled* passive behavior on demand, so you can see its output without waiting for the schedule. Each scheduled passive behavior gets one, named to match. Today that's `recap.js` — `/recap` previews `weeklyRecap` in the current channel without awarding points. They dispatch exactly like prompt commands but live beside the behavior they preview and set `adminOnly: true`, which sets `defaultMemberPermissions` on registration so **only members with the Manage Server permission see or can run them** (Discord enforces this — the interaction never reaches the bot for anyone else); `hidden: true` keeps them out of the generated `/help` on top of that. (Event-driven passives like `celebrate` aren't scheduled, so they have no preview.)
 
 ### Current commands
 
@@ -44,7 +44,7 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
 | `/help` | Lists the available commands in the herald's voice. |
 
-One [preview command](#passive-vs-prompt-commands) exists (`/recap`, for the weekly recap) but is not registered with Discord — it is not visible in the picker for anyone. The weekly recap still fires on its Sunday cron schedule regardless.
+One [preview command](#passive-vs-prompt-commands) exists (`/recap`, for the weekly recap). It's registered with Discord but restricted to members with the Manage Server permission, so it's only visible to admins in the picker. The weekly recap still fires on its Sunday cron schedule regardless.
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
@@ -66,7 +66,8 @@ const greet = async function (interaction, commands) {
 module.exports = {
     description: 'Offer a courtly greeting',   // shown in Discord's picker and /help (max 100 chars)
     category: 'UTILITY',                       // /help group: NOBLE ANNOUNCEMENTS | ROYAL CHRONICLES | UTILITY
-    // hidden: true,                           // excludes from Discord registration entirely
+    // hidden: true,                           // excludes from the generated /help
+    // adminOnly: true,                        // restricts to members with Manage Server
     options: [                                 // slash-command arguments (optional)
         {
             name: 'member',
@@ -87,7 +88,7 @@ Conventions the dispatcher establishes:
 - The loader skips any module without a `run` function and logs an error, so a malformed file can't break dispatch. If `run` throws, the dispatcher catches it and apologizes in character.
 - Command names must be Discord-valid: lowercase letters, digits, `-`, `_`.
 
-**Adding a preview for a scheduled passive behavior:** if you add a new scheduled behavior in `commands/passive/`, give it a matching preview command in `commands/passive/preview/<name>.js` — same module shape, calling the behavior's exported runner with `persist: false`, and set `hidden: true` so it is excluded from Discord registration. See `commands/passive/preview/recap.js` for the pattern.
+**Adding a preview for a scheduled passive behavior:** if you add a new scheduled behavior in `commands/passive/`, give it a matching preview command in `commands/passive/preview/<name>.js` — same module shape, calling the behavior's exported runner with `persist: false`, and set both `adminOnly: true` (restricts it to members with Manage Server) and `hidden: true` (keeps it out of `/help`). See `commands/passive/preview/recap.js` for the pattern.
 
 ### Style notes
 
@@ -219,7 +220,7 @@ You should see `King's <bot-name> is online.` followed by `Registered N slash co
 - **Slash commands don't appear in the picker** — the bot was invited without the `applications.commands` scope. Re-run the OAuth2 invite URL with both `bot` and `applications.commands` checked. Also confirm the console showed the `Registered N slash commands` line — registration happens on startup.
 - **Commands appear but fail or hang** — make sure the **Message Content Intent** is enabled in the developer portal (the history-scanning commands need it) and the bot has Read Messages + Send Messages permissions in the channel.
 - **`Used disallowed intents` on startup** — enable all three privileged intents (**Presence**, **Server Members**, **Message Content**) under Bot in the developer portal.
-- **`/recap` is missing** — expected. Preview commands (`hidden: true`) are not registered with Discord at all; they don't appear in the picker for anyone. The cron still fires the recap on schedule.
+- **`/recap` is missing** — it's `adminOnly: true`, so Discord only shows it to members with the Manage Server permission. If you have that permission and it's still missing, re-check the `Registered N slash commands` log line on startup; a stale registration from before this command existed won't self-heal until the next deploy/restart.
 - **`Invalid token`** — re-copy from the developer portal; tokens reset whenever you click "Reset Token".
 
 ## Hosting on AWS

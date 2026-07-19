@@ -5,7 +5,7 @@
 
 
 //This will allow constact Discord to communicate with all of our node modules
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, PermissionFlagsBits } = require('discord.js');
 
 //Create new client that will appear in discord
 const client = new Client({
@@ -60,9 +60,12 @@ const loadCommandsFrom = (dir, label) => {
             const command = require(path.join(dir, file));
             const command_real_name = file.substring(0, file.length - 3); // ".js" = 3
 
-            //Every command module must export { description, category, hidden?, options?, run }.
+            //Every command module must export { description, category, hidden?, adminOnly?, options?, run }.
             //The run function is the dispatch target; the rest builds the Discord
-            //registration payload and the generated /help.
+            //registration payload and the generated /help. hidden excludes a command
+            //from /help only (see commands/prompts/help.js); adminOnly still registers
+            //it with Discord but restricts visibility to members with the Manage
+            //Server permission, via defaultMemberPermissions below.
             if (typeof command.run !== 'function') {
                 console.error(`Skipping ${file}: module does not export a run function.`);
                 return;
@@ -80,15 +83,17 @@ loadCommandsFrom(promptsPath, 'Command');
 loadCommandsFrom(previewPath, 'Preview Command');
 
 //Build the slash-command registration payload from the loaded metadata.
-//hidden commands (preview commands) are excluded entirely — they don't
-//appear in the picker for anyone, including admins.
+//Every loaded command is registered; adminOnly commands (preview commands)
+//get defaultMemberPermissions set so Discord only shows them in the picker
+//to members with the Manage Server permission — everyone else can't see or
+//run them, but no separate allowlist needs maintaining here.
 const commandDefinitions = () =>
     Object.entries(commands)
-        .filter(([, cmd]) => !cmd.hidden)
         .map(([name, cmd]) => ({
             name,
             description: cmd.description.slice(0, 100), // Discord caps descriptions at 100 chars
             options: cmd.options || [],
+            defaultMemberPermissions: cmd.adminOnly ? PermissionFlagsBits.ManageGuild : null,
         }));
 
 //Register the commands with one guild, replacing whatever was there before.
