@@ -6,8 +6,10 @@
  * author, and awards points toward a running leaderboard on three independent
  * scales: podium points (5/3/1 for the top posts), reaction points (1 per
  * REACTIONS_PER_POINT total reactions received across the week), and chatter
- * points (5/3/1 for the most messages sent). Points persist in DynamoDB via
- * ../../src/pointsStore.
+ * points (5/3/1 for the most messages sent). Podium ties share their rank and
+ * consume the ranks below (competition ranking: two seconds means no third),
+ * so a podium can hold more than three members. Points persist in DynamoDB
+ * via ../../src/pointsStore.
  *
  * Exposes:
  *   scheduleWeeklyRecap(client) - registers the cron job (call once, on ready)
@@ -39,9 +41,37 @@ const REACTIONS_PER_POINT = 10;
 // most messages during the week. Same shape as the reactions podium.
 const MESSAGE_POINTS_BY_RANK = [5, 3, 1];
 
+// How many members the display-only "most marks of favor received" section
+// shows. Reaction points themselves are awarded to everyone (see
+// REACTIONS_PER_POINT); this section just surfaces the biggest earners.
+const TOP_REACTED_SIZE = 3;
+
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 
 // ---- helpers ---------------------------------------------------------------
+
+// Competition ranking ("1224"): entries must already be sorted best-first;
+// every entry tied on `scoreOf` shares the rank of the first of them, and the
+// tied group consumes the ranks below it (two seconds means no third). Returns
+// copies of the entries with a 1-based `rank` added, keeping every entry whose
+// rank lands within `maxRank` — so a tie straddling the cutoff is kept whole
+// and the result can hold more than `maxRank` entries. Exported for the tests.
+const rankWithTies = (sortedEntries, scoreOf, maxRank) => {
+    const ranked = [];
+    let index = 0;
+    while (index < sortedEntries.length) {
+        const rank = index + 1;
+        if (rank > maxRank) break;
+        const score = scoreOf(sortedEntries[index]);
+        let end = index;
+        while (end < sortedEntries.length && scoreOf(sortedEntries[end]) === score) {
+            ranked.push({ ...sortedEntries[end], rank });
+            end++;
+        }
+        index = end;
+    }
+    return ranked;
+};
 
 // Where the scheduled recap posts, in order of preference:
 //   1. a text channel literally named "general",
@@ -146,6 +176,9 @@ const collectWeeklyStats = async (guild, sinceDate) => {
         }
     }
 
+    // Most reactions first; equal counts tie for the same rank (see
+    // rankWithTies), so the timestamp sort only fixes display order within a
+    // tied group (oldest first) — it no longer decides who makes the podium.
     candidates.sort((a, b) => {
         if (b.totalReactions !== a.totalReactions) {
             return b.totalReactions - a.totalReactions;
@@ -168,17 +201,29 @@ const collectWeeklyStats = async (guild, sinceDate) => {
     }
 
     return {
-        topPosts: candidates.slice(0, POINTS_BY_RANK.length),
+        topPosts: rankWithTies(candidates, (c) => c.totalReactions, POINTS_BY_RANK.length),
         reactionsByAuthor,
         messagesByAuthor,
     };
 };
 
-// The week's top message senders, most first, capped to the podium size.
+// The week's top message senders with competition ranks; ties share a rank,
+// so this can hold more than the podium size.
 const topChattersOf = (messagesByAuthor) =>
-    [...messagesByAuthor.values()]
-        .sort((a, b) => b.count - a.count)
-        .slice(0, MESSAGE_POINTS_BY_RANK.length);
+    rankWithTies(
+        [...messagesByAuthor.values()].sort((a, b) => b.count - a.count),
+        (entry) => entry.count,
+        MESSAGE_POINTS_BY_RANK.length
+    );
+
+// The week's top reaction receivers with competition ranks — display only;
+// the reaction points scale already pays everyone (see computeAwards).
+const topReactedOf = (reactionsByAuthor) =>
+    rankWithTies(
+        [...reactionsByAuthor.values()].sort((a, b) => b.reactions - a.reactions),
+        (entry) => entry.reactions,
+        TOP_REACTED_SIZE
+    );
 
 const displayNameOf = (message) => message.member?.displayName || message.author.username;
 
@@ -186,6 +231,8 @@ const displayNameOf = (message) => message.member?.displayName || message.author
  *   - podium points (5/3/1) for authoring the week's most-reacted posts,
  *   - reaction points: floor(total reactions received / REACTIONS_PER_POINT),
  *   - chatter points (5/3/1) for sending the most messages.
+ * Podium entries carry a competition rank (see rankWithTies): tied members
+ * each get that rank's full points, and the tie consumes the ranks below.
  * A member can earn from all three (or hold two podium spots); everything sums.
  * Members whose combined award is 0 are dropped. Exported for the tests.
  */
@@ -203,13 +250,13 @@ const computeAwards = (topPosts, reactionsByAuthor, messagesByAuthor = new Map()
         awards.set(userId, entry);
     };
 
-    topPosts.forEach((post, index) => {
+    topPosts.forEach((post) => {
         addAward(
             post.message.author.id,
             displayNameOf(post.message),
-            POINTS_BY_RANK[index],
+            POINTS_BY_RANK[post.rank - 1],
             'podium',
-            `rank ${index + 1} of ${POINTS_BY_RANK.length} most-reacted posts`
+            `rank ${post.rank} most-reacted post (${post.totalReactions} reactions)`
         );
     });
 
@@ -223,13 +270,13 @@ const computeAwards = (topPosts, reactionsByAuthor, messagesByAuthor = new Map()
         );
     }
 
-    topChattersOf(messagesByAuthor).forEach((entry, index) => {
+    topChattersOf(messagesByAuthor).forEach((entry) => {
         addAward(
             entry.userId,
             entry.displayName,
-            MESSAGE_POINTS_BY_RANK[index],
+            MESSAGE_POINTS_BY_RANK[entry.rank - 1],
             'chatter',
-            `rank ${index + 1} of ${MESSAGE_POINTS_BY_RANK.length} most messages (${entry.count} sent)`
+            `rank ${entry.rank} most messages (${entry.count} sent)`
         );
     });
 
@@ -277,7 +324,26 @@ const snippetOf = (message) => {
     return raw.length > 60 ? `${raw.slice(0, 57)}...` : raw;
 };
 
-const buildRecapPost = (topPosts, leaderboard, topChatters = []) => {
+const rankWordOf = (rank) => RANK_WORDS[rank - 1] || `Rank ${rank}`;
+
+// Discord rejects the whole message if any embed field value exceeds 1024
+// characters. The podium sections are unbounded now that ties share a rank
+// (an N-way tie keeps all N posts), so drop trailing lines until the field
+// fits, noting how many were cut.
+const EMBED_FIELD_MAX = 1024;
+const fitFieldLines = (lines) => {
+    for (let kept = lines.length; kept > 0; kept--) {
+        const omitted = lines.length - kept;
+        const suffix = omitted ? `\n...and ${omitted} more` : '';
+        const text = lines.slice(0, kept).join('\n') + suffix;
+        if (text.length <= EMBED_FIELD_MAX) return text;
+    }
+    return lines[0].slice(0, EMBED_FIELD_MAX);
+};
+
+// `weeklyPoints` maps userId -> points earned by THIS run (from computeAwards),
+// shown as a (+X) delta beside each member's running total.
+const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = [], weeklyPoints = new Map()) => {
     const winnerIds = [...new Set(topPosts.map((post) => post.message.author.id))];
 
     const content = winnerIds.length
@@ -285,32 +351,41 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = []) => {
         : 'Hear ye! The Herald brings tidings of the past sennight.';
 
     const postsText = topPosts.length
-        ? topPosts
-              .map((post, index) => {
-                  const rank = RANK_WORDS[index] || `Rank ${index + 1}`;
+        ? fitFieldLines(
+              topPosts.map((post) => {
                   const marks = post.totalReactions === 1 ? 'mark of favor' : 'marks of favor';
-                  return `**${rank}:** [${snippetOf(post.message)}](${post.message.url}) — <@${post.message.author.id}> (${post.totalReactions} ${marks})`;
+                  return `**${rankWordOf(post.rank)}:** [${snippetOf(post.message)}](${post.message.url}) — <@${post.message.author.id}> (${post.totalReactions} ${marks})`;
               })
-              .join('\n')
+          )
         : 'No proclamation earned the people\'s favor this past sennight.';
 
     const chattersText = topChatters.length
-        ? topChatters
-              .map((entry, index) => {
-                  const rank = RANK_WORDS[index] || `Rank ${index + 1}`;
+        ? fitFieldLines(
+              topChatters.map((entry) => {
                   const messages = entry.count === 1 ? 'proclamation' : 'proclamations';
-                  return `**${rank}:** ${entry.displayName} — ${entry.count} ${messages}`;
+                  return `**${rankWordOf(entry.rank)}:** ${entry.displayName} — ${entry.count} ${messages}`;
               })
-              .join('\n')
+          )
         : 'The court sat silent this past sennight.';
 
-    const boardText = leaderboard.length
-        ? leaderboard
-              .map((entry, index) => {
-                  const points = entry.points === 1 ? 'point' : 'points';
-                  return `${index + 1}. ${entry.displayName} — ${entry.points} ${points}`;
+    const favoredText = topReacted.length
+        ? fitFieldLines(
+              topReacted.map((entry) => {
+                  const marks = entry.reactions === 1 ? 'mark of favor' : 'marks of favor';
+                  return `**${rankWordOf(entry.rank)}:** ${entry.displayName} — ${entry.reactions} ${marks}`;
               })
-              .join('\n')
+          )
+        : 'No marks of favor were bestowed this past sennight.';
+
+    const boardText = leaderboard.length
+        ? fitFieldLines(
+              leaderboard.map((entry, index) => {
+                  const points = entry.points === 1 ? 'point' : 'points';
+                  const earned = weeklyPoints.get(entry.userId);
+                  const delta = earned ? ` (+${earned})` : '';
+                  return `${index + 1}. ${entry.displayName} — ${entry.points} ${points}${delta}`;
+              })
+          )
         : 'The royal ledger is yet unwritten.';
 
     const embed = new EmbedBuilder()
@@ -320,9 +395,10 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = []) => {
         .addFields(
             { name: 'Most Celebrated Proclamations', value: postsText },
             { name: 'Most Prolific Voices', value: chattersText },
+            { name: 'Most Showered in Favor', value: favoredText },
             { name: 'Running Tally of Honor', value: boardText }
         )
-        .setFooter({ text: `Points each Sunday: 5/3/1 for the top proclamations, 5/3/1 for the most messages, plus 1 per ${REACTIONS_PER_POINT} marks of favor received.` })
+        .setFooter({ text: `Points each Sunday: 5/3/1 for the top proclamations, 5/3/1 for the most messages, plus 1 per ${REACTIONS_PER_POINT} marks of favor received. Ties share a rank and consume the next.` })
         .setTimestamp();
 
     return {
@@ -359,9 +435,15 @@ const runWeeklyRecap = async function (client, options = {}) {
 
             const { topPosts, reactionsByAuthor, messagesByAuthor } = await collectWeeklyStats(g, sinceDate);
             const topChatters = topChattersOf(messagesByAuthor);
+            const topReacted = topReactedOf(reactionsByAuthor);
 
             const awards = computeAwards(topPosts, reactionsByAuthor, messagesByAuthor);
             logAwardBreakdown(g.id, awards, runLabel);
+
+            // userId -> points earned this run, for the (+X) column beside the
+            // running tally. On preview runs (persist=false) the running total
+            // doesn't include these yet; on scheduled runs it does.
+            const weeklyPoints = new Map(awards.map((award) => [award.userId, award.points]));
 
             if (persist && awards.length) {
                 try {
@@ -379,7 +461,7 @@ const runWeeklyRecap = async function (client, options = {}) {
                 console.error('Weekly recap: failed to load leaderboard:', storeError.message);
             }
 
-            await channel.send(buildRecapPost(topPosts, leaderboard, topChatters));
+            await channel.send(buildRecapPost(topPosts, leaderboard, topChatters, topReacted, weeklyPoints));
             console.log(`Weekly recap posted to #${channel.name} in "${g.name}" [${runLabel}] (${topPosts.length} honored, persist=${persist}).`);
         } catch (guildError) {
             console.error(`Weekly recap failed for guild "${g.name}":`, guildError);
@@ -408,4 +490,4 @@ const scheduleWeeklyRecap = function (client) {
     console.log(`Weekly recap scheduled: "${CRON_EXPRESSION}" (${TIMEZONE}) — Sundays at noon Eastern.`);
 };
 
-module.exports = { scheduleWeeklyRecap, runWeeklyRecap, computeAwards, findRecapChannel };
+module.exports = { scheduleWeeklyRecap, runWeeklyRecap, computeAwards, findRecapChannel, rankWithTies };
