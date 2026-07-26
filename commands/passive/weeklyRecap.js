@@ -344,10 +344,17 @@ const fitFieldLines = (lines) => {
 // `weeklyPoints` maps userId -> points earned by THIS run (from computeAwards),
 // shown as a (+X) delta beside each member's running total.
 const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = [], weeklyPoints = new Map()) => {
-    const winnerIds = [...new Set(topPosts.map((post) => post.message.author.id))];
+    // All three weekly categories crown winners — proclamations, voices, and
+    // favor alike — so everyone who topped any of them gets named and pinged,
+    // not just the proclamation podium.
+    const winnerIds = [...new Set([
+        ...topPosts.map((post) => post.message.author.id),
+        ...topChatters.map((entry) => entry.userId),
+        ...topReacted.map((entry) => entry.userId),
+    ])];
 
     const content = winnerIds.length
-        ? `Hear ye, hear ye! Let the realm give praise unto ${joinMentions(winnerIds)}, whose words have most stirred the court this past sennight!`
+        ? `Hear ye, hear ye! Let the realm give praise unto ${joinMentions(winnerIds)}, whose words, voice, and favor have most stirred the court this past sennight!`
         : 'Hear ye! The Herald brings tidings of the past sennight.';
 
     const postsText = topPosts.length
