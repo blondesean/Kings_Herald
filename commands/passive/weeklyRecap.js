@@ -345,8 +345,10 @@ const fitFieldLines = (lines) => {
 // shown as a (+X) delta beside each member's running total.
 const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = [], weeklyPoints = new Map()) => {
     // All three weekly categories crown winners — proclamations, voices, and
-    // favor alike — so everyone who topped any of them gets named and pinged,
-    // not just the proclamation podium.
+    // favor alike — so everyone who topped any of them gets pinged. Each is
+    // already @mentioned in their own podium line below (see postsText /
+    // chattersText / favoredText), so the intro stays a short, generic
+    // ping — it doesn't re-narrate who won what.
     const winnerIds = [...new Set([
         ...topPosts.map((post) => post.message.author.id),
         ...topChatters.map((entry) => entry.userId),
@@ -354,7 +356,7 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
     ])];
 
     const content = winnerIds.length
-        ? `Hear ye, hear ye! Let the realm give praise unto ${joinMentions(winnerIds)}, whose words, voice, and favor have most stirred the court this past sennight!`
+        ? `Hear ye, hear ye! Let the realm give praise unto ${joinMentions(winnerIds)}!`
         : 'Hear ye! The Herald brings tidings of the past sennight.';
 
     const postsText = topPosts.length
@@ -370,7 +372,7 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
         ? fitFieldLines(
               topChatters.map((entry) => {
                   const messages = entry.count === 1 ? 'proclamation' : 'proclamations';
-                  return `**${rankWordOf(entry.rank)}:** ${entry.displayName} — ${entry.count} ${messages}`;
+                  return `**${rankWordOf(entry.rank)}:** <@${entry.userId}> — ${entry.count} ${messages}`;
               })
           )
         : 'The court sat silent this past sennight.';
@@ -379,7 +381,7 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
         ? fitFieldLines(
               topReacted.map((entry) => {
                   const marks = entry.reactions === 1 ? 'mark of favor' : 'marks of favor';
-                  return `**${rankWordOf(entry.rank)}:** ${entry.displayName} — ${entry.reactions} ${marks}`;
+                  return `**${rankWordOf(entry.rank)}:** <@${entry.userId}> — ${entry.reactions} ${marks}`;
               })
           )
         : 'No marks of favor were bestowed this past sennight.';
