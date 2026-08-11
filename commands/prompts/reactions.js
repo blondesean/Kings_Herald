@@ -36,17 +36,19 @@ const reactions = async function (interaction) {
 
         console.log(`Scanning ${channels.size} channels for reactions...`);
 
-        const emojiCounts = new Map();
-        let totalReactionsGiven = 0;
-        let channelsScanned = 0;
+        // Scan a single channel for reactions from the target user, returning
+        // its own tally. Channels are scanned concurrently (see Promise.all
+        // below) since Discord's interaction token only lives 15 minutes and
+        // scanning a month of history one channel at a time can blow past that
+        // on an active server.
+        const scanChannel = async (channel) => {
+            const channelEmojiCounts = new Map();
+            let messagesScanned = 0;
 
-        // Scan each channel for messages with reactions
-        for (const [channelId, channel] of channels) {
             try {
                 console.log(`Scanning channel: ${channel.name}`);
 
                 let lastMessageId = null;
-                let messagesScanned = 0;
                 const maxMessagesPerChannel = 500; // Limit to prevent timeout
 
                 while (messagesScanned < maxMessagesPerChannel) {
@@ -67,17 +69,17 @@ const reactions = async function (interaction) {
                             break;
                         }
 
-                        // Check if this message has reactions from our target user
+                        // Check if this message has reactions from our target user.
+                        // Reactions on a single message are checked in parallel too,
+                        // since each requires its own users.fetch() round-trip.
                         if (msg.reactions.cache.size > 0) {
-                            for (const [emojiId, reaction] of msg.reactions.cache) {
-                                // Check if our target user reacted with this emoji
+                            await Promise.all(Array.from(msg.reactions.cache.values()).map(async (reaction) => {
                                 const users = await reaction.users.fetch();
                                 if (users.has(targetUserId)) {
                                     const emojiName = reaction.emoji.name;
-                                    emojiCounts.set(emojiName, (emojiCounts.get(emojiName) || 0) + 1);
-                                    totalReactionsGiven++;
+                                    channelEmojiCounts.set(emojiName, (channelEmojiCounts.get(emojiName) || 0) + 1);
                                 }
-                            }
+                            }));
                         }
 
                         lastMessageId = messageId;
@@ -87,11 +89,26 @@ const reactions = async function (interaction) {
                     if (foundOldMessage) break;
                 }
 
-                channelsScanned++;
                 console.log(`Scanned ${messagesScanned} messages in ${channel.name}`);
+                return { emojiCounts: channelEmojiCounts, scanned: true };
 
             } catch (channelError) {
                 console.error(`Error scanning channel ${channel.name}:`, channelError);
+                return { emojiCounts: channelEmojiCounts, scanned: false };
+            }
+        };
+
+        const channelResults = await Promise.all(Array.from(channels.values()).map(scanChannel));
+
+        const emojiCounts = new Map();
+        let totalReactionsGiven = 0;
+        let channelsScanned = 0;
+
+        for (const result of channelResults) {
+            if (result.scanned) channelsScanned++;
+            for (const [emojiName, count] of result.emojiCounts) {
+                emojiCounts.set(emojiName, (emojiCounts.get(emojiName) || 0) + count);
+                totalReactionsGiven += count;
             }
         }
 

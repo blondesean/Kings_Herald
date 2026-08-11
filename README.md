@@ -40,7 +40,6 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/whois <member>` | Announces a member's titles (roles) in herald style. The member is picked from Discord's user selector. |
 | `/nobility` | Lists everyone with weekly-recap points, top to bottom, with the noble title their points have earned (a new rank every 5 points from 5 up — see `flavor_text/nobilityRanks.js` for the ladder). |
 | `/reactions [member]` | Scans the past month of messages and reports the member's most-used reaction emojis (defaults to whoever ran it). |
-| `/activity` | Scans the past 30 days of the current channel and reports top posters, repliers, reactors, and most-reacted-to. |
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
 | `/help` | Lists the available commands in the herald's voice. |
 
@@ -128,7 +127,7 @@ The single source of truth for everything the bot needs from Discord. Three sepa
 
 | Intent | Why |
 | --- | --- |
-| Message Content | The history-scanning features (`/activity`, `/reactions`, weekly recap) read message text and reactions. |
+| Message Content | The history-scanning features (`/reactions`, weekly recap) read message text and reactions. |
 | Server Members | Member lookups and display names (`/whois`, recap author names). |
 | Presence | Currently unused by the code, but enabled historically; safe to leave on. |
 
@@ -140,7 +139,7 @@ Missing intents fail loudly: the bot exits with `Used disallowed intents` at sta
 | --- | --- |
 | View Channels | Everything. |
 | Send Messages | Every reply and proclamation. |
-| Read Message History | `/activity`, `/reactions`, weekly recap scans. |
+| Read Message History | `/reactions`, weekly recap scans. |
 | Embed Links | The weekly recap's rich embed (without this the embed silently fails to render). |
 | Manage Messages | Pinning celebrated posts (`celebrate.js`). |
 

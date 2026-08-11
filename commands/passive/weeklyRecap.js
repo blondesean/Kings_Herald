@@ -103,8 +103,7 @@ const findRecapChannel = (guild) => {
 // Scan the guild's readable text channels for messages created on or after
 // `sinceDate` and return the top posts (by total reaction count), each author's
 // total reactions received, and each author's message count across the window.
-// Mirrors the batch-fetch pattern used by commands/activity.js and
-// commands/reactions.js.
+// Mirrors the batch-fetch pattern used by commands/prompts/reactions.js.
 const collectWeeklyStats = async (guild, sinceDate) => {
     const channels = guild.channels.cache.filter((channel) =>
         channel.type === 0 &&
