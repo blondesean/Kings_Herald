@@ -3,9 +3,10 @@
  * Reads the weekly-recap points ledger (DynamoDB via ../../src/pointsStore)
  * and lists every member with points, top to bottom, with their earned title
  * and current tally. Titles come from the ladder in
- * flavor_text/nobilityRanks.js: a new rank every 5 points starting at 5.
- * Members with points but below the first rung are listed as commoners still
- * earning their name.
+ * flavor_text/nobilityRanks.js: a new rank starting at 5 points, with the
+ * step between rungs widening as the ladder climbs (see that file for the
+ * breakdown). Members with points but below the first rung are listed as
+ * commoners still earning their name.
  */
 
 const pointsStore = require('../../src/pointsStore');
@@ -58,7 +59,7 @@ const nobility = function (interaction) {
 
             const header = `**THE PEERAGE OF THE REALM**\n\n` +
                 `*Hear ye! The Herald proclaims the standing nobility, from the loftiest station to the humblest:*\n\n`;
-            const footer = `\n\n*Rise in station through the weekly chronicle: podium finishes and marks of favor both earn points, and a new title awaits every 5.*`;
+            const footer = `\n\n*Rise in station through the weekly chronicle: podium finishes and marks of favor both earn points, and a new title awaits at every rung.*`;
 
             // Discord caps messages at 2000 characters; a long peerage is split
             // across follow-up messages rather than truncated.

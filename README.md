@@ -38,7 +38,7 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | --- | --- |
 | `/ping` | Health check — replies "Pong!". |
 | `/whois <member>` | Announces a member's titles (roles) in herald style. The member is picked from Discord's user selector. |
-| `/nobility` | Lists everyone with weekly-recap points, top to bottom, with the noble title their points have earned (a new rank every 5 points from 5 up — see `flavor_text/nobilityRanks.js` for the ladder). |
+| `/nobility` | Lists everyone with weekly-recap points, top to bottom, with the noble title their points have earned (ranks run from 5 up to 500, with wider gaps between rungs higher up — see `flavor_text/nobilityRanks.js` for the ladder). |
 | `/reactions [member]` | Scans the past month of messages and reports the member's most-used reaction emojis (defaults to whoever ran it). |
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
 | `/help` | Lists the available commands in the herald's voice. |
