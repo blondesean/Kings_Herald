@@ -35,6 +35,7 @@ const path = require('path');
 //Passive behaviors live in commands/passive and are wired into client events directly (not slash commands).
 const celebrate = require('./../commands/passive/celebrate');
 const { scheduleWeeklyRecap } = require('./../commands/passive/weeklyRecap');
+const { scheduleTrivia } = require('./../commands/passive/trivia');
 
 //Slash commands are auto-loaded by filename from commands/prompts (user-facing)
 //and commands/passive/preview (manual triggers for scheduled passive behaviors,
@@ -113,8 +114,9 @@ client.on('ready', (c) => {
     //so a deploy refreshes the definitions.
     client.guilds.cache.forEach(registerCommands);
 
-    // Schedule the weekly recap now that the bot is connected.
+    // Schedule the weekly recap and daily trivia now that the bot is connected.
     scheduleWeeklyRecap(client);
+    scheduleTrivia(client);
 });
 
 //Register commands when the bot is invited to a new server.

@@ -8,11 +8,12 @@ A Discord bot that plays the role of a medieval herald — announcing user title
 
 ## How it works
 
-Kings_Herald is a Node.js process that connects to Discord's gateway using [discord.js](https://discord.js.org/) and a bot token. It responds to two gateway events and runs one scheduled job:
+Kings_Herald is a Node.js process that connects to Discord's gateway using [discord.js](https://discord.js.org/) and a bot token. It responds to two gateway events and runs two scheduled jobs:
 
 1. **`interactionCreate`** — slash-command invocations (`/ping`, `/whois`, ...). The bot immediately defers the reply (Discord requires an acknowledgment within 3 seconds; several commands scan history for longer) and routes to the handler in `commands/prompts/` or `commands/passive/preview/`.
 2. **`messageReactionAdd`** — every reaction on a message the bot can see. When a non-bot message hits 25 total reactions, the herald replies with a celebratory proclamation and pins it (`commands/passive/celebrate.js`).
 3. **Weekly recap** — every Sunday at noon Eastern the herald posts in `#general` (falling back to the guild's system channel, then the topmost channel it can post in) celebrating the week's three most-reacted posts (linked, with their authors pinged) plus a running points leaderboard. Points come from three independent scales: 5/3/1 for the podium posts, 5/3/1 for the most messages sent, plus 1 point per 10 total reactions received across the week. Points persist in DynamoDB (`commands/passive/weeklyRecap.js`, `src/pointsStore.js`).
+4. **Daily trivia** — once a day, at a random 15-minute-aligned moment inside the 18-hour window from 9:00 AM Eastern to 3:00 AM Eastern the next day, the herald posts a nerd pop-culture trivia question seeded with four reactions (🇦/🇧/🇨/🇩). Five minutes later it closes the question: whoever reacted with exactly one option emoji and it was correct earns 2 points (reacting with more than one option disqualifies that round). Points persist the same way as the weekly recap (`commands/passive/trivia.js`, `flavor_text/triviaQuestions.js`).
 
 `src/index.js` is the entry point. On startup it:
 
@@ -26,11 +27,11 @@ Kings_Herald is a Node.js process that connects to Discord's gateway using [disc
 The bot has two distinct command styles, kept in separate folders:
 
 - **Prompt commands** (`commands/prompts/`) are *pull*: a human explicitly invokes `/<name>` and the bot replies. They are auto-loaded by filename, registered with Discord, and dispatched from `src/index.js` — drop in a file, done. Everything in the [command table](#current-commands) below is one of these.
-- **Passive behaviors** (`commands/passive/`) are *push*: nobody types anything — the bot acts on its own in response to a gateway event or a schedule. Two exist today: `celebrate.js` (fires when a message crosses the reaction threshold) and `weeklyRecap.js` (the Sunday-noon recap). These are **not** auto-loaded; each is `require`d and wired to a specific client event or schedule by hand in `src/index.js`.
+- **Passive behaviors** (`commands/passive/`) are *push*: nobody types anything — the bot acts on its own in response to a gateway event or a schedule. Three exist today: `celebrate.js` (fires when a message crosses the reaction threshold), `weeklyRecap.js` (the Sunday-noon recap), and `trivia.js` (the daily randomized-time trivia round). These are **not** auto-loaded; each is `require`d and wired to a specific client event or schedule by hand in `src/index.js`.
 
 Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bot decides to act on its own, it's a passive behavior.
 
-**Preview commands** (`commands/passive/preview/`) bridge the two: a manual `/` trigger that fires a *scheduled* passive behavior on demand, so you can see its output without waiting for the schedule. Each scheduled passive behavior gets one, named to match. Today that's `recap.js` — `/recap` previews `weeklyRecap` in the current channel without awarding points. They dispatch exactly like prompt commands but live beside the behavior they preview and set `adminOnly: true`, which sets `defaultMemberPermissions` on registration so **only members with the Manage Server permission see or can run them** (Discord enforces this — the interaction never reaches the bot for anyone else); `hidden: true` keeps them out of the generated `/help` on top of that. (Event-driven passives like `celebrate` aren't scheduled, so they have no preview.)
+**Preview commands** (`commands/passive/preview/`) bridge the two: a manual `/` trigger that fires a *scheduled* passive behavior on demand, so you can see its output without waiting for the schedule. Each scheduled passive behavior gets one, named to match. Today that's `recap.js` (`/recap` previews `weeklyRecap` in the current channel without awarding points) and `trivia.js` (`/trivia` fires a trivia round in the current channel without awarding points, for testing the question flow and reaction tallying). They dispatch exactly like prompt commands but live beside the behavior they preview and set `adminOnly: true`, which sets `defaultMemberPermissions` on registration so **only members with the Manage Server permission see or can run them** (Discord enforces this — the interaction never reaches the bot for anyone else); `hidden: true` keeps them out of the generated `/help` on top of that. (Event-driven passives like `celebrate` aren't scheduled, so they have no preview.)
 
 ### Current commands
 
@@ -43,7 +44,7 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
 | `/help` | Lists the available commands in the herald's voice. |
 
-One [preview command](#passive-vs-prompt-commands) exists (`/recap`, for the weekly recap). It's registered with Discord but restricted to members with the Manage Server permission, so it's only visible to admins in the picker. The weekly recap still fires on its Sunday cron schedule regardless.
+Two [preview commands](#passive-vs-prompt-commands) exist (`/recap` for the weekly recap, `/trivia` for daily trivia). Both are registered with Discord but restricted to members with the Manage Server permission, so they're only visible to admins in the picker. The underlying schedules still fire on their own regardless.
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
@@ -128,7 +129,7 @@ The single source of truth for everything the bot needs from Discord. Three sepa
 | Intent | Why |
 | --- | --- |
 | Message Content | The history-scanning features (`/reactions`, weekly recap) read message text and reactions. |
-| Server Members | Member lookups and display names (`/whois`, recap author names). |
+| Server Members | Member lookups and display names (`/whois`, recap author names, trivia participants). |
 | Presence | Currently unused by the code, but enabled historically; safe to leave on. |
 
 Missing intents fail loudly: the bot exits with `Used disallowed intents` at startup.
@@ -140,21 +141,20 @@ Missing intents fail loudly: the bot exits with `Used disallowed intents` at sta
 | View Channels | Everything. |
 | Send Messages | Every reply and proclamation. |
 | Read Message History | `/reactions`, weekly recap scans. |
-| Embed Links | The weekly recap's rich embed (without this the embed silently fails to render). |
+| Embed Links | The weekly recap's and trivia's rich embeds (without this the embed silently fails to render). |
 | Manage Messages | Pinning celebrated posts (`celebrate.js`). |
+| Add Reactions | Seeding the 🇦/🇧/🇨/🇩 answer options on each trivia question (`commands/passive/trivia.js`). |
 
-Add Reactions is **not** currently needed — nothing in the code adds reactions.
-
-Ready-made invite URLs (`93184` encodes exactly the five permissions above):
+Ready-made invite URLs (`93248` encodes exactly the six permissions above):
 
 **Production bot:**
 ```
-https://discord.com/oauth2/authorize?client_id=759480089016270879&scope=bot+applications.commands&permissions=93184
+https://discord.com/oauth2/authorize?client_id=759480089016270879&scope=bot+applications.commands&permissions=93248
 ```
 
 **Dev bot:**
 ```
-https://discord.com/oauth2/authorize?client_id=1525947821746946139&scope=bot+applications.commands&permissions=93184
+https://discord.com/oauth2/authorize?client_id=1525947821746946139&scope=bot+applications.commands&permissions=93248
 ```
 
 Missing permissions fail quietly (no embed, failed pin, silent bot), so if a feature half-works, check this table first.

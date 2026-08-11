@@ -19,6 +19,7 @@
 const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 
 // Sunday at 12:00, interpreted in Eastern local time (DST-aware) so it stays at
 // local noon year-round.
@@ -73,32 +74,10 @@ const rankWithTies = (sortedEntries, scoreOf, maxRank) => {
     return ranked;
 };
 
-// Where the scheduled recap posts, in order of preference:
-//   1. a text channel literally named "general",
-//   2. the guild's system channel (where Discord posts join messages),
-//   3. the topmost text channel the bot can post in.
-// Returns null only if the bot can't post anywhere in the guild.
-const findRecapChannel = (guild) => {
-    const canPost = (channel) => {
-        if (!channel || channel.type !== 0) return false;
-        const perms = channel.permissionsFor(guild.members.me);
-        return Boolean(perms && perms.has('ViewChannel') && perms.has('SendMessages'));
-    };
-
-    const general = guild.channels.cache.find(
-        (channel) => channel.type === 0 && channel.name.toLowerCase() === 'general' && canPost(channel)
-    );
-    if (general) return general;
-
-    if (canPost(guild.systemChannel)) return guild.systemChannel;
-
-    let topmost = null;
-    for (const channel of guild.channels.cache.values()) {
-        if (!canPost(channel)) continue;
-        if (!topmost || channel.rawPosition < topmost.rawPosition) topmost = channel;
-    }
-    return topmost;
-};
+// Channel selection now lives in src/findAnnounceChannel.js, shared with the
+// daily trivia behavior. Kept as a local alias since it's exported below for
+// callers that imported it from this module.
+const findRecapChannel = findAnnounceChannel;
 
 // Scan the guild's readable text channels for messages created on or after
 // `sinceDate` and return the top posts (by total reaction count), each author's

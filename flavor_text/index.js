@@ -19,4 +19,5 @@ module.exports = {
     heraldResponses: require('./heraldResponses'),
     basicAnnouncements: require('./basicAnnouncements'),
     announcementTemplates: require('./announcementTemplates'),
+    triviaQuestions: require('./triviaQuestions'),
 };
