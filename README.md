@@ -40,11 +40,17 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/ping` | Health check — replies "Pong!". |
 | `/whois <member>` | Announces a member's titles (roles) in herald style. The member is picked from Discord's user selector. |
 | `/nobility` | Lists everyone with weekly-recap points, top to bottom, with the noble title their points have earned (ranks run from 5 up to 500, with wider gaps between rungs higher up — see `flavor_text/nobilityRanks.js` for the ladder). |
+| `/balance` | Checks your own point balance and current title. Ephemeral — only you see the reply. |
 | `/reactions [member]` | Scans the past month of messages and reports the member's most-used reaction emojis (defaults to whoever ran it). |
+| `/trivia_signup` | Toggles the "Hear Ye Trivia" role on the caller: run once to be summoned when the daily trivia round posts, run again to be removed (`src/triviaRole.js`). |
+| `/duel <opponent> <method> <wager>` | Challenges another member to a points wager, settled by Coin Flip, Rock Paper Scissors, or Death Roll, once they accept via button (`commands/prompts/duel.js`). |
+| `/duel_stats [member]` | Reports a member's `/duel` win/loss record and win rate (defaults to whoever ran it). |
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
 | `/help` | Lists the available commands in the herald's voice. |
 
 Two [preview commands](#passive-vs-prompt-commands) exist (`/recap` for the weekly recap, `/trivia` for daily trivia). Both are registered with Discord but restricted to members with the Manage Server permission, so they're only visible to admins in the picker. The underlying schedules still fire on their own regardless.
+
+A third `adminOnly` + `hidden` command lives directly in `commands/prompts/`: `/point_adjust <member> <amount>` grants or deducts a member's ledger points by a set amount (positive to grant, negative to deduct), for correcting mistakes or rewarding things off the books. It isn't a preview of a passive behavior, so it doesn't live in `commands/passive/preview/`, but the visibility restriction works the same way. Every adjustment — and every `/duel` result — is logged to CloudWatch for audit (see `commands/prompts/point_adjust.js` and `commands/prompts/duel.js`).
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
@@ -65,9 +71,10 @@ const greet = async function (interaction, commands) {
 
 module.exports = {
     description: 'Offer a courtly greeting',   // shown in Discord's picker and /help (max 100 chars)
-    category: 'UTILITY',                       // /help group: NOBLE ANNOUNCEMENTS | ROYAL CHRONICLES | UTILITY
+    category: 'UTILITY',                       // /help group: NOBLE ANNOUNCEMENTS | ROYAL CHRONICLES | COURTLY GAMES | UTILITY
     // hidden: true,                           // excludes from the generated /help
     // adminOnly: true,                        // restricts to members with Manage Server
+    // ephemeral: true,                        // reply is visible only to whoever ran it
     options: [                                 // slash-command arguments (optional)
         {
             name: 'member',
@@ -184,6 +191,7 @@ GITHUB_TOKEN=github_pat_xxxxxxxxxxxxxxxxxxxxxxxx
 - `GITHUB_REPO` — the `owner/repo` to file complaints into. Defaults to `blondesean/Kings_Herald`.
 - `POINTS_TABLE_NAME` — the DynamoDB table name. If unset (the default locally), the recap still runs and posts the top 3, but the leaderboard is skipped — so you can develop without AWS.
 - `AWS_REGION` — set this (plus AWS credentials) only if you want to exercise the DynamoDB path locally.
+- `TEST_GUILD_IDS` — comma-separated Discord guild IDs where `/duel` allows challenging yourself, for testing the whole accept/resolve flow solo. Not set by the CDK stack — leave it unset in production so self-duels stay blocked there.
 
 Rules of the format:
 
@@ -231,7 +239,7 @@ The bot runs as a long-lived [Fargate](https://docs.aws.amazon.com/AmazonECS/lat
 - **ECR** — private container registry holding the bot image (built from the repo's `Dockerfile`).
 - **ECS Fargate** — runs the bot task, 256 CPU / 512 MB, on **Fargate Spot** (~70% cheaper; a reclaimed task just restarts and reconnects). No load balancer; the bot has no inbound traffic, only an outbound WebSocket to Discord.
 - **SSM Parameter Store** — `SecureString` parameters hold the secrets (Discord bot token + GitHub PAT for `/complain`). The task definition references them by name; the values never live in source or image.
-- **DynamoDB** — a small on-demand table holds the weekly-recap points leaderboard, the bot's only persistent state, so standings survive restarts and redeploys.
+- **DynamoDB** — a small on-demand table holds the bot's only persistent state, so it survives restarts and redeploys. Two kinds of item share the table, both partitioned by `guildId`: a per-`(guildId, userId)` item holding `displayName`, `points` (the weekly-recap/trivia/duel ledger), and `duelWins`/`duelLosses`; and one item per resolved `/duel` under a synthetic `DUEL#<timestamp>#...` sort key (challenger, target, method, wager, winner — never mistaken for a real user since Discord IDs are purely numeric). See `src/pointsStore.js`.
 - **CloudWatch Logs** — `console.log` output ships to the environment's log group.
 - **VPC** — a public-only VPC (no NAT gateway); the task gets a public IP for outbound Discord traffic and no inbound rules.
 - **AWS CDK** (TypeScript) — all of the above is defined in `infra/` and provisioned with `cdk deploy`.
@@ -500,12 +508,12 @@ Steady-state monthly cost for **production** (us-east-1):
 | CloudWatch Logs (low volume + 1 mo retention) | <$1 |
 | ECR storage (one image) | <$1 |
 | Data transfer (Discord WebSocket out) | <$1 |
-| DynamoDB (on-demand, weekly-recap leaderboard) | <$1 (well within free tier) |
+| DynamoDB (on-demand, points ledger + duel stats) | <$1 (well within free tier) |
 | **Total** | **~$8** |
 
 Fargate Spot cuts compute ~70% versus on-demand (was ~$8/mo). The **beta** stack adds effectively **$0** at rest — it runs 0 tasks by default, so it only bills for the minutes you scale it to 1 to test (plus a few cents of ECR storage for its image).
 
-No NAT gateway (would be ~$32/mo), no load balancer (~$16/mo) — both intentionally avoided. The task uses a public subnet with a public IP and only outbound traffic to Discord, which is the cheapest viable shape; the public IPv4 charge is unavoidable without a far pricier NAT gateway. The bot's only persistent state is the weekly-recap points leaderboard, kept in a small DynamoDB table so it survives restarts and redeploys; everything else is stateless.
+No NAT gateway (would be ~$32/mo), no load balancer (~$16/mo) — both intentionally avoided. The task uses a public subnet with a public IP and only outbound traffic to Discord, which is the cheapest viable shape; the public IPv4 charge is unavoidable without a far pricier NAT gateway. The bot's only persistent state is the points ledger and duel win/loss record, kept in a small DynamoDB table so it survives restarts and redeploys; everything else is stateless.
 
 ### Follow-ups (not blocking)
 

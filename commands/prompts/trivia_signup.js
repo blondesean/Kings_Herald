@@ -38,7 +38,7 @@ const triviaSignup = async function (interaction) {
 };
 
 module.exports = {
-    description: 'Sign up (or opt out) to be pinged when the daily trivia round posts',
+    description: 'Toggle: run once to be summoned for daily trivia, run again to be removed',
     category: 'ROYAL CHRONICLES',
     run: triviaSignup,
 };

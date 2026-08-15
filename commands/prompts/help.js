@@ -7,7 +7,7 @@
  */
 
 // Display order for known categories; anything new lands after these.
-const CATEGORY_ORDER = ['NOBLE ANNOUNCEMENTS', 'ROYAL CHRONICLES', 'UTILITY'];
+const CATEGORY_ORDER = ['NOBLE ANNOUNCEMENTS', 'ROYAL CHRONICLES', 'COURTLY GAMES', 'UTILITY'];
 
 // Render a command's usage from its name and options: /whois <member>
 const usageOf = (name, cmd) => {

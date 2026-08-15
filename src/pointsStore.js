@@ -5,6 +5,14 @@
  * third). The table is keyed (guildId, userId) so multiple servers stay
  * separate.
  *
+ * The same table also holds two other kinds of item, still under `guildId`:
+ *   - duelWins/duelLosses: extra attributes on a real user's own item (see
+ *     recordDuelResult/getDuelStats).
+ *   - duel history: one item per resolved /duel, keyed (guildId, "DUEL#...")
+ *     — a synthetic sort key that can never collide with a real Discord user
+ *     ID (always purely numeric), so it's safely excluded from
+ *     getLeaderboard's results (see recordDuelHistory/getDuelHistory).
+ *
  * Configuration comes from the environment:
  *   POINTS_TABLE_NAME  - the DynamoDB table name (set by the CDK stack)
  *   AWS_REGION         - resolved automatically on Fargate; set it locally to
@@ -16,9 +24,14 @@
  */
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, UpdateCommand, QueryCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, UpdateCommand, QueryCommand, GetCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
 
 const TABLE_NAME = process.env.POINTS_TABLE_NAME;
+
+// Sort-key prefix for duel-history items, so they live in the same table
+// and partition as real per-user items but are never mistaken for one
+// (Discord user IDs are always purely numeric snowflakes).
+const DUEL_HISTORY_PREFIX = 'DUEL#';
 
 // Lazily created so the bot can run locally without AWS credentials configured.
 let docClient = null;
@@ -84,6 +97,11 @@ const getLeaderboard = async function (guildId, limit = 10) {
 
     const items = result.Items || [];
     return items
+        // Duel-history items live in the same partition under a "DUEL#..."
+        // sort key rather than a real Discord user ID — DynamoDB won't let a
+        // Query's FilterExpression reference a key attribute like userId, so
+        // this exclusion has to happen client-side instead.
+        .filter((item) => !String(item.userId).startsWith(DUEL_HISTORY_PREFIX))
         .map((item) => ({
             userId: item.userId,
             displayName: item.displayName || 'a noble',
@@ -111,4 +129,111 @@ const getPoints = async function (guildId, userId) {
     return (result.Item && result.Item.points) || 0;
 };
 
-module.exports = { addPoints, getLeaderboard, getPoints, isConfigured };
+/* Record a /duel outcome: increments the winner's duelWins and the loser's
+ * duelLosses (separate attributes on the same points-table item, so no
+ * second table is needed). `winner`/`loser` are { userId, displayName }.
+ */
+const recordDuelResult = async function (guildId, winner, loser) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping duel stat persistence.');
+        return;
+    }
+
+    const client = getClient();
+
+    await client.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId: winner.userId },
+        UpdateExpression: 'SET #dn = :n ADD #w :one',
+        ExpressionAttributeNames: { '#dn': 'displayName', '#w': 'duelWins' },
+        ExpressionAttributeValues: { ':n': winner.displayName || 'a noble', ':one': 1 },
+    }));
+
+    await client.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId: loser.userId },
+        UpdateExpression: 'SET #dn = :n ADD #l :one',
+        ExpressionAttributeNames: { '#dn': 'displayName', '#l': 'duelLosses' },
+        ExpressionAttributeValues: { ':n': loser.displayName || 'a noble', ':one': 1 },
+    }));
+};
+
+/* Return a single member's duel record as { wins, losses } (both 0 if
+ * they've never dueled, or if the table isn't configured).
+ */
+const getDuelStats = async function (guildId, userId) {
+    if (!isConfigured()) {
+        return { wins: 0, losses: 0 };
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+    }));
+
+    return {
+        wins: (result.Item && result.Item.duelWins) || 0,
+        losses: (result.Item && result.Item.duelLosses) || 0,
+    };
+};
+
+/* Record one resolved /duel as its own durable item — who challenged whom,
+ * the method, the wager, and who won — independent of the running
+ * duelWins/duelLosses counters (which only ever hold a tally, not the
+ * events behind it) and independent of CloudWatch (whose log group only
+ * retains a month). `entry` is
+ *   { method, wager, challengerId, challengerName, targetId, targetName,
+ *     winnerId, winnerName, loserId, loserName }
+ */
+const recordDuelHistory = async function (guildId, entry) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping duel history persistence.');
+        return;
+    }
+
+    const client = getClient();
+    const timestamp = new Date().toISOString();
+    // Random suffix guards against two duels resolving in the same
+    // millisecond in the same guild, which would otherwise collide.
+    const sortKey = `${DUEL_HISTORY_PREFIX}${timestamp}#${Math.random().toString(36).slice(2, 8)}`;
+
+    await client.send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId, userId: sortKey, timestamp, ...entry },
+    }));
+};
+
+/* Return the `limit` most recent resolved duels for a guild, newest first,
+ * as entries shaped like recordDuelHistory's `entry` (plus `timestamp`).
+ */
+const getDuelHistory = async function (guildId, limit = 10) {
+    if (!isConfigured()) {
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: '#g = :g AND begins_with(#u, :duelPrefix)',
+        ExpressionAttributeNames: { '#g': 'guildId', '#u': 'userId' },
+        ExpressionAttributeValues: { ':g': guildId, ':duelPrefix': DUEL_HISTORY_PREFIX },
+        ScanIndexForward: false, // newest first (sort key starts with an ISO timestamp)
+        Limit: limit,
+    }));
+
+    return (result.Items || []).map(({ guildId: _g, userId: _u, ...entry }) => entry);
+};
+
+module.exports = {
+    addPoints,
+    getLeaderboard,
+    getPoints,
+    recordDuelResult,
+    getDuelStats,
+    recordDuelHistory,
+    getDuelHistory,
+    isConfigured,
+};

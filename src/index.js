@@ -61,12 +61,14 @@ const loadCommandsFrom = (dir, label) => {
             const command = require(path.join(dir, file));
             const command_real_name = file.substring(0, file.length - 3); // ".js" = 3
 
-            //Every command module must export { description, category, hidden?, adminOnly?, options?, run }.
+            //Every command module must export { description, category, hidden?, adminOnly?, ephemeral?, options?, run }.
             //The run function is the dispatch target; the rest builds the Discord
             //registration payload and the generated /help. hidden excludes a command
             //from /help only (see commands/prompts/help.js); adminOnly still registers
             //it with Discord but restricts visibility to members with the Manage
-            //Server permission, via defaultMemberPermissions below.
+            //Server permission, via defaultMemberPermissions below. ephemeral makes
+            //the initial deferral (and so every editReply/followUp) visible only to
+            //the invoking member — see the interactionCreate handler below.
             if (typeof command.run !== 'function') {
                 console.error(`Skipping ${file}: module does not export a run function.`);
                 return;
@@ -142,7 +144,9 @@ client.on('interactionCreate', async (interaction) => {
         //Acknowledge immediately: Discord requires a response within 3 seconds,
         //and several commands scan history for far longer. Commands send their
         //real answer with editReply (first message) and followUp (subsequent).
-        await interaction.deferReply();
+        //ephemeral: true on a command's metadata keeps that whole exchange
+        //visible only to whoever ran it (e.g. /balance).
+        await interaction.deferReply(cmd.ephemeral ? { ephemeral: true } : undefined);
         await cmd.run(interaction, commands);
     } catch (error) {
         console.error(`Command ${interaction.commandName} threw:`, error);

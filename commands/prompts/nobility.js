@@ -15,17 +15,6 @@ const { titleFor } = require('../../src/nobilityTitle');
 // 2000-character message limit).
 const MAX_NOBLES = 25;
 
-/* Placeholder: assign the member's earned title as a real Discord role.
- * Intentionally not implemented yet — when we're ready, this is where the
- * bot will create/find the role named after the rank and add the member to
- * it (and remove their previous rank's role).
- */
-// eslint-disable-next-line no-unused-vars
-const assignNobilityRole = async (guild, userId, rank) => {
-    // TODO: role assignment on promotion. Requires the Manage Roles permission
-    // and a role-hierarchy position below the bot's own role.
-};
-
 const nobility = function (interaction) {
     const guild = interaction.guild;
 
