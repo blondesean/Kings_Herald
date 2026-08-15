@@ -1,11 +1,15 @@
 /* /duel <opponent> <method> <wager> - challenge another court member to a
  * wager of points, settled by Coin Flip, Rock Paper Scissors, or Death Roll.
  *
- * The challenge posts publicly with three buttons — Accept, Decline with
- * Honor, and Scoff and Decline — so the whole court can watch, but only the
- * challenged member's click does anything; anyone else clicking is turned
- * away with a private note. Both decline buttons end the engagement
- * identically (no duel, no points move); they only flavor the public
+ * The challenge posts publicly, in the same thread it was declared in, with
+ * three buttons — Accept, Decline with Honor, and Scoff and Decline — and
+ * pings the target so they're notified even if they aren't watching the
+ * channel right now. Discord has no way to show buttons to only one member
+ * of a public message, so the buttons are visible to everyone, but only the
+ * challenged member's click does anything: the challenger (who already
+ * committed by running the command) is told they can't back out, and anyone
+ * else is told it isn't their affair. Both decline buttons end the
+ * engagement identically (no duel, no points move); they only flavor the
  * announcement differently — neutral/respectful vs. dismissive. No response
  * within ACCEPT_WINDOW_MS and the challenge falls on deaf ears instead.
  *
@@ -259,7 +263,11 @@ const duel = async function (interaction) {
         return;
     }
 
+    // Content carries the ping (Discord only notifies on mentions in
+    // content, not embed text) so the target is notified even if they
+    // aren't watching the channel right now.
     const challengeMessage = await interaction.editReply({
+        content: `${targetMember}`,
         embeds: [buildChallengeEmbed(challengerMember, targetMember, method, wager)],
         components: [buildChallengeRow(false)],
     });
@@ -276,8 +284,20 @@ const duel = async function (interaction) {
 
     await new Promise((resolve) => {
         collector.on('collect', async (buttonInteraction) => {
+            // In self-duel test guilds challengerMember and targetMember are
+            // the same person — check target first so that case still works.
             if (buttonInteraction.user.id !== targetMember.id) {
-                await buttonInteraction.reply({ content: "This isn't thy duel to answer, Milord!", flags: MessageFlags.Ephemeral }).catch(() => {});
+                if (buttonInteraction.user.id === challengerMember.id) {
+                    await buttonInteraction.reply({
+                        content: pick([
+                            "Thou hast already declared this duel, Milord — there is no backing out now!",
+                            "One does not withdraw once the gauntlet is thrown. Make thy house proud!",
+                        ]),
+                        flags: MessageFlags.Ephemeral,
+                    }).catch(() => {});
+                } else {
+                    await buttonInteraction.reply({ content: 'This affair does not concern thee, Milord.', flags: MessageFlags.Ephemeral }).catch(() => {});
+                }
                 return;
             }
             response = buttonInteraction.customId.replace('duel_', ''); // 'accept' | 'decline_respectful' | 'decline_scoff'
