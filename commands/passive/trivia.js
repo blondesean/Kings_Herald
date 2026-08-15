@@ -2,11 +2,15 @@
  *
  * Once a day, at a random moment inside an 18-hour window (9:00 AM Eastern to
  * 3:00 AM Eastern the next day — i.e. 6:00 AM to midnight Pacific), the Herald
- * posts a nerd pop-culture trivia question with four answers (A/B/C/D), seeded
- * with the corresponding regional-indicator reactions. Five minutes later it
- * closes the question: anyone who reacted with exactly one of the four option
- * emojis, and it was the correct one, earns TRIVIA_POINTS. Reacting with more
- * than one option (hedging) disqualifies that member for the round.
+ * posts a nerd pop-culture trivia question with four answer buttons (A/B/C/D).
+ * Answering is done by clicking a button rather than reacting: Discord
+ * reactions are public (anyone can see who reacted with what), which let
+ * later answerers just copy whoever went first. A button click instead gets
+ * an ephemeral reply that only the clicker sees, so choices stay secret until
+ * the round closes. Clicking again changes the recorded answer — only the
+ * last click before the window closes counts. Five minutes after posting,
+ * the round closes and anyone whose final answer was correct earns
+ * TRIVIA_POINTS.
  *
  * The random start time only lands on a 15-minute boundary within the window
  * (9:00, 9:15, 9:30, ...), chosen fresh once a day.
@@ -17,9 +21,10 @@
  */
 
 const cron = require('node-cron');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { findTriviaRole } = require('../../src/triviaRole');
 const flavor = require('../../flavor_text');
 
 // Window start (Eastern local time) and length. The window runs 9:00 AM to
@@ -35,9 +40,8 @@ const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES; // 72 possible start time
 const ANSWER_WINDOW_MS = 5 * 60 * 1000; // how long the question stays open
 const TRIVIA_POINTS = 2;
 
-const OPTION_EMOJIS = ['🇦', '🇧', '🇨', '🇩'];
 const LETTERS = ['A', 'B', 'C', 'D'];
-const LETTER_BY_EMOJI = Object.fromEntries(OPTION_EMOJIS.map((emoji, i) => [emoji, LETTERS[i]]));
+const BUTTON_PREFIX = 'trivia_answer_';
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 
@@ -72,56 +76,74 @@ const nextQuestion = (consumeBag) => {
 
 const displayNameFor = (guild, user) => guild.members.cache.get(user.id)?.displayName || user.username;
 
+// One row of A/B/C/D answer buttons. `disabled` is used to visually close
+// voting once the round's answer window has ended.
+const buildOptionRow = (disabled = false) =>
+    new ActionRowBuilder().addComponents(
+        LETTERS.map((letter) =>
+            new ButtonBuilder()
+                .setCustomId(`${BUTTON_PREFIX}${letter}`)
+                .setLabel(letter)
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(disabled)
+        )
+    );
+
 const buildQuestionPost = (question) => {
     const optionLines = LETTERS.map((letter) => `**${letter}.** ${question.options[letter]}`).join('\n');
     const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle("The Herald's Daily Trivia")
         .setDescription(`Hear ye! A test of knowledge for the court:\n\n**${question.question}**\n\n${optionLines}`)
-        .setFooter({ text: `React with the matching letter within ${ANSWER_WINDOW_MS / 60000} minutes. Choose only one — hedging thy bets earns no favor, and scrying the Great Web for answers is known to invite a curse upon thy house name!` })
+        .setFooter({ text: `Click the button matching thy answer within ${ANSWER_WINDOW_MS / 60000} minutes — thy choice stays secret 'til the round closes, and thou mayest change it 'til then. Scrying the Great Web for answers is known to invite a curse upon thy house name!` })
         .setTimestamp();
 
-    return { embeds: [embed] };
+    return { embeds: [embed], components: [buildOptionRow(false)] };
 };
 
-// Fetch each option reaction's users (minus the Herald's own seed reactions)
-// and return { participants, winners } where participants is
-// [{ userId, displayName, letters: ['A', 'B', ...] }] for everyone who reacted
-// with at least one option emoji, and winners is the subset who reacted with
-// exactly one emoji and got it right.
-const tallyReactions = async (message, guild, correctLetter) => {
-    const botId = message.client.user.id;
-    const lettersByUser = new Map(); // userId -> { displayName, letters: Set }
+// Collect answers via button clicks for `windowMs`, then resolve with
+// { participants, winners }. participants is [{ userId, displayName, letter }]
+// for everyone who clicked an answer button — only their final click before
+// the window closes counts, so there's no reaction-style hedging to guard
+// against. Each click gets an ephemeral reply (visible only to the clicker),
+// so no one can see what anyone else picked.
+const collectAnswers = (message, guild, correctLetter, windowMs) =>
+    new Promise((resolve) => {
+        const votesByUser = new Map(); // userId -> { displayName, letter }
 
-    for (const emoji of OPTION_EMOJIS) {
-        const reaction = message.reactions.cache.get(emoji);
-        if (!reaction) continue;
+        const collector = message.createMessageComponentCollector({
+            componentType: ComponentType.Button,
+            time: windowMs,
+        });
 
-        const users = await reaction.users.fetch();
-        for (const user of users.values()) {
-            if (user.id === botId) continue;
+        collector.on('collect', async (buttonInteraction) => {
+            const letter = buttonInteraction.customId.slice(BUTTON_PREFIX.length);
+            const changed = votesByUser.has(buttonInteraction.user.id);
+            votesByUser.set(buttonInteraction.user.id, {
+                displayName: displayNameFor(guild, buttonInteraction.user),
+                letter,
+            });
 
-            const entry = lettersByUser.get(user.id) || {
-                displayName: displayNameFor(guild, user),
-                letters: new Set(),
-            };
-            entry.letters.add(LETTER_BY_EMOJI[emoji]);
-            lettersByUser.set(user.id, entry);
-        }
-    }
+            const reply = changed
+                ? `Thy answer is changed to **${letter}** — recorded in secret!`
+                : `Thy answer, **${letter}**, is recorded in secret!`;
+            await buttonInteraction.reply({ content: reply, flags: MessageFlags.Ephemeral }).catch(() => {});
+        });
 
-    const participants = [...lettersByUser.entries()].map(([userId, entry]) => ({
-        userId,
-        displayName: entry.displayName,
-        letters: [...entry.letters].sort(),
-    }));
+        collector.on('end', () => {
+            const participants = [...votesByUser.entries()].map(([userId, { displayName, letter }]) => ({
+                userId,
+                displayName,
+                letter,
+            }));
 
-    const winners = participants
-        .filter((p) => p.letters.length === 1 && p.letters[0] === correctLetter)
-        .map((p) => ({ userId: p.userId, displayName: p.displayName, points: TRIVIA_POINTS }));
+            const winners = participants
+                .filter((p) => p.letter === correctLetter)
+                .map((p) => ({ userId: p.userId, displayName: p.displayName, points: TRIVIA_POINTS }));
 
-    return { participants, winners };
-};
+            resolve({ participants, winners });
+        });
+    });
 
 // Log exactly who participated, what they picked, and who won — so a round
 // can be audited in CloudWatch without re-deriving it from Discord.
@@ -130,28 +152,30 @@ const logRoundBreakdown = (guildId, question, participants, winners, runLabel) =
     console.log(`Trivia round (${tag}): "${question.question}" — correct answer: ${question.correct}`);
 
     if (!participants.length) {
-        console.log(`Trivia round (${tag}): no one reacted.`);
+        console.log(`Trivia round (${tag}): no one answered.`);
         return;
     }
 
     for (const p of participants) {
         const won = winners.some((w) => w.userId === p.userId);
-        console.log(`  ${p.displayName} (${p.userId}): picked [${p.letters.join(', ')}] — ${won ? `+${TRIVIA_POINTS} correct` : 'no points'}`);
+        console.log(`  ${p.displayName} (${p.userId}): picked ${p.letter} — ${won ? `+${TRIVIA_POINTS} correct` : 'no points'}`);
     }
     console.log(`Trivia round (${tag}): ${winners.length} of ${participants.length} participant(s) earned points.`);
 };
+
+const SIGNUP_NOTE = '\n\n*Wish to be summoned the instant future questions are posed? Use /trivia_signup!*';
 
 const buildResultsPost = (question, winners, persist) => {
     const answerLine = `The correct answer was **${question.correct}. ${question.options[question.correct]}**.`;
     const previewNote = persist ? '' : '\n*(This be but a rehearsal — no points were truly bestowed.)*';
 
     if (winners.length === 0) {
-        return `${answerLine}\n\nAlas, none of the court answered true and true alone. Sharper wits next time!${previewNote}`;
+        return `${answerLine}\n\nAlas, none of the court answered true and true alone. Sharper wits next time!${previewNote}${SIGNUP_NOTE}`;
     }
 
     const mentions = winners.map((w) => `<@${w.userId}>`).join(', ');
     const nobleWord = winners.length === 1 ? 'noble' : 'nobles';
-    return `${answerLine}\n\nLet it be proclaimed: ${mentions} — ${winners.length === 1 ? 'this' : 'these'} wise ${nobleWord} answered true and true alone, earning ${TRIVIA_POINTS} points apiece!${previewNote}`;
+    return `${answerLine}\n\nLet it be proclaimed: ${mentions} — ${winners.length === 1 ? 'this' : 'these'} wise ${nobleWord} answered true and true alone, earning ${TRIVIA_POINTS} points apiece!${previewNote}${SIGNUP_NOTE}`;
 };
 
 // ---- entry points -------------------------------------------------------------
@@ -187,15 +211,21 @@ const runTrivia = async function (client, options = {}) {
                 continue;
             }
 
-            const message = await channel.send(buildQuestionPost(question));
-            for (const emoji of OPTION_EMOJIS) {
-                await message.react(emoji);
+            // Only the real scheduled round pings signed-up members
+            // (/trivia_signup) — preview runs shouldn't spam them.
+            const post = buildQuestionPost(question);
+            if (persist) {
+                const role = findTriviaRole(g);
+                if (role) post.content = `<@&${role.id}>`;
             }
+
+            const message = await channel.send(post);
             console.log(`Trivia: posted round to #${channel.name} in "${g.name}" [${runLabel}]. Closes in ${ANSWER_WINDOW_MS / 60000} minutes.`);
 
-            await new Promise((resolve) => setTimeout(resolve, ANSWER_WINDOW_MS));
-
-            const { participants, winners } = await tallyReactions(message, g, question.correct);
+            const { participants, winners } = await collectAnswers(message, g, question.correct, ANSWER_WINDOW_MS);
+            await message.edit({ components: [buildOptionRow(true)] }).catch((error) =>
+                console.error(`Trivia: could not disable buttons for guild "${g.name}":`, error.message)
+            );
             logRoundBreakdown(g.id, question, participants, winners, runLabel);
 
             if (persist && winners.length) {

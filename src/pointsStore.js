@@ -16,7 +16,7 @@
  */
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, UpdateCommand, QueryCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
 
 const TABLE_NAME = process.env.POINTS_TABLE_NAME;
 
@@ -93,4 +93,22 @@ const getLeaderboard = async function (guildId, limit = 10) {
         .slice(0, limit);
 };
 
-module.exports = { addPoints, getLeaderboard, isConfigured };
+/* Return a single member's point total (0 if they have none, or if the
+ * table isn't configured).
+ */
+const getPoints = async function (guildId, userId) {
+    if (!isConfigured()) {
+        return 0;
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+    }));
+
+    return (result.Item && result.Item.points) || 0;
+};
+
+module.exports = { addPoints, getLeaderboard, getPoints, isConfigured };

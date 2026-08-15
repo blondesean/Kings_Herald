@@ -6,6 +6,7 @@
  *
  * The step between rungs widens as the ladder climbs, so early points come
  * fast and the top is a long haul:
+ *   -   0        : Peasant — the starting station, below the first real rung
  *   -   5 to  50: +5  per rung (10 rungs)
  *   -  50 to 100: +10 per rung (5 rungs)
  *   - 100 to 400: +15 per rung (20 rungs)
@@ -18,6 +19,8 @@
  * don't need to stay evenly spaced; pick whatever fits the surrounding tier.
  */
 const nobilityRanks = () => [
+    // The starting station — anyone with points but below the first real rung
+    { points: 0, title: 'Peasant' },
     // The commons and local office
     { points: 5, title: 'Sheriff of Small Talk' },
     { points: 10, title: 'Boss of Babble' },

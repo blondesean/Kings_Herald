@@ -3,11 +3,15 @@
  * The member arrives as a typed slash-command option, so there is no name
  * parsing or member-list matching here — Discord's picker guarantees a real
  * guild member. The Herald announces up to three of their roles with royal
- * flair, or a basic announcement if they hold no meaningful roles.
+ * flair, or a basic announcement if they hold no meaningful roles. Also
+ * appends their current recap-ladder title (see /nobility and
+ * ../../src/nobilityTitle), if they've earned one.
  */
 
 const { ApplicationCommandOptionType } = require('discord.js');
 const flavor = require('../../flavor_text');
+const pointsStore = require('../../src/pointsStore');
+const { titleFor } = require('../../src/nobilityTitle');
 
 const whois = async function (interaction) {
     // A real GuildMember, resolved by Discord from the option.
@@ -39,6 +43,16 @@ const whois = async function (interaction) {
                        role.permissions.has('Administrator')
                    );
 
+    // Current recap title, if they've earned one (see /nobility).
+    let nobilityTitle = null;
+    try {
+        const points = await pointsStore.getPoints(interaction.guild.id, member.id);
+        nobilityTitle = titleFor(points);
+    } catch (error) {
+        console.error(`Could not look up recap title for ${displayName}:`, error);
+    }
+    const titleLine = nobilityTitle ? `\n\n**Their current station in the peerage: ${nobilityTitle.title}**` : '';
+
     // If no meaningful roles, give a basic announcement
     if (userRoles.length === 0) {
         const basicAnnouncements = flavor.basicAnnouncements(displayName);
@@ -47,6 +61,7 @@ const whois = async function (interaction) {
         if (isAdmin) {
             randomAnnouncement += "\n\n**...and they're also an Admin, Milord!**";
         }
+        randomAnnouncement += titleLine;
 
         await interaction.editReply(randomAnnouncement);
         return;
@@ -92,6 +107,7 @@ const whois = async function (interaction) {
     if (isAdmin) {
         announcement += "\n\n**...and they're also an Admin, Milord!**";
     }
+    announcement += titleLine;
 
     console.log("Herald announcement:", announcement);
     console.log(`Responding at ${new Date().toISOString()}`);

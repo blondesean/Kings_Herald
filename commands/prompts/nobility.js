@@ -3,30 +3,17 @@
  * Reads the weekly-recap points ledger (DynamoDB via ../../src/pointsStore)
  * and lists every member with points, top to bottom, with their earned title
  * and current tally. Titles come from the ladder in
- * flavor_text/nobilityRanks.js: a new rank starting at 5 points, with the
- * step between rungs widening as the ladder climbs (see that file for the
- * breakdown). Members with points but below the first rung are listed as
- * commoners still earning their name.
+ * flavor_text/nobilityRanks.js: Peasant at 0 points, then a new rank starting
+ * at 5 points, with the step between rungs widening as the ladder climbs
+ * (see that file for the breakdown).
  */
 
 const pointsStore = require('../../src/pointsStore');
-const nobilityRanks = require('../../flavor_text/nobilityRanks');
+const { titleFor } = require('../../src/nobilityTitle');
 
 // How many nobles to proclaim at most (also keeps the reply under Discord's
 // 2000-character message limit).
 const MAX_NOBLES = 25;
-
-// The highest rank whose threshold the member has reached, or null if they
-// are still a commoner.
-const titleFor = (points) => {
-    const ranks = nobilityRanks();
-    let earned = null;
-    for (const rank of ranks) {
-        if (points >= rank.points) earned = rank;
-        else break;
-    }
-    return earned;
-};
 
 /* Placeholder: assign the member's earned title as a real Discord role.
  * Intentionally not implemented yet — when we're ready, this is where the
@@ -51,10 +38,7 @@ const nobility = function (interaction) {
             const lines = leaderboard.map((entry, index) => {
                 const rank = titleFor(entry.points);
                 const points = entry.points === 1 ? 'point' : 'points';
-                const station = rank
-                    ? `**${rank.title}**`
-                    : '*a commoner, yet earning their name*';
-                return `${index + 1}. ${station} — ${entry.displayName} (${entry.points} ${points})`;
+                return `${index + 1}. **${rank.title}** — ${entry.displayName} (${entry.points} ${points})`;
             });
 
             const header = `**THE PEERAGE OF THE REALM**\n\n` +
