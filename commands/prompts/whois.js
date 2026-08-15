@@ -3,9 +3,12 @@
  * The member arrives as a typed slash-command option, so there is no name
  * parsing or member-list matching here — Discord's picker guarantees a real
  * guild member. The Herald announces up to three of their roles with royal
- * flair, or a basic announcement if they hold no meaningful roles. Also
- * appends their current recap-ladder title (see /nobility and
- * ../../src/nobilityTitle), if they've earned one.
+ * flair, or a basic announcement if they hold no meaningful roles. Either
+ * way, their current recap-ladder title (see /nobility and
+ * ../../src/nobilityTitle) is woven into the opening line itself — e.g.
+ * "You seek knowledge of the Sheriff of Small Talk <name>?" — rather than
+ * tacked on as a separate sentence. The admin note, if any, is always the
+ * last line of the reply.
  */
 
 const { ApplicationCommandOptionType } = require('discord.js');
@@ -43,7 +46,9 @@ const whois = async function (interaction) {
                        role.permissions.has('Administrator')
                    );
 
-    // Current recap title, if they've earned one (see /nobility).
+    // Current recap title, if they've earned one (see /nobility). Every
+    // member with a tracked point total has at least Peasant, so this only
+    // stays null if the ledger lookup itself failed.
     let nobilityTitle = null;
     try {
         const points = await pointsStore.getPoints(interaction.guild.id, member.id);
@@ -51,17 +56,16 @@ const whois = async function (interaction) {
     } catch (error) {
         console.error(`Could not look up recap title for ${displayName}:`, error);
     }
-    const titleLine = nobilityTitle ? `\n\n**Their current station in the peerage: ${nobilityTitle.title}**` : '';
+    const title = nobilityTitle ? nobilityTitle.title : 'commoner';
 
     // If no meaningful roles, give a basic announcement
     if (userRoles.length === 0) {
-        const basicAnnouncements = flavor.basicAnnouncements(displayName);
+        const basicAnnouncements = flavor.basicAnnouncements(displayName, title);
         let randomAnnouncement = basicAnnouncements[Math.floor(Math.random() * basicAnnouncements.length)];
 
         if (isAdmin) {
             randomAnnouncement += "\n\n**...and they're also an Admin, Milord!**";
         }
-        randomAnnouncement += titleLine;
 
         await interaction.editReply(randomAnnouncement);
         return;
@@ -84,7 +88,7 @@ const whois = async function (interaction) {
     const royalAdjectives = flavor.royalAdjectives();
 
     // Herald announcement templates
-    const announcementTemplates = flavor.announcementTemplates(displayName);
+    const announcementTemplates = flavor.announcementTemplates(displayName, title);
 
     // Select random template
     const template = announcementTemplates[Math.floor(Math.random() * announcementTemplates.length)];
@@ -103,11 +107,10 @@ const whois = async function (interaction) {
     const finalAdj = royalAdjectives[Math.floor(Math.random() * royalAdjectives.length)];
     announcement += "\n" + template.closing.replace("{adj}", finalAdj);
 
-    // Add admin announcement if they're an admin
+    // Add admin announcement if they're an admin — always the last line
     if (isAdmin) {
         announcement += "\n\n**...and they're also an Admin, Milord!**";
     }
-    announcement += titleLine;
 
     console.log("Herald announcement:", announcement);
     console.log(`Responding at ${new Date().toISOString()}`);

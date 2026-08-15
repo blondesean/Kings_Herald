@@ -1,10 +1,12 @@
-/* Flavor text: full herald announcement templates for !whois.
- * Takes the member's nickname; the {adj} and {role} placeholders are filled in
- * by the caller for each selected role. */
-const announcementTemplates = (nickname) => [
+/* Flavor text: full herald announcement templates for /whois.
+ * Takes the member's nickname and their current recap-ladder title (see
+ * src/nobilityTitle.js), which replaces what used to be a fixed adjective
+ * like "esteemed" in the intro line. The {adj} and {role} placeholders are
+ * still filled in by the caller for each selected role. */
+const announcementTemplates = (nickname, title) => [
     {
         opening: "HEAR YE, HEAR YE!",
-        intro: `Thou dost inquire about ${nickname}?`,
+        intro: `Thou dost inquire about the ${title} ${nickname}?`,
         titles: [
             "Behold! The {adj} {role}!",
             "Witness! The {adj} {role}!",
@@ -14,7 +16,7 @@ const announcementTemplates = (nickname) => [
     },
     {
         opening: "BY ROYAL DECREE!",
-        intro: `You seek knowledge of the esteemed ${nickname}?`,
+        intro: `You seek knowledge of the ${title} ${nickname}?`,
         titles: [
             "Know them as the {adj} {role}!",
             "They are called the {adj} {role}!",
@@ -24,7 +26,7 @@ const announcementTemplates = (nickname) => [
     },
     {
         opening: "PROCLAMATION!",
-        intro: `Ah! You would know of ${nickname}!`,
+        intro: `Ah! You would know of the ${title} ${nickname}!`,
         titles: [
             "The realm knows them as the {adj} {role}!",
             "Far and wide, they're hailed as the {adj} {role}!",
