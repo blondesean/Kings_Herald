@@ -18,6 +18,9 @@
  * Exposes:
  *   scheduleTrivia(client) - registers the daily randomized timer (call once, on ready)
  *   runTrivia(client, opts) - runs one round; reused by the /trivia preview command
+ *   getScheduledFireTime() - the Date today's round is armed to fire, or null
+ *                            if the window hasn't opened yet or already fired;
+ *                            backs the /trivia_time preview command
  */
 
 const cron = require('node-cron');
@@ -42,6 +45,12 @@ const TRIVIA_POINTS = 2;
 
 const LETTERS = ['A', 'B', 'C', 'D'];
 const BUTTON_PREFIX = 'trivia_answer_';
+
+// The Date today's round is armed to fire, set when the window opens and
+// cleared once it actually runs. In memory only — not persisted, so a
+// restart loses it until the next window open (see scheduleTrivia).
+let scheduledFireAt = null;
+const getScheduledFireTime = () => scheduledFireAt;
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 
@@ -263,11 +272,13 @@ const scheduleTrivia = function (client) {
             const slot = Math.floor(Math.random() * SLOT_COUNT);
             const delayMs = slot * SLOT_MINUTES * 60 * 1000;
             const fireAt = new Date(Date.now() + delayMs);
+            scheduledFireAt = fireAt;
 
             console.log(`Trivia: today's round will fire at ~${fireAt.toISOString()} (slot ${slot + 1}/${SLOT_COUNT}).`);
 
             setTimeout(() => {
                 console.log('Running scheduled trivia round...');
+                scheduledFireAt = null;
                 runTrivia(client, { persist: true }).catch((error) =>
                     console.error('Scheduled trivia round failed:', error)
                 );
@@ -279,4 +290,4 @@ const scheduleTrivia = function (client) {
     console.log(`Trivia scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), random ${SLOT_MINUTES}-minute slot across ${WINDOW_HOURS}h.`);
 };
 
-module.exports = { scheduleTrivia, runTrivia };
+module.exports = { scheduleTrivia, runTrivia, getScheduledFireTime };
