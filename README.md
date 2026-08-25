@@ -46,6 +46,7 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/trivia_signup` | Toggles the "Hear Ye Trivia" role on the caller: run once to be summoned when the daily trivia round posts, run again to be removed (`src/triviaRole.js`). |
 | `/duel <opponent> <method> <wager>` | Challenges another member to a points wager, settled by Coin Flip, Rock Paper Scissors, or Death Roll, once they accept via button (`commands/prompts/duel.js`). |
 | `/duel_stats [member]` | Reports a member's `/duel` win/loss record and win rate (defaults to whoever ran it). |
+| `/wow_trivia` | Posts a free-text WoW trivia question (ported from a classic WoW addon's question bank) — first member to type the correct answer in chat within 30 seconds wins the points (`commands/prompts/wow_trivia.js`, `flavor_text/wowTriviaQuestions.js`). |
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
 | `/help` | Lists the available commands in the herald's voice. |
 

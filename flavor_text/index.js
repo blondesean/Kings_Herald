@@ -20,5 +20,7 @@ module.exports = {
     basicAnnouncements: require('./basicAnnouncements'),
     announcementTemplates: require('./announcementTemplates'),
     triviaQuestions: require('./triviaQuestions'),
+    wowTriviaQuestions: require('./wowTriviaQuestions'),
     ...require('./duelFlavor'),
+    ...require('./wowTriviaFlavor'),
 };
