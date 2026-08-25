@@ -1,5 +1,5 @@
 /* Shared helper: the role members can join via /wow_trivia_signup to be
- * pinged when a /wow_trivia session starts (commands/prompts/wow_trivia.js).
+ * pinged when a /wow_trivia session starts (commands/passive/wowTrivia.js).
  * Looked up by name per guild rather than stored anywhere — Discord persists
  * the role itself, so nothing needs to survive a bot restart. Mirrors
  * src/triviaRole.js exactly; kept as its own role (rather than reusing "Hear

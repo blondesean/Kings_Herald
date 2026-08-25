@@ -1,4 +1,4 @@
-/* Flavor text: variation pools for /wow_trivia (see commands/prompts/wow_trivia.js).
+/* Flavor text: variation pools for /wow_trivia (see commands/passive/wowTrivia.js).
  * Each entry is a function returning its array of strings (some take
  * parameters to interpolate).
  *

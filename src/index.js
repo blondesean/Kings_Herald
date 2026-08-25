@@ -37,6 +37,7 @@ const path = require('path');
 const celebrate = require('./../commands/passive/celebrate');
 const { scheduleWeeklyRecap } = require('./../commands/passive/weeklyRecap');
 const { scheduleTrivia } = require('./../commands/passive/trivia');
+const { scheduleWowTriviaWednesday } = require('./../commands/passive/wowTrivia');
 const { trackVoiceStateUpdate, startVoiceTracking } = require('./../commands/passive/voiceTime');
 
 //Slash commands are auto-loaded by filename from commands/prompts (user-facing)
@@ -121,6 +122,7 @@ client.on('ready', (c) => {
     // Schedule the weekly recap and daily trivia now that the bot is connected.
     scheduleWeeklyRecap(client);
     scheduleTrivia(client);
+    scheduleWowTriviaWednesday(client);
     startVoiceTracking(client);
 });
 

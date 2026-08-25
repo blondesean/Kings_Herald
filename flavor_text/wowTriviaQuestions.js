@@ -1,4 +1,4 @@
-/* WoW trivia bank for /wow_trivia (commands/prompts/wow_trivia.js).
+/* WoW trivia bank for /wow_trivia (commands/passive/wowTrivia.js).
  *
  * Each entry is { question, answers }, answers being every string that
  * counts as correct (matched case-insensitively, exact after trimming —

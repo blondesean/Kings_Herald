@@ -134,7 +134,8 @@ const buildQuestionPost = (question) => {
 // for everyone who clicked an answer button — only their final click before
 // the window closes counts, so there's no reaction-style hedging to guard
 // against. Each click gets an ephemeral reply (visible only to the clicker),
-// so no one can see what anyone else picked.
+// so no one can see what anyone else picked. Bot clicks are ignored outright
+// (no reply, no recorded vote) — only real members can win trivia points.
 const collectAnswers = (message, guild, correctLetter, windowMs) =>
     new Promise((resolve) => {
         const votesByUser = new Map(); // userId -> { displayName, letter }
@@ -145,6 +146,10 @@ const collectAnswers = (message, guild, correctLetter, windowMs) =>
         });
 
         collector.on('collect', async (buttonInteraction) => {
+            // A bot account with permission to click buttons (another bot in
+            // the server, say) shouldn't be able to win trivia points.
+            if (buttonInteraction.user.bot) return;
+
             const letter = buttonInteraction.customId.slice(BUTTON_PREFIX.length);
             const changed = votesByUser.has(buttonInteraction.user.id);
             votesByUser.set(buttonInteraction.user.id, {
