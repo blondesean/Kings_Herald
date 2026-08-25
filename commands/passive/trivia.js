@@ -56,29 +56,48 @@ const EMBED_COLOR = 0xd4af37; // heraldic gold
 
 // ---- question selection -----------------------------------------------------
 
-// Shuffle bag so scheduled rounds work through the whole question bank before
-// any question repeats. Preview/test runs (see runTrivia's `consumeBag` option)
+// No-repeat cycle so scheduled rounds work through the whole question bank
+// before any question repeats: each pick excludes whatever's already been
+// asked since the last full cycle, and once nothing's left unasked, the
+// cycle restarts. Preview/test runs (see runTrivia's `consumeBag` option)
 // pick straight from the full bank instead, so testing doesn't burn through
-// the bag real play relies on.
-let bag = [];
-const shuffle = (array) => {
-    const copy = [...array];
-    for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    return copy;
-};
+// the cycle real play relies on.
+//
+// Tracked by question text via pointsStore.getUsedTriviaQuestions/
+// setUsedTriviaQuestions (DynamoDB) rather than kept purely in memory, so a
+// restart — Fargate Spot can reclaim the task with as little as a 2-minute
+// warning — resumes the same cycle instead of starting over and risking an
+// early repeat. Cached in memory once loaded so routine picks don't each
+// cost a read; `null` means "not yet loaded from persistence".
+let usedQuestions = null;
 
-const nextQuestion = (consumeBag) => {
+const nextQuestion = async (consumeBag) => {
     const allQuestions = flavor.triviaQuestions();
     if (!consumeBag) {
         return allQuestions[Math.floor(Math.random() * allQuestions.length)];
     }
-    if (bag.length === 0) {
-        bag = shuffle(allQuestions);
+
+    if (usedQuestions === null) {
+        usedQuestions = await pointsStore.getUsedTriviaQuestions();
     }
-    return bag.pop();
+
+    let candidates = allQuestions.filter((q) => !usedQuestions.includes(q.question));
+    if (candidates.length === 0) {
+        // Whole bank asked through since the last reset — start a fresh cycle.
+        usedQuestions = [];
+        candidates = allQuestions;
+    }
+
+    const picked = candidates[Math.floor(Math.random() * candidates.length)];
+    usedQuestions.push(picked.question);
+
+    try {
+        await pointsStore.setUsedTriviaQuestions(usedQuestions);
+    } catch (error) {
+        console.error('Trivia: failed to persist used-question state:', error.message);
+    }
+
+    return picked;
 };
 
 // ---- helpers ----------------------------------------------------------------
@@ -210,7 +229,7 @@ const runTrivia = async function (client, options = {}) {
     } = options;
     const guilds = guild ? [guild] : Array.from(client.guilds.cache.values());
 
-    const question = nextQuestion(consumeBag);
+    const question = await nextQuestion(consumeBag);
 
     for (const g of guilds) {
         try {

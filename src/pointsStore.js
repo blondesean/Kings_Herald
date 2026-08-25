@@ -19,6 +19,12 @@
  * addVoiceSeconds/getWeeklyVoiceStats/resetWeeklyVoiceSeconds and
  * commands/passive/voiceTime.js.
  *
+ * One more synthetic item, keyed (TRIVIA_STATE_PARTITION, "BAG") rather than
+ * a real guildId — the daily trivia's shared no-repeat cycle isn't
+ * guild-scoped (one scheduled run posts the same question to every guild),
+ * so it doesn't fit the per-guild partitioning above. See
+ * getUsedTriviaQuestions/setUsedTriviaQuestions and commands/passive/trivia.js.
+ *
  * Configuration comes from the environment:
  *   POINTS_TABLE_NAME  - the DynamoDB table name (set by the CDK stack)
  *   AWS_REGION         - resolved automatically on Fargate; set it locally to
@@ -46,6 +52,13 @@ const DUEL_HISTORY_PREFIX = 'DUEL#';
 // division against the running totalVoiceSeconds counter.
 const VOICE_POINTS_PER_HOUR = 2;
 const VOICE_SECONDS_PER_POINT = 3600 / VOICE_POINTS_PER_HOUR;
+
+// Synthetic partition for the daily trivia's used-question state (see
+// commands/passive/trivia.js). Not a real guildId — Discord guild IDs are
+// always purely numeric snowflakes, so this value can never collide with
+// one — and there's only ever one item in it, under a fixed sort key.
+const TRIVIA_STATE_PARTITION = 'TRIVIA#STATE';
+const TRIVIA_STATE_SORT_KEY = 'BAG';
 
 // Lazily created so the bot can run locally without AWS credentials configured.
 let docClient = null;
@@ -243,6 +256,46 @@ const resetWeeklyVoiceSeconds = async function (guildId, userIds) {
     }
 };
 
+/* Return the trivia question texts already asked during the current
+ * no-repeat cycle, as a string array (empty if no cycle is in progress, or
+ * the table isn't configured — in which case the cycle tracks in-memory only
+ * for the life of the process, same as before this existed). Backs
+ * commands/passive/trivia.js's restart-safe no-repeat bag.
+ */
+const getUsedTriviaQuestions = async function () {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; returning empty trivia bag state.');
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: TRIVIA_STATE_PARTITION, userId: TRIVIA_STATE_SORT_KEY },
+    }));
+
+    return (result.Item && result.Item.usedQuestions) || [];
+};
+
+/* Overwrite the persisted set of trivia question texts asked this cycle.
+ * Pass an empty array to start a fresh cycle (called once the whole bank
+ * has been asked through — see commands/passive/trivia.js).
+ */
+const setUsedTriviaQuestions = async function (usedQuestions) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping trivia bag persistence.');
+        return;
+    }
+
+    const client = getClient();
+
+    await client.send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: TRIVIA_STATE_PARTITION, userId: TRIVIA_STATE_SORT_KEY, usedQuestions },
+    }));
+};
+
 /* Record a /duel outcome: increments the winner's duelWins and the loser's
  * duelLosses (separate attributes on the same points-table item, so no
  * second table is needed). `winner`/`loser` are { userId, displayName }.
@@ -349,6 +402,8 @@ module.exports = {
     getWeeklyVoiceStats,
     resetWeeklyVoiceSeconds,
     VOICE_POINTS_PER_HOUR,
+    getUsedTriviaQuestions,
+    setUsedTriviaQuestions,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,
