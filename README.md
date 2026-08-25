@@ -44,6 +44,7 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/balance` | Checks your own point balance and current title. Ephemeral — only you see the reply. |
 | `/reactions [member]` | Scans the past month of messages and reports the member's most-used reaction emojis (defaults to whoever ran it). |
 | `/trivia_signup` | Toggles the "Hear Ye Trivia" role on the caller: run once to be summoned when the daily trivia round posts, run again to be removed (`src/triviaRole.js`). |
+| `/wow_trivia_signup` | Toggles the "Those Buffed with Arcane Intellect" role on the caller: run once to be summoned when a `/wow_trivia` session starts, run again to be removed (`src/wowTriviaRole.js`). |
 | `/duel <opponent> <method> <wager>` | Challenges another member to a points wager, settled by Coin Flip, Rock Paper Scissors, or Death Roll, once they accept via button (`commands/prompts/duel.js`). |
 | `/duel_stats [member]` | Reports a member's `/duel` win/loss record and win rate (defaults to whoever ran it). |
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
@@ -53,7 +54,7 @@ Two [preview commands](#passive-vs-prompt-commands) exist (`/recap` for the week
 
 A third `adminOnly` + `hidden` command lives directly in `commands/prompts/`: `/point_adjust <member> <amount>` grants or deducts a member's ledger points by a set amount (positive to grant, negative to deduct), for correcting mistakes or rewarding things off the books. It isn't a preview of a passive behavior, so it doesn't live in `commands/passive/preview/`, but the visibility restriction works the same way. Every adjustment — and every `/duel` result — is logged to CloudWatch for audit (see `commands/prompts/point_adjust.js` and `commands/prompts/duel.js`).
 
-A fourth: `/wow_trivia [questions]` runs a free-text WoW trivia session (ported from a classic WoW addon's question bank) — `questions` questions in a row (default 1, max 15), each won by whoever types the correct answer in chat first within 30 seconds. Whoever wins the most questions is crowned champion and paid a flat 2 points at the end (ties share the crown, each paid in full); no points change hands per question. Only starting a session is restricted to Manage Server — once running, anyone in the channel can play (`commands/prompts/wow_trivia.js`, `flavor_text/wowTriviaQuestions.js`).
+A fourth: `/wow_trivia [questions]` runs a free-text WoW trivia session (ported from a classic WoW addon's question bank) — `questions` questions in a row (default 1, max 15), each won by whoever types the correct answer in chat first within 30 seconds. Whoever wins the most questions is crowned champion and paid a flat 2 points at the end (ties share the crown, each paid in full); no points change hands per question. Only starting a session is restricted to Manage Server — once running, anyone in the channel can play. Starting one pings the `/wow_trivia_signup` role, same as the daily trivia pings its own (`commands/prompts/wow_trivia.js`, `flavor_text/wowTriviaQuestions.js`).
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
@@ -153,7 +154,7 @@ Missing intents fail loudly: the bot exits with `Used disallowed intents` at sta
 | Read Message History | `/reactions`, weekly recap scans. |
 | Embed Links | The weekly recap's and trivia's rich embeds (without this the embed silently fails to render). |
 | Manage Messages | Pinning celebrated posts (`celebrate.js`). |
-| Manage Roles | Creating and assigning the "Hear Ye Trivia" role (`/trivia_signup`, `src/triviaRole.js`). |
+| Manage Roles | Creating and assigning the "Hear Ye Trivia" and "Those Buffed with Arcane Intellect" roles (`/trivia_signup`, `/wow_trivia_signup`, `src/triviaRole.js`, `src/wowTriviaRole.js`). |
 
 Ready-made invite URLs (`268528640` encodes exactly the six permissions above):
 

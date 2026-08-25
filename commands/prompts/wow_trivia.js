@@ -36,6 +36,7 @@
 
 const { ApplicationCommandOptionType, EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const { findWowTriviaRole } = require('../../src/wowTriviaRole');
 const flavor = require('../../flavor_text');
 
 const ANSWER_WINDOW_MS = 30 * 1000;
@@ -115,7 +116,12 @@ const wowTrivia = async function (interaction) {
     const allQuestions = flavor.wowTriviaQuestions();
     const roundQuestions = shuffle(allQuestions).slice(0, totalQuestions);
 
-    await interaction.editReply(pick(flavor.wowTriviaIntroLines()));
+    // Ping whoever's signed up (/wow_trivia_signup), same as the daily
+    // trivia pings its own role — content carries the mention since Discord
+    // doesn't notify on mentions inside embeds.
+    const role = findWowTriviaRole(guild);
+    const introLine = pick(flavor.wowTriviaIntroLines());
+    await interaction.editReply(role ? `<@&${role.id}> ${introLine}` : introLine);
 
     // userId -> { displayName, count } — how many questions each member won.
     const roundsWonBy = new Map();
