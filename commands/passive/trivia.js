@@ -1,8 +1,8 @@
 /* Passive behavior: the Herald's daily trivia.
  *
- * Once a day, at a random moment inside an 18-hour window (9:00 AM Eastern to
- * 3:00 AM Eastern the next day — i.e. 6:00 AM to midnight Pacific), the Herald
- * posts a nerd pop-culture trivia question with four answer buttons (A/B/C/D).
+ * Once a day, at a random moment inside a 15-hour window (9:00 AM Eastern to
+ * midnight Eastern — i.e. 6:00 AM to 9:00 PM Pacific), the Herald posts a
+ * nerd pop-culture trivia question with four answer buttons (A/B/C/D).
  * Answering is done by clicking a button rather than reacting: Discord
  * reactions are public (anyone can see who reacted with what), which let
  * later answerers just copy whoever went first. A button click instead gets
@@ -31,14 +31,14 @@ const { findTriviaRole } = require('../../src/triviaRole');
 const flavor = require('../../flavor_text');
 
 // Window start (Eastern local time) and length. The window runs 9:00 AM to
-// 3:00 AM the following day Eastern, which is 6:00 AM to midnight Pacific —
-// an 18-hour span either way you name it.
+// midnight Eastern, which is 6:00 AM to 9:00 PM Pacific — a 15-hour span
+// either way you name it.
 const WINDOW_CRON = '0 9 * * *';
-const WINDOW_HOURS = 18;
+const WINDOW_HOURS = 15;
 const TIMEZONE = 'America/New_York';
 
 const SLOT_MINUTES = 15;
-const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES; // 72 possible start times
+const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES; // 60 possible start times
 
 const ANSWER_WINDOW_MS = 5 * 60 * 1000; // how long the question stays open
 const TRIVIA_POINTS = 2;

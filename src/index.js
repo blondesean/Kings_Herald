@@ -15,6 +15,7 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildVoiceStates,
     ],
     partials: [
         Partials.Message,
@@ -36,6 +37,7 @@ const path = require('path');
 const celebrate = require('./../commands/passive/celebrate');
 const { scheduleWeeklyRecap } = require('./../commands/passive/weeklyRecap');
 const { scheduleTrivia } = require('./../commands/passive/trivia');
+const { trackVoiceStateUpdate, startVoiceTracking } = require('./../commands/passive/voiceTime');
 
 //Slash commands are auto-loaded by filename from commands/prompts (user-facing)
 //and commands/passive/preview (manual triggers for scheduled passive behaviors,
@@ -119,10 +121,15 @@ client.on('ready', (c) => {
     // Schedule the weekly recap and daily trivia now that the bot is connected.
     scheduleWeeklyRecap(client);
     scheduleTrivia(client);
+    startVoiceTracking(client);
 });
 
 //Register commands when the bot is invited to a new server.
 client.on('guildCreate', registerCommands);
+
+//Track voice-channel presence for the Herald's continuous voice-chat points
+//(see commands/passive/voiceTime.js).
+client.on('voiceStateUpdate', trackVoiceStateUpdate);
 
 //Client reacts whenever a slash command comes in
 client.on('interactionCreate', async (interaction) => {

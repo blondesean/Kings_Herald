@@ -13,6 +13,12 @@
  *     ID (always purely numeric), so it's safely excluded from
  *     getLeaderboard's results (see recordDuelHistory/getDuelHistory).
  *
+ * A real user's item also carries totalVoiceSeconds (lifetime, never reset —
+ * what voice points are computed from) and weeklyVoiceSeconds (reset after
+ * each weekly recap — what the recap's voice podium ranks on). See
+ * addVoiceSeconds/getWeeklyVoiceStats/resetWeeklyVoiceSeconds and
+ * commands/passive/voiceTime.js.
+ *
  * Configuration comes from the environment:
  *   POINTS_TABLE_NAME  - the DynamoDB table name (set by the CDK stack)
  *   AWS_REGION         - resolved automatically on Fargate; set it locally to
@@ -32,6 +38,14 @@ const TABLE_NAME = process.env.POINTS_TABLE_NAME;
 // and partition as real per-user items but are never mistaken for one
 // (Discord user IDs are always purely numeric snowflakes).
 const DUEL_HISTORY_PREFIX = 'DUEL#';
+
+// Voice-chat points: awarded continuously as members spend time connected to
+// a voice channel (see commands/passive/voiceTime.js), independent of the
+// weekly recap's schedule. Expressed as seconds-per-point (rather than a
+// fraction) so addVoiceSeconds can compute earned points with integer floor
+// division against the running totalVoiceSeconds counter.
+const VOICE_POINTS_PER_HOUR = 2;
+const VOICE_SECONDS_PER_POINT = 3600 / VOICE_POINTS_PER_HOUR;
 
 // Lazily created so the bot can run locally without AWS credentials configured.
 let docClient = null;
@@ -127,6 +141,106 @@ const getPoints = async function (guildId, userId) {
     }));
 
     return (result.Item && result.Item.points) || 0;
+};
+
+/* Credit a member with `seconds` of voice-channel time: adds to their
+ * running totalVoiceSeconds (never reset — this is what points are computed
+ * from) and their weeklyVoiceSeconds (reset after each weekly recap — see
+ * resetWeeklyVoiceSeconds — and used only to rank the recap's voice podium).
+ * Points are floor(newTotal / VOICE_SECONDS_PER_POINT) -
+ * floor(priorTotal / VOICE_SECONDS_PER_POINT), so fractional time always
+ * carries forward to the next call rather than being dropped.
+ *
+ * Not a single atomic DynamoDB update (needs a read first to compute the
+ * points delta), but the bot only ever runs one task at a time, and a given
+ * member's voice sessions are only ever flushed from one place in that one
+ * process, so there's no concurrent writer to race against.
+ */
+const addVoiceSeconds = async function (guildId, userId, displayName, seconds) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping voice time persistence.');
+        return;
+    }
+    if (!seconds || seconds <= 0) return;
+
+    const client = getClient();
+
+    const existing = await client.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+    }));
+    const priorTotal = (existing.Item && existing.Item.totalVoiceSeconds) || 0;
+    const newTotal = priorTotal + seconds;
+    const pointsEarned = Math.floor(newTotal / VOICE_SECONDS_PER_POINT) - Math.floor(priorTotal / VOICE_SECONDS_PER_POINT);
+
+    await client.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+        UpdateExpression: 'SET #dn = :n, #tvs = :newTotal ADD #wvs :s, #pts :p',
+        ExpressionAttributeNames: {
+            '#dn': 'displayName',
+            '#tvs': 'totalVoiceSeconds',
+            '#wvs': 'weeklyVoiceSeconds',
+            '#pts': 'points',
+        },
+        ExpressionAttributeValues: {
+            ':n': displayName || 'a noble',
+            ':newTotal': newTotal,
+            ':s': seconds,
+            ':p': pointsEarned,
+        },
+    }));
+};
+
+/* Return every member of a guild with voice time logged since the last
+ * weekly reset, as [{ userId, displayName, weeklyVoiceSeconds }]. Backs the
+ * weekly recap's voice podium (commands/passive/weeklyRecap.js).
+ */
+const getWeeklyVoiceStats = async function (guildId) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; returning empty voice stats.');
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: '#g = :g',
+        ExpressionAttributeNames: { '#g': 'guildId' },
+        ExpressionAttributeValues: { ':g': guildId },
+    }));
+
+    const items = result.Items || [];
+    return items
+        .filter((item) => !String(item.userId).startsWith(DUEL_HISTORY_PREFIX))
+        .filter((item) => (item.weeklyVoiceSeconds || 0) > 0)
+        .map((item) => ({
+            userId: item.userId,
+            displayName: item.displayName || 'a noble',
+            weeklyVoiceSeconds: item.weeklyVoiceSeconds,
+        }));
+};
+
+/* Zero out weeklyVoiceSeconds for the given members (their totalVoiceSeconds
+ * and points are untouched — this only resets the podium-ranking window).
+ * Called by the weekly recap right after it reads and awards the voice
+ * podium, so next week starts from zero.
+ */
+const resetWeeklyVoiceSeconds = async function (guildId, userIds) {
+    if (!isConfigured() || !userIds.length) return;
+
+    const client = getClient();
+
+    for (const userId of userIds) {
+        await client.send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: 'SET #wvs = :zero',
+            ExpressionAttributeNames: { '#wvs': 'weeklyVoiceSeconds' },
+            ExpressionAttributeValues: { ':zero': 0 },
+        }));
+    }
 };
 
 /* Record a /duel outcome: increments the winner's duelWins and the loser's
@@ -231,6 +345,10 @@ module.exports = {
     addPoints,
     getLeaderboard,
     getPoints,
+    addVoiceSeconds,
+    getWeeklyVoiceStats,
+    resetWeeklyVoiceSeconds,
+    VOICE_POINTS_PER_HOUR,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,
