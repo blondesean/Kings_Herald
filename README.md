@@ -46,13 +46,14 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/trivia_signup` | Toggles the "Hear Ye Trivia" role on the caller: run once to be summoned when the daily trivia round posts, run again to be removed (`src/triviaRole.js`). |
 | `/duel <opponent> <method> <wager>` | Challenges another member to a points wager, settled by Coin Flip, Rock Paper Scissors, or Death Roll, once they accept via button (`commands/prompts/duel.js`). |
 | `/duel_stats [member]` | Reports a member's `/duel` win/loss record and win rate (defaults to whoever ran it). |
-| `/wow_trivia` | Posts a free-text WoW trivia question (ported from a classic WoW addon's question bank) — first member to type the correct answer in chat within 30 seconds wins the points (`commands/prompts/wow_trivia.js`, `flavor_text/wowTriviaQuestions.js`). |
 | `/complain <grievance>` | Files the grievance verbatim as a GitHub issue in the repo (titled `Request from <tag> on <YYYY-MM-DD>`) and replies with a link. |
 | `/help` | Lists the available commands in the herald's voice. |
 
 Two [preview commands](#passive-vs-prompt-commands) exist (`/recap` for the weekly recap, `/trivia` for daily trivia). Both are registered with Discord but restricted to members with the Manage Server permission, so they're only visible to admins in the picker. The underlying schedules still fire on their own regardless.
 
 A third `adminOnly` + `hidden` command lives directly in `commands/prompts/`: `/point_adjust <member> <amount>` grants or deducts a member's ledger points by a set amount (positive to grant, negative to deduct), for correcting mistakes or rewarding things off the books. It isn't a preview of a passive behavior, so it doesn't live in `commands/passive/preview/`, but the visibility restriction works the same way. Every adjustment — and every `/duel` result — is logged to CloudWatch for audit (see `commands/prompts/point_adjust.js` and `commands/prompts/duel.js`).
+
+A fourth: `/wow_trivia [questions]` runs a free-text WoW trivia session (ported from a classic WoW addon's question bank) — `questions` questions in a row (default 1, max 15), each won by whoever types the correct answer in chat first within 30 seconds. Whoever wins the most questions is crowned champion and paid a flat 2 points at the end (ties share the crown, each paid in full); no points change hands per question. Only starting a session is restricted to Manage Server — once running, anyone in the channel can play (`commands/prompts/wow_trivia.js`, `flavor_text/wowTriviaQuestions.js`).
 
 Commands that aren't currently in use live in `commands/retired/` for reference. They are not loaded at runtime.
 
