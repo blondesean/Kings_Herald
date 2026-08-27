@@ -46,6 +46,11 @@ const CRON_EXPRESSION = '0 21 * * 3';
 const TIMEZONE = 'America/New_York';
 const WEDNESDAY_QUESTIONS = 5;
 
+// WoW trivia always fires in #orgrimmar-meme-patrol rather than each guild's
+// general-purpose announce channel — falls back to findAnnounceChannel if the
+// bot can't find/post there (e.g. in a guild that doesn't have this channel).
+const WOW_TRIVIA_CHANNEL_ID = '773792644777902080';
+
 const ANSWER_WINDOW_MS = 30 * 1000;
 const CHAMPION_POINTS = 2; // flat award to the session's champion, regardless of how many questions were asked
 const MAX_QUESTIONS = 15; // 15 * 30s = 7.5 minutes worst case
@@ -62,6 +67,15 @@ const shuffle = (array) => {
         [copy[i], copy[j]] = [copy[j], copy[i]];
     }
     return copy;
+};
+
+// The dedicated WoW trivia channel, if it exists in this guild and the bot
+// can post there.
+const findWowTriviaChannel = (guild) => {
+    const channel = guild.channels.cache.get(WOW_TRIVIA_CHANNEL_ID);
+    if (!channel || channel.type !== 0) return null;
+    const perms = channel.permissionsFor(guild.members.me);
+    return perms && perms.has('ViewChannel') && perms.has('SendMessages') ? channel : null;
 };
 
 const joinMentions = (ids) => {
@@ -204,7 +218,7 @@ const runWowTrivia = async function (client, options = {}) {
 
     for (const g of guilds) {
         try {
-            const channel = targetChannel || findAnnounceChannel(g);
+            const channel = targetChannel || findWowTriviaChannel(g) || findAnnounceChannel(g);
             if (!channel) {
                 console.log(`WoW trivia: no channel the herald can post in found in "${g.name}"; skipping.`);
                 continue;
