@@ -328,10 +328,17 @@ const joinMentions = (ids) => {
 };
 
 // A short, link-safe snippet of a post's content for the masked link text.
+// URLs are stripped out first: Discord's markdown parser tries to auto-link a
+// bare URL even inside a masked link's label text, which breaks the outer
+// [text](url) link entirely and shows it as raw, unclickable text. A post
+// that's just a link ends up with nothing left, same as a wordless one.
+const URL_PATTERN = /https?:\/\/\S+/gi;
 const snippetOf = (message) => {
-    const raw = (message.content || '').replace(/\s+/g, ' ').replace(/[[\]]/g, '').trim();
+    const hadUrl = URL_PATTERN.test(message.content || '');
+    const raw = (message.content || '').replace(URL_PATTERN, '').replace(/\s+/g, ' ').replace(/[[\]]/g, '').trim();
     if (!raw) {
-        return message.attachments?.size ? 'a wordless offering of images' : 'a wordless proclamation';
+        if (message.attachments?.size) return 'a wordless offering of images';
+        return hadUrl ? 'a proclamation of but a single link' : 'a wordless proclamation';
     }
     return raw.length > 60 ? `${raw.slice(0, 57)}...` : raw;
 };
@@ -424,7 +431,7 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
             { name: 'Most Celebrated Proclamations', value: postsText },
             { name: 'Most Prolific Voices', value: chattersText },
             { name: 'Most Showered in Favor', value: favoredText },
-            { name: 'Longest Held in Council', value: voiceText },
+            { name: 'Longest Time Spent in Council', value: voiceText },
             { name: 'Running Tally of Honor', value: boardText }
         )
         .setFooter({ text: `Points each Sunday: 5/3/1 for the top proclamations, 5/3/1 for the most messages, 5/3/1 for the most time in voice, plus 1 per ${REACTIONS_PER_POINT} marks of favor received. Voice chat itself earns ${pointsStore.VOICE_POINTS_PER_HOUR} points per hour as it happens. Ties share a rank and consume the next.` })
