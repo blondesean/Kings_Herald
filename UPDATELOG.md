@@ -5,8 +5,29 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-08-30
+
+- Score weekly recap reactions by unique reactors, not raw reaction events (`fa866fe`)
+- Fix unclickable link-only proclamation links, rename voice field (`88e2603`)
+
+## 2026-08-26
+
+- Fix WoW trivia to post in orgrimmar-meme-patrol, not general announce channel (`2ee4640`)
+
+## 2026-08-24
+
+- Schedule wow trivia for Wedneday, don't award points to bots (`5fc7637`)
+- Add wow trivia bot sign up (`faa21e5`)
+- Tuning wow trivia (`5107dc8`)
+- Trivia bot style wow quiz added (`8878efe`)
+- Fix repeat questions (`e4565d7`)
+- Participation points for voice (`d384cad`)
+
 ## 2026-08-15
 
+- Add /trivia_time admin command to check today's scheduled trivia fire time (`2e5b46a`)
+- Duel fix, one makes sure to ping the target, the other handles button clickers who are not involved more gracefully (`a139395`)
+- Update Updatelog and small whois flavortext fix with points title placement (`66dfc98`)
 - Added duel functionality, basic support functions for point awarding, more flavor text, ddb duel record recording and a balance check (`2036bb9`)
 
 ## 2026-08-14
