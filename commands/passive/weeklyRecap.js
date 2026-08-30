@@ -5,7 +5,7 @@
  * three most-reacted messages of the past week. It links each post, pings its
  * author, and awards points toward a running leaderboard on four independent
  * scales: podium points (5/3/1 for the top posts), reaction points (1 per
- * REACTIONS_PER_POINT total reactions received across the week), chatter
+ * REACTIONS_PER_POINT distinct members who reacted across the week), chatter
  * points (5/3/1 for the most messages sent), and a voice podium (5/3/1 for
  * the most time spent in voice channels that week — see VOICE_POINTS_BY_RANK
  * and ../../src/pointsStore's weeklyVoiceSeconds). The voice podium is a
@@ -39,9 +39,17 @@ const LEADERBOARD_SIZE = 10;
 const POINTS_BY_RANK = [5, 3, 1];
 const RANK_WORDS = ['First', 'Second', 'Third'];
 
-// Second, independent points scale: 1 point per this many total reactions
-// received on a member's posts during the week (floored, remainder discarded).
-// Stacks with the podium points above; both feed the same leaderboard.
+// Second, independent points scale: 1 point per this many distinct members
+// who reacted to a member's posts during the week (floored, remainder
+// discarded). Stacks with the podium points above; both feed the same
+// leaderboard.
+//
+// Scored by unique reactor count, not raw reaction-event count: a message's
+// raw count sums every emoji separately, so one member reacting with several
+// different emoji on the same post inflates it well past "how many people
+// actually cared." Unique reactors tracks the latter and isn't gameable by
+// piling emoji onto an ally's post. Both counts are still logged per top
+// post (see runWeeklyRecap) so the raw-vs-unique gap stays visible over time.
 const REACTIONS_PER_POINT = 10;
 
 // Third, independent points scale: podium points for the members who sent the
@@ -91,10 +99,27 @@ const rankWithTies = (sortedEntries, scoreOf, maxRank) => {
 // callers that imported it from this module.
 const findRecapChannel = findAnnounceChannel;
 
+// Given a message with at least one reaction, fetch who reacted (across every
+// emoji used) and return the count of distinct members — not the raw
+// reaction-event count, which double-counts a member who reacted with
+// several different emoji on the same post. Mirrors the users.fetch pattern
+// in commands/prompts/reactions.js.
+const countUniqueReactors = async (message) => {
+    const reactorIds = new Set();
+    await Promise.all(
+        Array.from(message.reactions.cache.values()).map(async (reaction) => {
+            const users = await reaction.users.fetch();
+            users.forEach((user) => reactorIds.add(user.id));
+        })
+    );
+    return reactorIds.size;
+};
+
 // Scan the guild's readable text channels for messages created on or after
-// `sinceDate` and return the top posts (by total reaction count), each author's
-// total reactions received, and each author's message count across the window.
-// Mirrors the batch-fetch pattern used by commands/prompts/reactions.js.
+// `sinceDate` and return the top posts (by unique reactor count), each
+// author's total unique-reactor count received, and each author's message
+// count across the window. Mirrors the batch-fetch pattern used by
+// commands/prompts/reactions.js.
 const collectWeeklyStats = async (guild, sinceDate) => {
     const channels = guild.channels.cache.filter((channel) =>
         channel.type === 0 &&
@@ -144,11 +169,19 @@ const collectWeeklyStats = async (guild, sinceDate) => {
                         counter.count += 1;
                         messagesByAuthor.set(authorId, counter);
 
-                        // Reaction scales: only reacted posts matter.
+                        // Reaction scales: only reacted posts matter. Scored by
+                        // unique reactor count (see countUniqueReactors); the raw
+                        // event count is kept alongside purely so the gap between
+                        // the two — a signal of reaction-stacking — stays visible
+                        // in CloudWatch (see the log line below).
                         if (msg.reactions.cache.size > 0) {
-                            const totalReactions = msg.reactions.cache.reduce((sum, r) => sum + r.count, 0);
-                            if (totalReactions > 0) {
-                                candidates.push({ message: msg, channel, totalReactions });
+                            const rawReactionCount = msg.reactions.cache.reduce((sum, r) => sum + r.count, 0);
+                            if (rawReactionCount > 0) {
+                                const reactorCount = await countUniqueReactors(msg);
+                                if (reactorCount > 0) {
+                                    candidates.push({ message: msg, channel, reactorCount, rawReactionCount });
+                                    console.log(`Weekly recap: message ${msg.id} in #${channel.name} — ${reactorCount} unique reactors, ${rawReactionCount} raw reaction events.`);
+                                }
                             }
                         }
                     }
@@ -166,18 +199,18 @@ const collectWeeklyStats = async (guild, sinceDate) => {
         }
     }
 
-    // Most reactions first; equal counts tie for the same rank (see
+    // Most unique reactors first; equal counts tie for the same rank (see
     // rankWithTies), so the timestamp sort only fixes display order within a
     // tied group (oldest first) — it no longer decides who makes the podium.
     candidates.sort((a, b) => {
-        if (b.totalReactions !== a.totalReactions) {
-            return b.totalReactions - a.totalReactions;
+        if (b.reactorCount !== a.reactorCount) {
+            return b.reactorCount - a.reactorCount;
         }
         return a.message.createdTimestamp - b.message.createdTimestamp;
     });
 
-    // Total reactions received per author across the whole window (not just
-    // the podium posts) — feeds the second points scale.
+    // Total unique reactors received per author across the whole window (not
+    // just the podium posts) — feeds the second points scale.
     const reactionsByAuthor = new Map();
     for (const candidate of candidates) {
         const authorId = candidate.message.author.id;
@@ -186,12 +219,12 @@ const collectWeeklyStats = async (guild, sinceDate) => {
             displayName: displayNameOf(candidate.message),
             reactions: 0,
         };
-        entry.reactions += candidate.totalReactions;
+        entry.reactions += candidate.reactorCount;
         reactionsByAuthor.set(authorId, entry);
     }
 
     return {
-        topPosts: rankWithTies(candidates, (c) => c.totalReactions, POINTS_BY_RANK.length),
+        topPosts: rankWithTies(candidates, (c) => c.reactorCount, POINTS_BY_RANK.length),
         reactionsByAuthor,
         messagesByAuthor,
     };
@@ -230,7 +263,7 @@ const displayNameOf = (message) => message.member?.displayName || message.author
 
 /* Merge the four independent points scales into one award per member:
  *   - podium points (5/3/1) for authoring the week's most-reacted posts,
- *   - reaction points: floor(total reactions received / REACTIONS_PER_POINT),
+ *   - reaction points: floor(distinct reactors received / REACTIONS_PER_POINT),
  *   - chatter points (5/3/1) for sending the most messages,
  *   - voice podium points (5/3/1) for the most time spent in voice channels.
  * Podium entries carry a competition rank (see rankWithTies): tied members
@@ -258,7 +291,7 @@ const computeAwards = (topPosts, reactionsByAuthor, messagesByAuthor = new Map()
             displayNameOf(post.message),
             POINTS_BY_RANK[post.rank - 1],
             'podium',
-            `rank ${post.rank} most-reacted post (${post.totalReactions} reactions)`
+            `rank ${post.rank} most-reacted post (${post.reactorCount} unique reactors, ${post.rawReactionCount} raw reaction events)`
         );
     });
 
@@ -382,8 +415,8 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
     const postsText = topPosts.length
         ? fitFieldLines(
               topPosts.map((post) => {
-                  const marks = post.totalReactions === 1 ? 'mark of favor' : 'marks of favor';
-                  return `**${rankWordOf(post.rank)}:** [${snippetOf(post.message)}](${post.message.url}) — <@${post.message.author.id}> (${post.totalReactions} ${marks})`;
+                  const marks = post.reactorCount === 1 ? 'mark of favor' : 'marks of favor';
+                  return `**${rankWordOf(post.rank)}:** [${snippetOf(post.message)}](${post.message.url}) — <@${post.message.author.id}> (${post.reactorCount} ${marks})`;
               })
           )
         : 'No proclamation earned the people\'s favor this past sennight.';
