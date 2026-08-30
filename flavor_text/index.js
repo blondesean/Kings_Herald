@@ -23,4 +23,5 @@ module.exports = {
     wowTriviaQuestions: require('./wowTriviaQuestions'),
     ...require('./duelFlavor'),
     ...require('./wowTriviaFlavor'),
+    ...require('./patchNotesFlavor'),
 };
