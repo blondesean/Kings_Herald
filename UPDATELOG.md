@@ -7,6 +7,8 @@ Regenerate after committing and commit the refreshed file.*
 
 ## 2026-08-30
 
+- Redesign /patch_notes to auto-cite recent commits from UPDATELOG.md (`03a576b`)
+- Regenerate UPDATELOG.md (`d34628e`)
 - Redesign /patch_notes as type+area instead of free-text notes (`5ecdd9f`)
 - Add /patch_notes admin command to announce changes in the Herald's voice (`fd7b938`)
 - Score weekly recap reactions by unique reactors, not raw reaction events (`fa866fe`)
