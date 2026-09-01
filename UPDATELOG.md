@@ -5,8 +5,13 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-08-31
+
+- Trim WoW trivia to vanilla-only, fix Alliance ruler lore (`1ba3553`)
+
 ## 2026-08-30
 
+- Regenerate UPDATELOG.md (`904b9dd`)
 - Redesign /patch_notes to auto-cite recent commits from UPDATELOG.md (`03a576b`)
 - Regenerate UPDATELOG.md (`d34628e`)
 - Redesign /patch_notes as type+area instead of free-text notes (`5ecdd9f`)
