@@ -19,12 +19,13 @@
  * false, so admins can test the flow without inflating the leaderboard —
  * only the scheduled Wednesday run (persist: true) actually pays out.
  *
- * The bank spans vanilla through early Wrath-era WoW, so a few answers have
- * gone stale since (a "will be added in the next patch" question, say). The
- * Herald leans into this rather than hiding it: he drops into an orcish
- * voice for the whole session and frames it as a trip back to that era —
- * Thrall as Warchief of the Horde, Varian Wrynn as High King of the
- * Alliance — see flavor_text/wowTriviaFlavor.js.
+ * The bank is vanilla WoW only (patches 1.0-1.12, launch through original
+ * 40-man Naxxramas) — no Burning Crusade or Wrath of the Lich King content.
+ * The Herald leans into the era rather than staying neutral about it: he
+ * drops into an orcish voice for the whole session and frames it as a trip
+ * back to that time — Thrall as Warchief of the Horde, Lord Regent Bolvar
+ * Fordragon holding Stormwind's throne while King Varian Wrynn remains
+ * missing — see flavor_text/wowTriviaFlavor.js.
  *
  * Exposes:
  *   scheduleWowTriviaWednesday(client) - registers the weekly timer (call once, on ready)

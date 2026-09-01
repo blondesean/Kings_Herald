@@ -4,18 +4,22 @@
  * counts as correct (matched case-insensitively, exact after trimming —
  * see wow_trivia.js). Ported from the free-text Q&A bank in
  * https://github.com/Road-block/TriviaBot (WoWQuestions.lua), which itself
- * spans vanilla through early Wrath-era content — hence the Herald's
- * in-character framing that the round is set in that era (see
- * flavor_text/wowTriviaFlavor.js).
+ * spans vanilla through early Wrath-era content. This bank is trimmed to
+ * vanilla only (WoW 1.0-1.12, launch through original 40-man Naxxramas) —
+ * everything from The Burning Crusade or Wrath of the Lich King (Outland
+ * and Northrend zones/instances, Draenei and Blood Elves as playable races,
+ * Death Knights, and the "upcoming expansion" preview trivia the source file
+ * had written in before Wrath shipped) was removed.
  *
  * A handful of the source file's entries reused the same numeric index for
  * unrelated questions (a data-entry bug in the original — a later entry
  * silently overwrote an earlier one at that index) or mistyped an answer
  * line's index so it landed on the wrong question. This port fixes both:
- * every question the source ever defined is kept (none silently dropped),
- * and stray answer lines are attached to whichever question they're
- * physically adjacent to in the source, which is where authorial intent
- * clearly points in every case (verified by hand against the source file).
+ * every vanilla question the source ever defined is kept (none silently
+ * dropped), and stray answer lines are attached to whichever question
+ * they're physically adjacent to in the source, which is where authorial
+ * intent clearly points in every case (verified by hand against the source
+ * file).
  */
 const wowTriviaQuestions = () => [
     {
@@ -81,10 +85,6 @@ const wowTriviaQuestions = () => [
     {
         question: "What does a green-colored text on an item refer to?",
         answers: ["Uncommon Quality", "uncommon"],
-    },
-    {
-        question: "Which of these pre-tbc end-game raiding instances is limited to 20 members? (UBRS, MC, AQ40, ZG, BWL",
-        answers: ["Zul'Gurub", "ZG", "Zul Gurub"],
     },
     {
         question: "What is the lowest level requirement for an epic weapon?",
@@ -161,10 +161,6 @@ const wowTriviaQuestions = () => [
     {
         question: "The Emerald Dragons are Ysondre, Emeriss, Taerar and _____?",
         answers: ["Lethon"],
-    },
-    {
-        question: "The first wow expansion is called? (full name)",
-        answers: ["The Burning Crusade", "Burnign Crusade"],
     },
     {
         question: "Name a secondary trade skill.",
@@ -387,10 +383,6 @@ const wowTriviaQuestions = () => [
         answers: ["Eastern Kingdoms", "Kalimdor"],
     },
     {
-        question: "What new profession came in the expansion? (full name)",
-        answers: ["Jewelcrafting"],
-    },
-    {
         question: "Essence of the Red in the Vaelastrasz encounter restores how much energy per second?",
         answers: ["Fifty", "50"],
     },
@@ -457,10 +449,6 @@ const wowTriviaQuestions = () => [
     {
         question: "What is the duration on Prayer of Shadow Protection?",
         answers: ["20 Minutes", "20 min", "20 mins"],
-    },
-    {
-        question: "How many tracks is there in The Burning Crusade soundtrack?",
-        answers: ["22", "twenty two", "twenty-two"],
     },
     {
         question: "The Bramblewood set grants resistance to what?",
@@ -739,20 +727,12 @@ const wowTriviaQuestions = () => [
         answers: ["5", "Five"],
     },
     {
-        question: "Name a DoT which was added to the Warlock class in TBC?",
-        answers: ["Unstable Affliction", "Seed of Corruption"],
-    },
-    {
         question: "What class besides a Warrior has a talent tree called protection?",
         answers: ["Paladin", "Paladins"],
     },
     {
         question: "Before the Paladin revamp, what was the top tier spell in the retribution tree of Paladins?",
         answers: ["Blessing of Kings", "BoK"],
-    },
-    {
-        question: "How many capital cities is there ingame, including Shattrath?",
-        answers: ["9", "Nine"],
     },
     {
         question: "On which boss in Naxxramas do you have to mind control a mob, but not use it for more than 5 seconds?",
@@ -815,10 +795,6 @@ const wowTriviaQuestions = () => [
         answers: ["Kingsblood"],
     },
     {
-        question: "What is the name of the raiding instance in Netherstorm? (full name)",
-        answers: ["Tempest Keep"],
-    },
-    {
         question: "What debuff once allowed Horde players to attack NPCs of their own faction?",
         answers: ["Mark of Shame"],
     },
@@ -847,16 +823,8 @@ const wowTriviaQuestions = () => [
         answers: ["Thunder Bluff"],
     },
     {
-        question: "What is the name of the lowest level zone in Outland?",
-        answers: ["Hellfire Peninsula"],
-    },
-    {
         question: "Which zone do Druids gain a teleport to at level 10?",
         answers: ["Moonglade"],
-    },
-    {
-        question: "Flasks can be crafted in two instances and one zone in the game. Name one?",
-        answers: ["Blackwing Lair", "Scholomance", "Shattrath", "Shattrath City"],
     },
     {
         question: "What creature despawns at 20%, saying it is 'not his time yet'?",
@@ -955,10 +923,6 @@ const wowTriviaQuestions = () => [
         answers: ["Ragefire Chasm", "RFC"],
     },
     {
-        question: "What is the name of the draenei capital city?",
-        answers: ["The Exodar", "Exodar"],
-    },
-    {
         question: "Which Alliance race has +15 engineering as racial passive?",
         answers: ["Gnome", "Gnomes"],
     },
@@ -1055,16 +1019,8 @@ const wowTriviaQuestions = () => [
         answers: ["Fenris"],
     },
     {
-        question: "Where does most of the Blue Dragonflight reside?",
-        answers: ["Northrend"],
-    },
-    {
         question: "Where does most of the Black Dragonflight reside?",
         answers: ["Blackrock Mountain", "Blackrock Spire", "Burning Steppes"],
-    },
-    {
-        question: "Where does most of the Bronze Dragonflight reside?",
-        answers: ["Caverns of Time", "Tanaris"],
     },
     {
         question: "Where does most of the Red Dragonflight reside?",
@@ -1119,10 +1075,6 @@ const wowTriviaQuestions = () => [
         answers: ["Reins of the Winterspring Frostsaber", "Winterspring Frostsaber"],
     },
     {
-        question: "What is the name of the dranei mount?",
-        answers: ["Elekk"],
-    },
-    {
         question: "Who is the mighty Warrior you must defeat in the Upper Blackrock Spire in order to obtain the tier 0 Warrior shoulders?",
         answers: ["Rend", "Rend Blackhand", "Warchief Rend Blackhand"],
     },
@@ -1155,20 +1107,12 @@ const wowTriviaQuestions = () => [
         answers: ["Icebane"],
     },
     {
-        question: "Prince ______ is the Scourge Ambassador to the Vrykuls.",
-        answers: ["Keleseth"],
-    },
-    {
         question: "What is the full name of the last boss in The Deadmines?",
         answers: ["Edwin Van Cleef"],
     },
     {
         question: "What rare spawn in Stratholme drops Piccolo of the Flaming Fire?",
         answers: ["Hearthsinger Forresten", "Forresten"],
-    },
-    {
-        question: "What is the name of the zone that you'll teleport into after entering the dark portal at Blasted Lands?",
-        answers: ["Hellfire Peninsula"],
     },
     {
         question: "Blizzard Entertainment is owned by which company?",
@@ -1239,10 +1183,6 @@ const wowTriviaQuestions = () => [
         answers: ["eastern kingdoms"],
     },
     {
-        question: "In what instance does Illidan the Betrayer reside in?",
-        answers: ["The Black Temple", "black temple", "bt"],
-    },
-    {
         question: "What will Piccolo of the Flaming Fire make you do?",
         answers: ["Dance", "dancing"],
     },
@@ -1271,68 +1211,16 @@ const wowTriviaQuestions = () => [
         answers: ["Western Plaguelands"],
     },
     {
-        question: "What is the name of the blood elves capital city?",
-        answers: ["Silvermoon", "Silvermoon city", "The Silvermoon", "The Silvermoon City"],
-    },
-    {
         question: "What is the starting place for Orcs?",
         answers: ["Valley of Trials", "The Valley of Trials"],
-    },
-    {
-        question: "In what zone lies Tempest Keep?",
-        answers: ["Netherstorm", "The Netherstorm"],
     },
     {
         question: "In what zone is Razorfen Kraul in?",
         answers: ["The Barrens", "Barrens"],
     },
     {
-        question: "In what zone does Gruul the Dragonslayer live?",
-        answers: ["Blade's Edge Mountains", "Blades Edge Mountains"],
-    },
-    {
-        question: "In what zone is Auchindoun in?",
-        answers: ["Terokkar forest", "Terokkar"],
-    },
-    {
-        question: "In what zone does Lady Vashj reside in?",
-        answers: ["Zangarmarsh"],
-    },
-    {
-        question: "In what zone can you fight the fel orc's of Kargath Bladefist?",
-        answers: ["Hellfire Peninsula"],
-    },
-    {
-        question: "What is the name of dranei's starting zone?",
-        answers: ["Azuremyst Isle"],
-    },
-    {
-        question: "What is the name of the blood elves starting zone?",
-        answers: ["Eversong Woods"],
-    },
-    {
-        question: "What is the name of zone that contains Zul'Aman?",
-        answers: ["Ghostlands", "Ghostland"],
-    },
-    {
-        question: "Acronyms: What does JC stand for?",
-        answers: ["Jewelcrafter", "Jewelcrafting"],
-    },
-    {
         question: "What is the skill limit on proffesions?",
         answers: ["375", "Three hundred seventy five"],
-    },
-    {
-        question: "Where is Caverns of Time?",
-        answers: ["Tanaris"],
-    },
-    {
-        question: "Where do you fight 'Epoch Hunter'?",
-        answers: ["Durnholde", "Escape from Durnholde Keep", "CoT - Durnholde", "CoT - Escape from Durnholde Keep", "Escape from Durnholde", "CoT - Escape from Durnholde"],
-    },
-    {
-        question: "What is the name of the zone where you protect Medivith? Its future name is the Blasted Lands.",
-        answers: ["Black Morass"],
     },
     {
         question: "In what zone is Molten Core?",
@@ -1347,24 +1235,12 @@ const wowTriviaQuestions = () => [
         answers: ["Eastern Plaguelands", "EPL"],
     },
     {
-        question: "What was the patch that came out before the expansion (tbc) called?",
-        answers: ["Before the Storm"],
-    },
-    {
         question: "What is the name of the populare auctioning addon?",
         answers: ["Auctioneer"],
     },
     {
-        question: "In the expansion, some of the heroic dungeons will offer new content, instead of just being harder. Such as new ______ and new areas. This is only for some of the new instances, though. The old heroic instances wont get this.",
-        answers: ["bosses"],
-    },
-    {
         question: "What mob-type is the realm Daggerspine named after?",
         answers: ["naga", "nagas"],
-    },
-    {
-        question: "What is the blood elves mount called?",
-        answers: ["Hawkstrider"],
     },
     {
         question: "What guild is infamous for its raiding achievments, such as world first C'thun and Kel'Thuzad kill?",
@@ -1437,10 +1313,6 @@ const wowTriviaQuestions = () => [
     {
         question: "The abbreviation 'BFD' refers to?",
         answers: ["Blackfathom Deeps"],
-    },
-    {
-        question: "Anetheron is a lich. (True/False)?",
-        answers: ["False"],
     },
     {
         question: "What zone lies north of Ashenvale?",
@@ -1575,10 +1447,6 @@ const wowTriviaQuestions = () => [
         answers: ["Game Master", "Guild Master"],
     },
     {
-        question: "The acronym 'HFR' refers to?",
-        answers: ["Hellfire Ramparts"],
-    },
-    {
         question: "The acronym 'SH' refers to?",
         answers: ["Shattered Halls", "The Shattered Halls"],
     },
@@ -1597,10 +1465,6 @@ const wowTriviaQuestions = () => [
     {
         question: "The acronym 'NE' refers to (not the direction, the race)?",
         answers: ["night elf"],
-    },
-    {
-        question: "The acronym 'WOTLK' refers to?",
-        answers: ["Wrath of the Lich King"],
     },
     {
         question: "The abbreviation 'Resto' refers to what? (hint: talent tree)",
@@ -1635,36 +1499,16 @@ const wowTriviaQuestions = () => [
         answers: ["Temple of Ahn'Qiraj", "The Temple of Ahn'Qiraj"],
     },
     {
-        question: "The acronym 'BEM' refers to?",
-        answers: ["Blade's Edge Mountains", "Blades Edge Mountains"],
-    },
-    {
         question: "The acronym 'BWL' refers to?",
         answers: ["Blackwing Lair"],
-    },
-    {
-        question: "The acronym 'KZ' refers to? (the full name)",
-        answers: ["Karazhan"],
     },
     {
         question: "The acronym 'EPL' refers to?",
         answers: ["Eastern Plaguelands"],
     },
     {
-        question: "The acronym 'CFR' refers to?",
-        answers: ["Coilfang Reservoir"],
-    },
-    {
         question: "The acronym 'SL' refers to?",
         answers: ["Shadow Labyrinth"],
-    },
-    {
-        question: "The acronymn 'SSC' refers to?",
-        answers: ["Serpentshrine Cavern"],
-    },
-    {
-        question: "The acronym 'SMV' refers to?",
-        answers: ["Shadowmoon valley"],
     },
     {
         question: "The drop chance for Baron Rivendare's mount is how much? (about, in percents)",
@@ -1731,10 +1575,6 @@ const wowTriviaQuestions = () => [
         answers: ["Voidwalker"],
     },
     {
-        question: "What is the name of the capital city of the fallen nerubian empire?",
-        answers: ["Azjol-Nerub"],
-    },
-    {
         question: "What is the Boulderfist clan made of?",
         answers: ["Ogres", "Ogre"],
     },
@@ -1799,16 +1639,8 @@ const wowTriviaQuestions = () => [
         answers: ["Draka"],
     },
     {
-        question: "What was Outland's true name, before it was sundered?",
-        answers: ["Draenor"],
-    },
-    {
         question: "Who is Thrall's advisor?",
         answers: ["Eitrigg"],
-    },
-    {
-        question: "Howling Fjord is the place where the emerald dream is supposed to be accessable. (True/False)?",
-        answers: ["False"],
     },
     {
         question: "What is Eonar? (ex. a naga)",
@@ -1855,14 +1687,6 @@ const wowTriviaQuestions = () => [
         answers: ["Grom Hellscream"],
     },
     {
-        question: "What is the largest glacier on Azeroth?",
-        answers: ["Icecrown Glacier", "The Icecrown glacier", "The Icecrown", "Icecrown"],
-    },
-    {
-        question: "Who is Malfurion Stormrage's brother?",
-        answers: ["Illidan", "Illidan Stormrage"],
-    },
-    {
         question: "Kel'Thuzad was killed by adventurers who entered Naxxramas. (True/False)?",
         answers: ["False"],
     },
@@ -1899,10 +1723,6 @@ const wowTriviaQuestions = () => [
         answers: ["True"],
     },
     {
-        question: "__________ was the former leader of Outland.",
-        answers: ["Magtheridon"],
-    },
-    {
         question: "__________ was the father of Cenarius.",
         answers: ["Malorne"],
     },
@@ -1935,10 +1755,6 @@ const wowTriviaQuestions = () => [
         answers: ["Mannoroth the Destructor", "the Destructor"],
     },
     {
-        question: "_________ opened the Dark Portal when he was possessed by Sargeras.",
-        answers: ["Medivh"],
-    },
-    {
         question: "_______ the Tidehunter was a Elemental Lieutenant of the Old Gods.",
         answers: ["Neptulon"],
     },
@@ -1957,10 +1773,6 @@ const wowTriviaQuestions = () => [
     {
         question: "Lord ______ of Alterac betrayed the Alliance and attempted to assasinate lord Uther.",
         answers: ["Perenolde", "Aieden Perenolde"],
-    },
-    {
-        question: "The Quel'dorei is a term meaning ________ in Thalassian.",
-        answers: ["high elves", "high elfs"],
     },
     {
         question: "Lord Kur'talos ________ was the master of the Black Rook Hold.",
@@ -2003,10 +1815,6 @@ const wowTriviaQuestions = () => [
         answers: ["Stormscale"],
     },
     {
-        question: "The 'oprah event' is in ___________.",
-        answers: ["Kara", "Karazhan"],
-    },
-    {
         question: "Where can you find Garr?",
         answers: ["Molten Core", "MC"],
     },
@@ -2043,32 +1851,12 @@ const wowTriviaQuestions = () => [
         answers: ["False"],
     },
     {
-        question: "The Sha'tar resides in _______________.",
-        answers: ["Shattrath City", "Shattrath"],
-    },
-    {
-        question: "The __________ clan in blade's edge mountain was killed by the Shadowmoon clan, who were led by Ner'zhul.",
-        answers: ["Thunderlord"],
-    },
-    {
         question: "Vek'nilash is the third boss in SSC. (True/False)?",
         answers: ["False"],
     },
     {
         question: "What is the name of the populare addon which has a database of every thing you have picked, since you had the addon?",
         answers: ["Gatherer"],
-    },
-    {
-        question: "Guess the Zone: This zone is very nature-looking, and has light-green crystals glowing all over the place.",
-        answers: ["Terokkar", "Terokkar forest"],
-    },
-    {
-        question: "The zone northwest of Terokkar Forest is known as ______________.",
-        answers: ["Zangarmarsh"],
-    },
-    {
-        question: "The shattered floating remnants of the red world is also known as __________.",
-        answers: ["Outland", "The Outland"],
     },
     {
         question: "World of Warcraft has a total of _____ million subscribers at the moment.",
@@ -2079,60 +1867,12 @@ const wowTriviaQuestions = () => [
         answers: ["Westfall"],
     },
     {
-        question: "Guess the Zone: Gruul's son Durn patrols around the enormeous crystal in this zone.",
-        answers: ["Nagrand"],
-    },
-    {
-        question: "Guess the Zone: This zone has Eco Domes, and is known for its large population of blood elves. This zone features four instances.",
-        answers: ["Netherstorm", "The Netherstorm"],
-    },
-    {
-        question: "Guess the Zone: This zone is known for the Camp of Boom, and The Vortex Fields.",
-        answers: ["Netherstorm"],
-    },
-    {
-        question: "Guess the Zone: This zone contains the Pools of Aggonar, the Void ridge, and the Path of Glory. This zone features four instances.",
-        answers: ["Hellfire peninsula"],
-    },
-    {
-        question: "Guess the Zone: The first time you will probably meet the Mag'har. A zeppelin has crashed here. This is the best place to gather fel iron.",
-        answers: ["Hellfire Peninsula"],
-    },
-    {
-        question: "Guess the Zone: You can visit the legendary Archmage, Khadgar, here. This zone features four instances.",
-        answers: ["Terokkar Forest", "Terokkar"],
-    },
-    {
-        question: "Guess the Zone: The world pvp event in this zone is to capture two beacons and to flag the graveyard.",
-        answers: ["Zangarmarsh"],
-    },
-    {
-        question: "Guess the Zone: 'This zone is a grim spectacle of demonic magic run amok. Day and night, molten fel energy erupts from the land and lights the sky with bilious green flame'",
-        answers: ["Shadowmoon", "Shadowmoon Valley"],
-    },
-    {
-        question: "Guess the Zone: Felguards, infernal's and other demonic beings ravages this zone. You can encounter the Shadow Councill here.",
-        answers: ["Shadowmoon", "Shadowmoon valley"],
-    },
-    {
-        question: "Guess the Zone: Before TBC came out, this zone featured the populare stat potions, the ones which gives the player +25 to a stat. With the recent development with the guardian and battle elixirs, these potions is not used anymore.",
-        answers: ["Blasted Lands"],
-    },
-    {
-        question: "Guess the Zone: This zone was originally the Black Morass, but has changed name since then, due to the changes in the environment. This zone features a dragon which drops spheres, which in turn can be turned in for loot.",
-        answers: ["Blasted Lands"],
-    },
-    {
         question: "Guess the Zone: This zone is located north of the Redridge Mountains, and features the two first 40man instances ever created by Blizzard.",
         answers: ["Burning Steppes"],
     },
     {
         question: "Guess the Zone: This zone features the Altar of Storms. This zone has plenty of dragon whelps and ogres. Herbers can find dreamfoil and black lotuses here.",
         answers: ["Burning Steppes"],
-    },
-    {
-        question: "Guess the Zone: This zone features Karazhan, and is a relatively small zone. This place is known for its ogres that is perfect to grind, for both experience, and for runecoth.",
-        answers: ["Deadwind Pass"],
     },
     {
         question: "Guess the Zone: The town in this zone is speculated to be Sunnyglade, but later renamed due to the events that has transpired in this zone. This zone features the Scourge, and a lot of worgens.",
@@ -2167,19 +1907,11 @@ const wowTriviaQuestions = () => [
         answers: ["Desolace"],
     },
     {
-        question: "Guess the Zone: This zone features the 'Tiny Emerald Whelpling' pet. There is only one instance in this zone. This zone is actually quite similar to Black Morass.",
-        answers: ["Swamp of Sorrows"],
-    },
-    {
         question: "Guess the Zone: Murlocs, crocolisks, spiders and lost one's occupies this zone. You can find much blindweed and goldthorn here, and therefor is a populare spot to grind the mats for arcane elixirs.",
         answers: ["Swamp of Sorrows"],
     },
     {
         question: "Guess the Zone: The zone lies south of Darkshore, and is the ancestral homeland of the night elves. They still remain in control of several holdings throughout the zone, such as Maestra's Post, and the Shrine of Aessina.",
-        answers: ["Ashenvale"],
-    },
-    {
-        question: "Guess the Zone: The Furbolgs, and satyrs are some of the local inhabitants of this zone. It was a populare world pvp zone before the expansion came out. This zone also features an Emerald Dream portal.",
         answers: ["Ashenvale"],
     },
     {
@@ -2191,24 +1923,12 @@ const wowTriviaQuestions = () => [
         answers: ["Azshara"],
     },
     {
-        question: "Guess the Zone: This zone is low on history due to being a out-of-the-way location, but the dranei capital city lies here. A quest chain named 'The Prophecy of Akida' in this zone is widely regarded to be one of the funniest quest chains in WoW.",
-        answers: ["Azuremyst", "Azuremyst Isle", "The Azuremyst Isle"],
-    },
-    {
         question: "Guess the Zone: Several large kaldorei cities once stood in this zone. This zone has one instance, and is mostly about corrupted Druids. A quest chain in this zone wants you to hunt raptors all over the place becuase they stole some silver.",
         answers: ["Barrens", "The Barrens"],
     },
     {
         question: "Guess the Zone: The zone has some well known area's, such as the Fray Island, the Stagnant Oasis, and the Fields of Giants. This zone also features a lot of 'hunting' quests.",
         answers: ["Barrens", "The Barrens"],
-    },
-    {
-        question: "Guess the Zone: This zone is filled with red glowing crystals. This place is also quite low on history, just like the Azuremyst Isle. The zone was formerly known as Silvergale.",
-        answers: ["Bloodmyst", "Bloodmyst Isle", "The bloodmyst Isle"],
-    },
-    {
-        question: "Guess the Zone: This zone has a micro-dungeon named 'The Vector Coil'. As the area suggest, The Vector Coil contains the vector coil of the dranei ship that crashed. An eredar here called Sionas, and is harvesting power from the coil itself.",
-        answers: ["Bloodmyst", "Bloodmyst Isle", "The bloodmyst Isle"],
     },
     {
         question: "Guess the Zone: The night elfs controls this zone. The night elf sentinels patrols the road from Auberdine in this zone till Ashenvale to the south. A quest-chain here is to free the furbolgs from a satyr's corruption.",
@@ -2233,18 +1953,6 @@ const wowTriviaQuestions = () => [
     {
         question: "Guess the Zone: This place contains the stonemaul ogres. One of the famous characters in this zone is Jaina Proudmoore. The zone contains creatures such as nagas, turtles, crocolisks, and spiders.",
         answers: ["Dustwallow marsh"],
-    },
-    {
-        question: "Guess the Zone: Sharks, dragonspawns, and raptors are some of the local inhabitants of this zone. This zone features a very popular pre-tbc instance, and the end boss of this instance has been 2manned.",
-        answers: ["Dustwallow marsh"],
-    },
-    {
-        question: "Guess the Zone: Lord Illidan Stormrage obtained the skull of gul'dan here. This place is known for its corruption, which were caused by the Burning Legion. The Shadow Councill has a base of operations in this zone.",
-        answers: ["Felwood"],
-    },
-    {
-        question: "Guess the Zone: This is the best zone to gather gromsblood in. You can also find lots of dreamfoil, and plaguebloom here. Some gold farmers farmed the angerclaw bears in this zone for money, pre-tbc due to their quick respawn.",
-        answers: ["Felwood"],
     },
     {
         question: "Guess the Zone: This zone holds many ancient ruins. The zone is famous for its ancient night elf city, which is now a instance. The zone is also one of the four locations which contain an emerald portal.",
@@ -2272,10 +1980,6 @@ const wowTriviaQuestions = () => [
     },
     {
         question: "Guess the Zone: This zone contains two high-end instances and was the location of a server wide event, more commonly known as the AQ War Effort. This zone also features extremely many insects.",
-        answers: ["Silithus"],
-    },
-    {
-        question: "Guess the Zone: The wildlife here are mostly insects, snakes, and spiders. This zone has a world pvp event, and had many populare grinding places pre-tbc. The Cenarion Cirlce defends the local town here.",
         answers: ["Silithus"],
     },
     {
@@ -2319,10 +2023,6 @@ const wowTriviaQuestions = () => [
         answers: ["Winterspring"],
     },
     {
-        question: "Guess the Zone: The Eye of Shadow was grinded quite often in this zone, before the expansion came. As Alliance you can obtain the 'Reins of the Winterspring Frostsaber' in this zone.",
-        answers: ["Winterspring"],
-    },
-    {
         question: "What is the highest speed you can obtain with a flying mount?",
         answers: ["492%", "492"],
     },
@@ -2331,20 +2031,8 @@ const wowTriviaQuestions = () => [
         answers: ["Icebane"],
     },
     {
-        question: "How many people can you enter Tempest Keep with?",
-        answers: ["25"],
-    },
-    {
-        question: "How many people can you enter Karazhan with?",
-        answers: ["10", "ten"],
-    },
-    {
         question: "The famous '______ on a stick' is widely known by nearly everyone in World of Warcaft.",
         answers: ["Carrot"],
-    },
-    {
-        question: "The rare trinket that is obtainable by doing quests with the Netherwing faction, is called '________ Whip'.",
-        answers: ["Skybreaker"],
     },
     {
         question: "Where can you find Lucifron?",
@@ -2429,10 +2117,6 @@ const wowTriviaQuestions = () => [
     {
         question: "Where can you find Wushoolay?",
         answers: ["Zul'Gurub", "ZG", "Zul Gurub"],
-    },
-    {
-        question: "Name the infamous troll player which leveled to 70 without using weapons or armors.",
-        answers: ["Gutrot"],
     },
     {
         question: "Where can you find Razorgore the Untamed?",
@@ -2551,10 +2235,6 @@ const wowTriviaQuestions = () => [
         answers: ["1.9"],
     },
     {
-        question: "Northrend will certainly feature 'The Venture Co'. (True/False)?",
-        answers: ["true"],
-    },
-    {
         question: "In what content patch was Naxxramas released?",
         answers: ["1.11"],
     },
@@ -2627,16 +2307,8 @@ const wowTriviaQuestions = () => [
         answers: ["Renault", "Renault Mograine"],
     },
     {
-        question: "You can find agents of Argent Dawn in Outland. (True/False)?",
-        answers: ["False"],
-    },
-    {
         question: "What is the firstname of the Scarlet Crusade's Ambassador, which was sent to discuss the Scourge Invasion?",
         answers: ["Marjhan"],
-    },
-    {
-        question: "How many Outland factions exists at the moment?",
-        answers: ["15", "fifteen"],
     },
     {
         question: "How many Azeroth factions exists at the moment?",
@@ -2671,16 +2343,8 @@ const wowTriviaQuestions = () => [
         answers: ["wcradio", "wowradio"],
     },
     {
-        question: "______ did the world first on Azgalor the pitlord.",
-        answers: ["Curse"],
-    },
-    {
         question: "What is the name of the guild which did the world first on Nefarian? (hint: Something that happens quite often in guilds is the guildname of this guild)",
         answers: ["Drama"],
-    },
-    {
-        question: "Death & Taxes did the world first on _______ in Karazhan.",
-        answers: ["Nightbane"],
     },
     {
         question: "Ascent did the world first on __________.",
@@ -2701,10 +2365,6 @@ const wowTriviaQuestions = () => [
     {
         question: "There is ______ holiday events in world of warcraft.",
         answers: ["ten", "10"],
-    },
-    {
-        question: "What is the name of the player which got to 1-60 in 4 days and 20 hours before TBC came, and made a guide about it?",
-        answers: ["Joana"],
     },
     {
         question: "What is the name of the player who is famous for his leveling guides? (from 20-60 on both factions)",
@@ -2729,70 +2389,6 @@ const wowTriviaQuestions = () => [
     {
         question: "How many troll tribes is known to exists?",
         answers: ["18", "eighteen"],
-    },
-    {
-        question: "Where can you find Attunmen & Midnight?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find Maiden of Virtue?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find Curator?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find Terestian Illhoof?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find the shade of Aran?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find Netherspite?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find Nightbane?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find Hyakiss the Lurker?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find Rokad the Ravager?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find Shadikith the Glider?",
-        answers: ["Karazhan", "KZ", "Kara"],
-    },
-    {
-        question: "Where can you find Hydross?",
-        answers: ["Serpentshrine Cavern", "SSC"],
-    },
-    {
-        question: "Where can you find 'The Lurker Below'?",
-        answers: ["Serpentshrine Cavern", "SSC"],
-    },
-    {
-        question: "Where can you find Leotheras?",
-        answers: ["Serpentshrine Cavern", "SSC"],
-    },
-    {
-        question: "Where can you find Karathress?",
-        answers: ["Serpentshrine Cavern", "SSC"],
-    },
-    {
-        question: "Where can you find Morogrim Tidewalker?",
-        answers: ["Serpentshrine Cavern", "SSC"],
-    },
-    {
-        question: "Where can you find Vashj?",
-        answers: ["Serpentshrine Cavern", "SSC"],
     },
     {
         question: "When does the Harvest Festival start, in September?",
@@ -2823,112 +2419,12 @@ const wowTriviaQuestions = () => [
         answers: ["June 21th", "21th June", "21th", "21"],
     },
     {
-        question: "Where can you find Rage Winterchill?",
-        answers: ["Battle for Mount Hyjal", "Hyjal", "Hyjal Summit"],
-    },
-    {
-        question: "Where can you find Anetheron?",
-        answers: ["Battle for Mount Hyjal", "Hyjal", "Hyjal Summit"],
-    },
-    {
-        question: "Where can you find Kaz'rogal?",
-        answers: ["Battle for Mount Hyjal", "Hyjal", "Hyjal Summit"],
-    },
-    {
-        question: "Where can you find Azgalor?",
-        answers: ["Battle for Mount Hyjal", "Hyjal", "Hyjal Summit"],
-    },
-    {
-        question: "Where can you find Archimonde?",
-        answers: ["Battle for Mount Hyjal", "Hyjal", "Hyjal Summit"],
-    },
-    {
-        question: "Where can you find Al'ar?",
-        answers: ["The Eye", "Tempest keep"],
-    },
-    {
-        question: "Where can you find Void Reaver?",
-        answers: ["The Eye", "Tempest keep"],
-    },
-    {
-        question: "Where can you find Solarian?",
-        answers: ["The Eye", "Tempest keep"],
-    },
-    {
-        question: "Where can you find Kael'thas Sundstrider?",
-        answers: ["The Eye", "Tempest keep"],
-    },
-    {
-        question: "Where can you find Naj'entus?",
-        answers: ["Black Temple", "BT", "Black Temple"],
-    },
-    {
-        question: "Where can you find Supremus?",
-        answers: ["Black Temple", "BT", "Black Temple"],
-    },
-    {
-        question: "Where can you find the Shade of Akama?",
-        answers: ["Black Temple", "BT", "Black Temple"],
-    },
-    {
-        question: "Where can you find Teron Gorefiend?",
-        answers: ["Black Temple", "BT", "Black Temple"],
-    },
-    {
-        question: "Where can you find Gurtogg Bloodboil?",
-        answers: ["Black Temple", "BT", "Black Temple"],
-    },
-    {
-        question: "Where can you find the Reqliquary of Souls?",
-        answers: ["Black Temple", "BT", "Black Temple"],
-    },
-    {
-        question: "Where can you find Mother Shahraz?",
-        answers: ["Black Temple", "BT", "Black Temple"],
-    },
-    {
-        question: "Where can you find the Illidari Council?",
-        answers: ["Black Temple", "BT", "Black Temple"],
-    },
-    {
-        question: "Where can you find Illidan Stormrage?",
-        answers: ["Black Temple", "BT", "Black Temple"],
-    },
-    {
         question: "Guess the Zone: This zone has lava elementals, spiders, and incendosaurs as its inhabitants. One of the quests in this zone is called 'What the Flux?'.",
         answers: ["Searing Gorge"],
     },
     {
-        question: "Guess the Zone: This zone has air elementals, crabs, blood elves, naga, and furbolgs as some of its inhabitants. Arcane storms strikes this peaceful zone, which lies west of darkshore.",
-        answers: ["Azuremyst Isle", "Azuremyst"],
-    },
-    {
         question: "Guess the Zone: 'Here, young orcs, tauren, and trolls study Shamanism, Hunting, and the Ways of the Warrior'.",
         answers: ["Durotar"],
-    },
-    {
-        question: "Guess the Zone: The zone has the famous Serpent Lake, where four instances lies. The zone is also famous for one of its inhabitants, the Sporelings.",
-        answers: ["Zangarmarsh"],
-    },
-    {
-        question: "Guess the Zone: This zone contains all kinds of elementals, from water to fire, from earth to air. When players try to explain this place, they often say its quite similar to Mulgore.",
-        answers: ["Nagrand"],
-    },
-    {
-        question: "Guess the Zone: The zone is known for its local inhabitants, the wild talbuks and clefthoofs especially. Alot of ogres and gronns also live here.",
-        answers: ["Nagrand"],
-    },
-    {
-        question: "Guess the Zone: This zone is known to be the 'Feralas of the Outland'. The local inhabitants in this zone are mainly the blood elves and the arrakoa. A NPC in this zone named Griftah is a well known scammer.",
-        answers: ["Terokkar forest", "Terokkar"],
-    },
-    {
-        question: "Guess the Zone: The Mok'Nathals live in this zone. The inhabitants here are mostly ogres, and etherals. The formula for +40 spell damage drops in this zone. ",
-        answers: ["Blades Edge Mountains", "Blade's Edge Mountains"],
-    },
-    {
-        question: "This zone has plenty of chimaeras, and ethereals as its inhabitants. There is one raid instance in this zone. You can find Rexxar in the Horde town of this place.",
-        answers: ["Blades Edge Mountains", "Blade's Edge Mountains"],
     },
     {
         question: "When does Hallow's End start, in october?",
@@ -2939,172 +2435,20 @@ const wowTriviaQuestions = () => [
         answers: ["Zul'Gurub", "ZG", "Zul Gurub"],
     },
     {
-        question: "The trolls in Zul'Aman are obviusly from the Amani empire, right? (True/False)?",
-        answers: ["True"],
-    },
-    {
         question: "What is Cenarius?",
         answers: ["A demigod", "Demigod", "A demi-god"],
-    },
-    {
-        question: "Who sells Soap on a Rope, in Shattrath?",
-        answers: ["Griftah"],
-    },
-    {
-        question: "What foe will you face the most in the expansion? (ex. Amani Empire)",
-        answers: ["Scourge", "the Scourge"],
-    },
-    {
-        question: "How many new zones is comming with the expansion?",
-        answers: ["10", "Ten"],
-    },
-    {
-        question: "Guess the Zone: This zone will be revamped in patch 2.3, and will feature the new goblin town, Mudsprocket. 'The Missing Diplomat' quest-chain has been countinued aswell. A total of 60 new quests has been added to the zone.",
-        answers: ["Dustwallow Marsh"],
-    },
-    {
-        question: "In patch 2.3 the dragons outside Onyxia's lair will no longer be elite. (True/False)?",
-        answers: ["True"],
-    },
-    {
-        question: "Sholazar Basin will be one of the largest zones in Northrend.",
-        answers: ["false"],
-    },
-    {
-        question: "The Borean Tundra and the ____________ will probably be the largest zones in Northrend.",
-        answers: ["The Dragonblight", "Dragonblight"],
-    },
-    {
-        question: "Lake Wintergrasp will feature a lot of ____________, because of the pvp-only uniqueness the zone has. (hint: Annother name of 'Outdoor PvP')",
-        answers: ["world pvp"],
-    },
-    {
-        question: "The Borean Tundra will feature the Riplash Ruins, which lies near the end of the zone to the south. It has nerubian architecture but is not occupied by them anymore. What group is currently inhabiting it?",
-        answers: ["The naga", "The nagas", "naga", "nagas"],
     },
     {
         question: "What is the naga's also known as? (like, Archimonde the Defiler)",
         answers: ["The terror of the tides", "Terror of the tides", "The naga, Terror of the Tides"],
     },
     {
-        question: "____________ watches over the Dragonblight together with his dragonflight, to make sure that the remains are undisturbed.",
-        answers: ["Malygos", "Malygos the Spell-Weaver", "Malygos the Spell Weaver"],
-    },
-    {
-        question: "The Grizzly Hills in Northrend has how many furbolg tribes?",
-        answers: ["4", "four"],
-    },
-    {
-        question: "What is the furbolg capital in The Grizzly Hills called?",
-        answers: ["Grizzlemaw", "The Grizzlemaw"],
-    },
-    {
         question: "How many furbolg tribes are known to exist?",
         answers: ["14", "fourteen"],
     },
     {
-        question: "What new proffesion will be introduced in the expansion?",
-        answers: ["Inscription"],
-    },
-    {
-        question: "What heroic class will be the first released?",
-        answers: ["Death knight", "The Death Kngiht"],
-    },
-    {
-        question: "What is the name of the undead settlement in Howling Fjord?",
-        answers: ["New Agamand"],
-    },
-    {
-        question: "The taunka's were thought to be lost untill they were discovered by ___________________ and his orcs when they landed in Northrend. (the full name)",
-        answers: ["Garrosh Hellscream"],
-    },
-    {
-        question: "The taunka are an ancient offshot of the _________.",
-        answers: ["Tauren", "Taurens"],
-    },
-    {
-        question: "The tuskarrs are a humanoid _______ race who live in Northrend.",
-        answers: ["Walrus"],
-    },
-    {
-        question: "A race of humanoid spiders, is also known as the __________.",
-        answers: ["Nerubians"],
-    },
-    {
-        question: "_________ was the former king of Azjol-Nerub. He now leads the undead nerubians.",
-        answers: ["Anub'Arak"],
-    },
-    {
-        question: "The 'Knights of the Silver Hand' will make their return in the expansion. They are lead by the previously exiled Highlord ______ Fordring, which you can encounter ingame in the Eastern Plaguelands.",
-        answers: ["Tirion"],
-    },
-    {
-        question: "In what zone lies Utgarde Keep?",
-        answers: ["Howling Fjord"],
-    },
-    {
-        question: "The inhabitants of Utgarde Keep is known as the _______ and are formidable warriors. They are bent on proving their strength to the Lich King, who will only raise the most worthy of their warriors to serve him beyond the grave.",
-        answers: ["Vrykuls", "Vrykul's"],
-    },
-    {
-        question: "It is expected that atleast one instance in the Utgarde Keep will feature some _________.",
-        answers: ["Undeads", "Scourge"],
-    },
-    {
         question: "Alliance can expect to finally see ______ Bronzebeard, the famous explorer. He will be critical in order to uncover the real truth of Azeroth.",
         answers: ["Brann"],
-    },
-    {
-        question: "The dwarves will discover the origin of life on Azeroth in the expansion. (True/False)?",
-        answers: ["true"],
-    },
-    {
-        question: "The second instance in Utgarde Keep is called 'Utgarde _______', and is planned to be a level 80 5-man instance.",
-        answers: ["Pinnacle"],
-    },
-    {
-        question: "Utgarde Keep will have a raiding instance that is similar to AQ in size. In here you will face the Utgarde Keep Champion, Gutrot Keleseth, as the last boss. He will fight with his fists just like the real Gutrot did, and wear no armor. (True/False)?",
-        answers: ["False"],
-    },
-    {
-        question: "Utgarde Keep will be quite similar to the Hellfire Citadel. (True/False)?",
-        answers: ["True"],
-    },
-    {
-        question: "The nexus has two 5man instances, and one 25man raid instance. In the raid instance you will face Malygos, also known as The Spell-Weaver. (True/False)?",
-        answers: ["true"],
-    },
-    {
-        question: "The nexus is located in __________, the home of Malygos.",
-        answers: ["Coldarra"],
-    },
-    {
-        question: "A scroll that was found in a Northrend ruin mentioned a spell that can remove the ________ from a huge number of undead creatures at the same time, putting the undead creatures permanently to rest.",
-        answers: ["Undeath"],
-    },
-    {
-        question: "A 5man instance in The Nexus is called '____ Caverns'.",
-        answers: ["ice"],
-    },
-    {
-        question: "The 25man raid instance in ____________ will be similar to Onyxia and Gruul. Here you will battle Malygos, the Dragon Aspect of Magic.",
-        answers: ["The Nexus"],
-    },
-    {
-        question: "Where is Ulduar located, in Northrend?",
-        answers: ["The Storm Peaks"],
-    },
-    {
-        question: "Ulduar is a titan ____.",
-        answers: ["City"],
-    },
-    {
-        question: "It is rumored that it's probably in ________ that dwarves will learn the truth about Azeroth. In short, very much lore in it.",
-        answers: ["Ulduar"],
-    },
-    {
-        question: "It is rumored that ________ has a great titan city, just like Ulduar.",
-        answers: ["Uldum"],
     },
     {
         question: "One of Azjol'Nerubs many mystery's is the __________ Ones.",
@@ -3115,356 +2459,20 @@ const wowTriviaQuestions = () => [
         answers: ["Lich King", "The Lich King"],
     },
     {
-        question: "The seat of power of the Scourge, is the Frozen Throne. The Frozen Throne lies in the ________________.",
-        answers: ["Icecrown glacier", "The Icecrown glacier"],
-    },
-    {
-        question: "____________ is the new leader of Dalaran in the expansion.",
-        answers: ["Rhonin"],
-    },
-    {
-        question: "Dalaran has been 'transported' to Northend and is a ________ town, even to the Horde.",
-        answers: ["neutral"],
-    },
-    {
-        question: "________ in Northrend, will have one or two instances, just like Stormwind and Orgrimmar.",
-        answers: ["Dalaran"],
-    },
-    {
-        question: "_________ Runeweaver is the current leader of Dalaran.",
-        answers: ["Ansirem"],
-    },
-    {
-        question: "____________ will be retuned into a level 80 instance with appropiate loot, and be the entry-raid instance in the expansion. The attunement will be removed aswell.",
-        answers: ["Naxxramas"],
-    },
-    {
-        question: "Caverns of Time: Culling of _______  is the new instance in CoT that will be added in the expansion. It will be a level 80 5-man instance that will be centered around helping Prince Arthas purge the plague infected populace of this place.",
-        answers: ["Stratholme"],
-    },
-    {
-        question: "What is the name of the capital city that the ice trolls, also known as the Zul'Drak empire, has in Northrend?",
-        answers: ["Gundrak"],
-    },
-    {
         question: "The Bloodmar is a community of magnataurs. They are currently building their numbers and gathering resources in preperation for war on the other races close to their border. They are led by the mighty Grom'Thar the _______.",
         answers: ["Thunderbringer"],
-    },
-    {
-        question: "The Drak'Tharon Keep is a fort where Arthas stayed while searching for ______________, and is located in the Grizly Hills.",
-        answers: ["Frostmourne"],
-    },
-    {
-        question: "The Drak'Tharon Keep originally belonged to the _________ trolls, but the Scourge drove them out and took their possesions, aswell as the fort. The Scourge now have a garrison here, which is holding the mountain passes.",
-        answers: ["Drakkari"],
-    },
-    {
-        question: "The ____________ Keep is easily defended. It is said that the small group of scourge that is garrisoned there can easily hold the keep against forces ten times its size, especially since they dont need nourishment, like food or water.",
-        answers: ["Drak'Tharon"],
-    },
-    {
-        question: "The Death Knight will just be the first of several upcomming ______ class. The current plan is to release one  _____ class per expansion pack.",
-        answers: ["hero"],
-    },
-    {
-        question: "The Death Knight will start at a high level, around level __-60 is the current plan.",
-        answers: ["55"],
-    },
-    {
-        question: "The Death Knights cant use shields. (True/False)?",
-        answers: ["true"],
-    },
-    {
-        question: "The Death Knight uses ______ as their source of 'mana'. The _______ on their runeblades have charges, so they dont have unlimited mana precisely. Once thouse charges are out, they need to regenerate in order to get their abilities and spells back.",
-        answers: ["runes"],
-    },
-    {
-        question: "Proffesions will have _____ skill points as limit in the expansion.",
-        answers: ["450", "four hundred fifty"],
-    },
-    {
-        question: "The riding skills will be _______ skill points as limit in the expansion.",
-        answers: ["375"],
-    },
-    {
-        question: "In the expansion you are able to customize your characters with new hair styles and _______. Characters wont be able to have a 'plastic surgery', though. (hint: This can be 'triggered' by writing an emote)",
-        answers: ["dances"],
-    },
-    {
-        question: "Blizzard hopes to bring the pvp to annother level with the new zone in the expansion, Lake __________. It will be the only-pvp zone in wow.",
-        answers: ["Wintergrasp"],
-    },
-    {
-        question: "The expansion will introduce _____ weapons into the game, and atleast one new battleground.",
-        answers: ["siege"],
-    },
-    {
-        question: "The art of Outland is going to return to the 'classical' Warcraft, and that is, ______ fantasy. The Outland art was high fantasy.",
-        answers: ["gothic"],
-    },
-    {
-        question: "What is 'the roof of the world' refering to?",
-        answers: ["Northrend"],
     },
     {
         question: "In which patch was the voice chat implemented?",
         answers: ["2.2"],
     },
     {
-        question: "What is the name of the tuskar's capital city?",
-        answers: ["Kaskala"],
-    },
-    {
-        question: "What is the Horde fortress called in Borean Tundra? (hint: Gromm Hellscream's clan)",
-        answers: ["Warsong Hold"],
-    },
-    {
-        question: "The tuskarr have allied themselves with the Horde expedition, both because of their cultural similarities (__________ particulary) and to battle the naga who assaults them from the south.",
-        answers: ["Shamanism"],
-    },
-    {
-        question: "The tuskarr's considers it a mark of _______ to give help to other tuskarr villages.",
-        answers: ["honor"],
-    },
-    {
-        question: "The _____________ received its name because of the wind which races in from the sea on all three sides, producing a constant howl, like a maddened beast seeking its prey.",
-        answers: ["Howling Fjord", "The Howling Fjord"],
-    },
-    {
-        question: "Guess the Zone: Both the Horde and the Alliance are steadily assaulted in this zone, by the vrykuls. The ironforge prospectors in this zone has discovered a new race of iron dwarves which may hint to their own ancient origin.",
-        answers: ["Howling Fjord", "The Howling Fjord"],
-    },
-    {
-        question: "Guess the Zone: Sylvanas and the Forsaken in this zone has engineered a new plague, and is ready to strike at the Lich King. They have built a new town in this zone, named 'New Agamand'. It's there the testing beings.",
-        answers: ["Howling Fjord", "The Howling Fjord"],
-    },
-    {
-        question: "Guess the Zone: This zone is located at the far western edge of Northrend. The naga, and the Scourge are two of the local inhabitants. The Tuskarr are the dominant presence in this zone, and their capital city Kaskala is here aswell.",
-        answers: ["Borean Tundra", "The Borean Tundra"],
-    },
-    {
-        question: "Guess the Zone: The Drakkari Trolls, and the Blue Dragonflight occupies this zone, together with many other species. This zone is flat, wide, and cold. A solid sheet of ice covers the zone.",
-        answers: ["Borean Tundra", "The Borean Tundra"],
-    },
-    {
-        question: "Guess the Zone: This zone is perhaps the softest of all of the zones in Northrend. The trolls is only a minor nuisance and the Scourge comes here rarely. The Alliance Keep in this zone is called Justice Keep and the Horde town is called Warsong Hold.",
-        answers: ["Borean Tundra", "The Borean Tundra"],
-    },
-    {
-        question: "Guess the Zone: The humans of this zone was the first of all to fall victim to the plague. This zone is also a graveyard for dragons. Old dragon's come here in their final hours or days, to rest in peace.",
-        answers: ["The Dragonblight"],
-    },
-    {
-        question: "Guess the Zone: Malygos and his Blue Dragonflight guards this zone fiercly. Undead animals also roams this land, attacking any living thing in sight. Travelers should try their best to avoid them.",
-        answers: ["The Dragonblight"],
-    },
-    {
-        question: "Guess the Zone: The dragons of this zone, in the Wyrmrest temple, communicate regulary with their kin in Coldarra. This zone also features the Tauren outpost of Icemist village, which has been known for helping strangers in need.",
-        answers: ["The Dragonblight"],
-    },
-    {
-        question: "Guess the Zone: The survivors of the fall of Azjol-Nerub has fled to the Sundered Monolith, a nerubian fortress in this zone. No one knows what their role will be in Northrend.",
-        answers: ["The Dragonblight"],
-    },
-    {
-        question: "Guess the Zone: This zone is the home of the trolls of the Drakkari empire. Their capital city Gundrak lies is here, aswell. Most people avoids this zone, for good reasons.",
-        answers: ["Zul'Drak"],
-    },
-    {
-        question: "Guess the Zone: This zone has excellent wildlife compared to most of the other zones in Northrend. The Scourge has so far not penetrated this zone to any degree, but a war between the Drakkari trolls here and the Scourge might be inevitable.",
-        answers: ["Zul'Drak"],
-    },
-    {
-        question: "The leader of the drakkari tribes in Zul'Drak is called 'Frost King _____'.",
-        answers: ["Malakk"],
-    },
-    {
-        question: "Guess the Zone: It's in this zone here the grizzlemaw furbolg made their capital city, Grizzlemaw. The grizzlemaw furbolgs claims they where the first people in these hills, just like the Drakkari.",
-        answers: ["Grizzly Hills", "The Grizzly Hills"],
-    },
-    {
-        question: "Guess the Zone: The dwarven settlement, Thor Modan, can be found in this zone. It is the ancient home of the iron dwarves. The furbolgs in this zone attacks this place frequently, because they think of the dwarves as graverobbers and trespassers.",
-        answers: ["Grizzly Hills", "The Grizzly Hills"],
-    },
-    {
-        question: "Guess the Zone: Drak'Tharon keep lies here. It's origin is from the Drakkari, and is very close to the border of Zul'Drak. The Scourge now occupies this keep, and can easily defend it from intruders.",
-        answers: ["Grizzly Hills", "The Grizzly Hills"],
-    },
-    {
-        question: "Guess the Zone: The furbolgs of this zone is not hostile unless someone enters their territory. The furbolgs are suprisingly friendly to travelers, aslong as they dont make any claims on anything in the hills. They are quite simple people actually.",
-        answers: ["The Grizzly Hills"],
-    },
-    {
-        question: "Guess the Zone: The wendigo and the sasquatch are some of the local inhabitants in the zone. This zone is full of life, and has many animals, such as wolves, and foxes, and even snow owl's. The Drakkari hunts only rarely in this zone.",
-        answers: ["Grizzly Hills", "The Grizzly Hills"],
-    },
-    {
-        question: "Guess the Zone: This zone has a low Scourge presence, only enough to block the northwest corner of the zone. The zone is described as 'It's not a easy land by any stretch, but its handsome and fierce, and full of life'.",
-        answers: ["Grizzly Hills", "The Grizzly Hills"],
-    },
-    {
-        question: "Guess the Zone: The Venture Co is deforesting the land in this zone, which is located in Northrend. The furbolgs in this zone probably has some quests regarding them, since they are a shamanistic people. This zone has many animals.",
-        answers: ["The Grizzly Hills", "Grizzly Hills"],
-    },
-    {
-        question: "Azjol-Nerub is located underground. (True/False)?",
-        answers: ["true"],
-    },
-    {
-        question: "Azjol-Nerub is also known as the ________ Kingdom.",
-        answers: ["Spider"],
-    },
-    {
-        question: "Guess the Zone: There is a small dwarven camp named Doorward, inside this zone. Some years ago Arthas attacked it, on his way to the Lich King. Most of the people there were not mortally wounded though. This zone is completly filled with the Scourge.",
-        answers: ["Azjol-nerub"],
-    },
-    {
-        question: "Guess the Zone: Brann Bronzebeard claims it might be possible for an Alliance with the surviving nerubians if one is willing to help them clear out the Scourge from their empire. This zone is also knwon as 'The Spider Kingdom'.",
-        answers: ["Azjol-Nerub"],
-    },
-    {
-        question: "Guess the Zone: It is said that this zone contains an Old God, and that the mysterius Forgotten Ones and the Faceless Ones and are his servants. Baelgun Flamebeard, the new leader of Doorward, fiercly belives in this and vows to stop them.",
-        answers: ["Azjol-Nerub"],
-    },
-    {
-        question: "Just like Un'Goro Crater, ___________ in Northrend is an anomoly.",
-        answers: ["Sholazar Basin"],
-    },
-    {
-        question: "Guess the Zone: This zone is a tropical jungle in the midst of Northrend. This zone is tropical, and no one knows why. This zone is quite small compared to other zones in Northrend. It's about the same size as the Crystalsong Forest.",
-        answers: ["Sholazar Basin"],
-    },
-    {
-        question: "Guess the Zone: This zone lies northwest of Borean Tundra. The zone contains very hot geysers and steam vents. So hot, that if you put your hands in one of them, your hands flesh would be incinerated instantly. The wildlife here is rich.",
-        answers: ["Sholazar Basin"],
-    },
-    {
-        question: "Guess the Zone: A high elf scholar belived that the Titans used the ________________ as a testing ground. If that's true, then some of their experiments might remain. The zone would be a tresure trove of knowledge and power if that is the case.",
-        answers: ["Sholazar Basin"],
-    },
-    {
-        question: "Guess the Zone: This zone is located in the north-east of Northrend. The mysterius storm giants live in the famous Titan city of Ulduar in this zone. The winds here are extremely violent and dangerous.",
-        answers: ["The Storm Peaks", "Storm Peaks"],
-    },
-    {
-        question: "Guess the Zone: It was here that Aegywynn, the Guardian of Tirisfal battled Sargeras, the lord of the Burning legion. The magnataurs and the wendigos are two of the local inhabitants in this zone.",
-        answers: ["The Storm Peaks", "Storm Peaks"],
-    },
-    {
-        question: "Guess the Zone: The Titans used to live here. They even created a city where they worked on their experiments. Many caves exists in this zone, and it is rumored that the titans themselves created them.",
-        answers: ["The Storm Peaks", "Storm Peaks"],
-    },
-    {
-        question: "Guess the Zone: This zone contains the largest glacier on Azeroth, and became infamous when Kil'jaeden hurled a certain being into the glacier.",
-        answers: ["Icecrown Glacier", "The Icecrown Glacier"],
-    },
-    {
-        question: "Guess the Zone: The Scarlet Crusade succeeded in approaching the stronghold in this zone once, but was in the end repelled by the Scourge. They lost countless men and women. In the end they only became scourge themselves, most probably.",
-        answers: ["Icecrown Glacier", "The Icecrown Glacier"],
-    },
-    {
-        question: "Guess the Zone: This zone has the largest scourge presence of them all, as this zone is the heart of the Scourge. Countless people have tried to destroy it from here, but were only added to their ranks in the end.",
-        answers: ["Icecrown Glacier", "The Icecrown Glacier"],
-    },
-    {
-        question: "Name the zone which is the only zone so far to be completly devoted to PvP, and nothing else.",
-        answers: ["Lake Wintergrasp"],
-    },
-    {
-        question: "Guess the Zone: This zone is basicly a large frozen lake. Sometimes, local taurens and taunka's cut holes in the lake to spear-fish. It is very dangerous to fall down in the lake, as you will be rendered unconscious by the cold within 3-10 minutes.",
-        answers: ["Lake Wintergrasp"],
-    },
-    {
-        question: "Dalaran has ties to the Old Horde. (True/False)?",
-        answers: ["false"],
-    },
-    {
-        question: "You cant use the flying mount before you are around level 75~ in __________.",
-        answers: ["Northrend"],
-    },
-    {
-        question: "The neutral town in Northrend is called __________. It was teleported to Northrend because of Malygos and and his war against magic users.",
-        answers: ["Dalaran"],
-    },
-    {
-        question: "___________ has moved to the new Forsaken town in Northrend, New Agamand. Its in New Agamand the testing of the new plague will begin.",
-        answers: ["Sylvanas"],
-    },
-    {
-        question: "In what patch will we see Zul'Aman?",
-        answers: ["2.3"],
-    },
-    {
         question: "The blue dragonkin's in _________ can now drop an Azure Whelp, a blue dragon pet.",
         answers: ["Azshara"],
     },
     {
-        question: "In the upcomming patch, quest givers availible with daily quests will now have a ______ exclamation point instead of a yellow one.",
-        answers: ["blue"],
-    },
-    {
-        question: "In the upcomming patch, the Sporregar faction will sell a ________ pet at exalted.",
-        answers: ["sporebat"],
-    },
-    {
-        question: "In the upcomming patch, how much vendor discount does exalted give, in percent?",
-        answers: ["20%", "twenty percent"],
-    },
-    {
-        question: "In the upcomming patch, the Alliance Brigadier Generals and the Horde Warbringers will give out ___________ daily quests.",
-        answers: ["battleground", "bg"],
-    },
-    {
-        question: "In the upcomming patch, __________________ will feature a major change. The Commanders and Lieutenants has left this battleground, in search for new battle opportunities. Also, the elite tag on most of the NPC's has been removed.",
-        answers: ["The Alterac Valley", "Alterac Valley", "AV"],
-    },
-    {
-        question: "In the upcomming patch, ____________ paladins will get seriusly revamped.",
-        answers: ["Retribution", "ret"],
-    },
-    {
-        question: "In the upcomming patch, the dressing room will feature a significant change. You can now see how you would look with items from __________.",
-        answers: ["receipes"],
-    },
-    {
-        question: "In the upcomming patch, engineers can create flying machines to have as flying mounts. (True/False)?",
-        answers: ["true"],
-    },
-    {
-        question: "In the upcomming patch, you can catch a fishing ________ which teaches you how to 'track fishing nodes' via fishing.",
-        answers: ["journal"],
-    },
-    {
-        question: "In the upcomming patch, all old world dungeons have had their loot revisited. One change in that all boss loot will now be of _________ quaility.",
-        answers: ["superior"],
-    },
-    {
-        question: "In the upcomming patch, the elite mobs outside the instances in _________ has been changed to non-elite. The trolls outside ZF will become non-elites, for example.",
-        answers: ["Azeroth"],
-    },
-    {
         question: "In the upcommming patch, the heroic keys has been changed from revered to __________ as requirement before you can buy.",
         answers: ["honored"],
-    },
-    {
-        question: "In the upcomming patch, a lot of the old world's dungeons has been changed. They have also made the instances narrower in level ranges. (True/False)?",
-        answers: ["true"],
-    },
-    {
-        question: "In the upcomming patch, you can get daily quests for fishing. (True/False)?",
-        answers: ["false"],
-    },
-    {
-        question: "In the upcomming patch, you can get ________________ for heroic and non-heroic dungeons in Outland.",
-        answers: ["daily quests"],
-    },
-    {
-        question: "In the upcomming patch, the ___________ has received some upgrades.",
-        answers: ["Auction House", "AH"],
-    },
-    {
-        question: "Naxxrammas was once an ancient ________ ziggurat, before it was pulled free from the ground by agents of the Lich King. It served as Kel'Thuzad's base of operations as he spread the plague. It's the home of Kel'Thuzad.",
-        answers: ["nerubian"],
     },
     {
         question: "What is the name of the legendary caster staff, in Naxxramas?",
@@ -3481,10 +2489,6 @@ const wowTriviaQuestions = () => [
     {
         question: "To enter Naxxramas you need to go into an open _________ in the middle of Plaguewood, which lies in the Eastern Plaguelands. From there you teleport yourself to Naxxramas, by standing on the main floor.",
         answers: ["ziggurat"],
-    },
-    {
-        question: "Naxxramas will be retuned for level 80. (True/False)?",
-        answers: ["true"],
     },
     {
         question: "Naxxramas has how many wings?",
@@ -3567,20 +2571,12 @@ const wowTriviaQuestions = () => [
         answers: ["Kel'Thuzad"],
     },
     {
-        question: "In what instance except Naxxramas, can Kel'Thuzad be found?",
-        answers: ["Escape from Durnholde Keep", "Durnholde", "Escape from Durnholde", "Old hillsbrad", "Old hillsbrad foothills"],
-    },
-    {
         question: "In order to fight Sapphiron, you need to ring a bell inside Naxxramas. (True/False)?",
         answers: ["false"],
     },
     {
         question: "What resistance do you need 150-200 of, in order to kill Sapphiron in Naxxramas? (atleast it was so, pre-bc)",
         answers: ["frost"],
-    },
-    {
-        question: "It is likely that the Ashbringer will be moved from Naxxramas till a instance in Utgarde Keep. (True/False)?",
-        answers: ["true"],
     },
     {
         question: "What is the name of the boss which is considered 'free loot' by many people?",
@@ -3875,10 +2871,6 @@ const wowTriviaQuestions = () => [
         answers: ["Sapphiron"],
     },
     {
-        question: "Sapphiron in Naxxramas was originally a blue dragon that was protecting Northrend, untill he was killed by _________ and his forces. He was resurrected as a undead shortly after, by Arthas.",
-        answers: ["Arthas"],
-    },
-    {
         question: "What boss drops 'The Face of Death', the best tanking shield availible pre-bc, in Naxxramas?",
         answers: ["Sapphiron"],
     },
@@ -4017,62 +3009,6 @@ const wowTriviaQuestions = () => [
     {
         question: "Quote: I am the coming of the end ",
         answers: ["Archimonde"],
-    },
-    {
-        question: "Quote: Abandon all hope! The legion has returned to finish what was begun so many years ago. This time there will be no escape!",
-        answers: ["Azgalor"],
-    },
-    {
-        question: "Quote: Cry for mercy! Your meaningless lives will soon be forfeit.",
-        answers: ["Kaz'rogal"],
-    },
-    {
-        question: "Quote: You are defenders of a doomed world. Flee here and perhaps you will prolong your pathetic lives.",
-        answers: ["Anetheron"],
-    },
-    {
-        question: "Quote: Succumb to the icy chill... of death!",
-        answers: ["Rage Winterchill"],
-    },
-    {
-        question: "Quote: Ashes to ashes, dust to dust.",
-        answers: ["Rage Winterchill"],
-    },
-    {
-        question: "Quote: My patience has run out! Die, die!",
-        answers: ["High Warlord Naj'entus", "High Warlord Najentus", "Najentus"],
-    },
-    {
-        question: "Quote: YOU WILL SHOW THE PROPER RESPECT!",
-        answers: ["Teron Gorefiend"],
-    },
-    {
-        question: "Quote: I'll rip the meat from your bones!",
-        answers: ["Gurtogg Bloodboil"],
-    },
-    {
-        question: "Quote: You can have anything you desire... for a price.",
-        answers: ["Reliquary of Souls", "Reliquary", "Essence of Souls"],
-    },
-    {
-        question: "Quote: So, business... or pleasure?",
-        answers: ["Mother Shahraz", "Shahraz"],
-    },
-    {
-        question: "Quote: You're not cut out for this!",
-        answers: ["Illidari Council"],
-    },
-    {
-        question: "Quote: Behold the flames of Azzinoth!",
-        answers: ["Illidan Stormrage"],
-    },
-    {
-        question: "Naxxramas will become a 25man in the expansion. (True/False)?",
-        answers: ["true"],
-    },
-    {
-        question: "The nerubian spiderlords are followers of the __________ in Northrend.",
-        answers: ["Old Gods"],
     },
     {
         question: "Quote: Shhh... it will all be over soon.",
