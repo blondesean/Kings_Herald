@@ -27,4 +27,5 @@ module.exports = {
     ...require('./patchNotesFlavor'),
     ...require('./triviaFlavor'),
     ...require('./halloweenTriviaFlavor'),
+    ...require('./connectionsFlavor'),
 };

@@ -39,12 +39,15 @@ const { scheduleWeeklyRecap } = require('./../commands/passive/weeklyRecap');
 const { scheduleTrivia } = require('./../commands/passive/trivia');
 const { scheduleWowTriviaWednesday } = require('./../commands/passive/wowTrivia');
 const { trackVoiceStateUpdate, startVoiceTracking } = require('./../commands/passive/voiceTime');
+const { scheduleConnectionsPuzzle } = require('./../commands/puzzles/connections');
 
-//Slash commands are auto-loaded by filename from commands/prompts (user-facing)
-//and commands/passive/preview (manual triggers for scheduled passive behaviors,
-//admin-only in Discord). Retired commands (commands/retired) are not loaded.
+//Slash commands are auto-loaded by filename from commands/prompts (user-facing),
+//commands/passive/preview (manual triggers for scheduled passive behaviors),
+//and commands/puzzles/preview (same idea, for the puzzles command group).
+//admin-only in Discord. Retired commands (commands/retired) are not loaded.
 const promptsPath = path.join(__dirname, '..', 'commands', 'prompts');
 const previewPath = path.join(__dirname, '..', 'commands', 'passive', 'preview');
+const puzzlesPreviewPath = path.join(__dirname, '..', 'commands', 'puzzles', 'preview');
 var commands = {};
 
 //Loaded synchronously so the command definitions are complete before the
@@ -87,6 +90,7 @@ const loadCommandsFrom = (dir, label) => {
 
 loadCommandsFrom(promptsPath, 'Command');
 loadCommandsFrom(previewPath, 'Preview Command');
+loadCommandsFrom(puzzlesPreviewPath, 'Preview Command');
 
 //Build the slash-command registration payload from the loaded metadata.
 //Every loaded command is registered; adminOnly commands (preview commands)
@@ -123,6 +127,7 @@ client.on('ready', (c) => {
     scheduleWeeklyRecap(client);
     scheduleTrivia(client);
     scheduleWowTriviaWednesday(client);
+    scheduleConnectionsPuzzle(client);
     startVoiceTracking(client);
 });
 

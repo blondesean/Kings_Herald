@@ -79,6 +79,11 @@ const PAIR_PREFIX = 'PAIR#';
 const TRIVIA_STATE_PARTITION = 'TRIVIA#STATE';
 const TRIVIA_STATE_SORT_KEY = 'BAG';
 
+// Same shape as the trivia state above, for the daily Connections-style
+// puzzle's no-repeat cycle (see commands/puzzles/connections.js).
+const CONNECTIONS_STATE_PARTITION = 'CONNECTIONS#STATE';
+const CONNECTIONS_STATE_SORT_KEY = 'BAG';
+
 // Lazily created so the bot can run locally without AWS credentials configured.
 let docClient = null;
 const getClient = () => {
@@ -377,6 +382,92 @@ const resetWeeklyPairSeconds = async function (guildId, pairKeys) {
     }
 };
 
+/* Credit a member with `points` from a puzzle game (see commands/puzzles/) —
+ * unlike voice/pair time, these points are real and awarded the moment
+ * they're earned, not converted from a running counter at recap time. Adds
+ * to both the running `points` total (immediately spendable/visible via
+ * /nobility) and `weeklyPuzzlePoints` (reset after each weekly recap, purely
+ * to power its display-only "puzzle podium" — see getWeeklyPuzzleStats/
+ * resetWeeklyPuzzlePoints). Meant to be shared across every puzzle game
+ * (Connections today, others later), so the recap's podium isn't tied to
+ * any one of them specifically.
+ */
+const addPuzzlePoints = async function (guildId, userId, displayName, points) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping puzzle point persistence.');
+        return;
+    }
+    if (!points || points <= 0) return;
+
+    const client = getClient();
+
+    await client.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+        UpdateExpression: 'SET #dn = :n ADD #pts :p, #wpp :p',
+        ExpressionAttributeNames: {
+            '#dn': 'displayName',
+            '#pts': 'points',
+            '#wpp': 'weeklyPuzzlePoints',
+        },
+        ExpressionAttributeValues: {
+            ':n': displayName || 'a noble',
+            ':p': points,
+        },
+    }));
+};
+
+/* Return every member with puzzle points logged since the last weekly
+ * reset, as [{ userId, displayName, weeklyPuzzlePoints }]. Backs the weekly
+ * recap's puzzle podium (commands/passive/weeklyRecap.js) — display only,
+ * since the points themselves were already awarded in real time above.
+ */
+const getWeeklyPuzzleStats = async function (guildId) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; returning empty puzzle stats.');
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: '#g = :g',
+        ExpressionAttributeNames: { '#g': 'guildId' },
+        ExpressionAttributeValues: { ':g': guildId },
+    }));
+
+    const items = result.Items || [];
+    return items
+        .filter((item) => !String(item.userId).startsWith(DUEL_HISTORY_PREFIX) && !String(item.userId).startsWith(PAIR_PREFIX))
+        .filter((item) => (item.weeklyPuzzlePoints || 0) > 0)
+        .map((item) => ({
+            userId: item.userId,
+            displayName: item.displayName || 'a noble',
+            weeklyPuzzlePoints: item.weeklyPuzzlePoints,
+        }));
+};
+
+/* Zero out weeklyPuzzlePoints for the given members (their running `points`
+ * total is untouched — this only resets the podium-ranking window). Called
+ * by the weekly recap right after it reads and displays the puzzle podium.
+ */
+const resetWeeklyPuzzlePoints = async function (guildId, userIds) {
+    if (!isConfigured() || !userIds.length) return;
+
+    const client = getClient();
+
+    for (const userId of userIds) {
+        await client.send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: 'SET #wpp = :zero',
+            ExpressionAttributeNames: { '#wpp': 'weeklyPuzzlePoints' },
+            ExpressionAttributeValues: { ':zero': 0 },
+        }));
+    }
+};
+
 /* Return the trivia question texts already asked during the current
  * no-repeat cycle, as a string array (empty if no cycle is in progress, or
  * the table isn't configured — in which case the cycle tracks in-memory only
@@ -414,6 +505,44 @@ const setUsedTriviaQuestions = async function (usedQuestions) {
     await client.send(new PutCommand({
         TableName: TABLE_NAME,
         Item: { guildId: TRIVIA_STATE_PARTITION, userId: TRIVIA_STATE_SORT_KEY, usedQuestions },
+    }));
+};
+
+/* Same as getUsedTriviaQuestions, but for the daily Connections-style
+ * puzzle's no-repeat cycle — a string array of puzzle signatures already
+ * used this cycle (see commands/puzzles/connections.js's puzzleSignature).
+ */
+const getUsedConnectionsPuzzles = async function () {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; returning empty connections bag state.');
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: CONNECTIONS_STATE_PARTITION, userId: CONNECTIONS_STATE_SORT_KEY },
+    }));
+
+    return (result.Item && result.Item.usedPuzzles) || [];
+};
+
+/* Overwrite the persisted set of used Connections puzzle signatures. Pass an
+ * empty array to start a fresh cycle (called once the whole bank has been
+ * used through — see commands/puzzles/connections.js).
+ */
+const setUsedConnectionsPuzzles = async function (usedPuzzles) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping connections bag persistence.');
+        return;
+    }
+
+    const client = getClient();
+
+    await client.send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: CONNECTIONS_STATE_PARTITION, userId: CONNECTIONS_STATE_SORT_KEY, usedPuzzles },
     }));
 };
 
@@ -525,9 +654,14 @@ module.exports = {
     addPairSeconds,
     getWeeklyPairStats,
     resetWeeklyPairSeconds,
+    addPuzzlePoints,
+    getWeeklyPuzzleStats,
+    resetWeeklyPuzzlePoints,
     VOICE_POINTS_PER_HOUR,
     getUsedTriviaQuestions,
     setUsedTriviaQuestions,
+    getUsedConnectionsPuzzles,
+    setUsedConnectionsPuzzles,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,
