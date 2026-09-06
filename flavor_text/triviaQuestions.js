@@ -1,528 +1,583 @@
 /* Trivia bank for the Herald's daily trivia (commands/passive/trivia.js).
  *
- * Each entry is { question, options: { A, B, C, D }, correct }, `correct` being
- * one of 'A' | 'B' | 'C' | 'D'. Hard difficulty, and every question is about a
- * work, event, or discovery from 2000 or later (so: MCU yes, original trilogy
- * Star Wars no; Lord of the Rings films yes since they released 2001-2003).
- * Two halves: nerd (sci-fi/fantasy/gaming/anime/tech) and general knowledge
- * (science/history/sports/music/current events), 50 each.
+ * Each entry is { question, options: { A, B, C, D } }, `correct` being one of
+ * 'A' | 'B' | 'C' | 'D'. General-knowledge trivia (geography, science,
+ * history) sourced from two places, both reshuffled into a roughly even
+ * A/B/C/D spread regardless of how the source presented them — see the note
+ * in flavor_text/triviaFlavor.js's sibling banks for why that balance
+ * matters (players farming a fixed "always pick D" pattern):
  *
- * At most one question per franchise/universe in the nerd half (e.g. only one
- * Marvel Cinematic Universe question total, only one Game of Thrones-universe
- * question total, even though it spans multiple shows) — keeps any one IP
- * from dominating a day's question and dilutes the value of being an expert
- * in just one franchise.
+ *   - The first 33 questions are from quizado.com's "Most Challenging Trivia
+ *     Questions of All Time" list — question text and all four answer
+ *     options verbatim from that source. On the source page the correct
+ *     answer was listed last (option 4) in 24 of these 33, which is what
+ *     prompted the reshuffle in the first place.
  *
- * Correct answers are spread evenly across A/B/C/D on purpose — an earlier
- * version of this bank skewed heavily toward B, which let people farm points
- * by always reacting B. Keep new entries balanced the same way if the bank
- * grows again.
+ *   - The next 28 are from mentimeter.com's trivia-questions blog post,
+ *     which only supplies 3 options per question — the 4th (always a wrong
+ *     answer, invented to fit the same theme/category as the real 3) was
+ *     added by hand. Only that post's questions that actually had 3 listed
+ *     options were used; a large majority of the post's other "trivia" is
+ *     single-answer with no options, not multiple choice, and was skipped
+ *     entirely. Two more were dropped outright: one had only 2 options and
+ *     no marked correct answer (which city tea was invented in), and one was
+ *     factually wrong regardless of which option you'd pick (claimed 2002
+ *     Olympics answer was "Sydney", which actually hosted the 2000 Summer
+ *     Games — the 2002 Games were the Salt Lake City Winter Games, not among
+ *     the options offered).
+ *
+ *   - The rest are hard general-knowledge trivia hand-picked from a larger
+ *     user-supplied list of 50, fact-checked one by one and kept only if
+ *     both accurate and non-trivial. Four from that list were left out: the
+ *     Bhutan-capital and "shortest day" planet questions duplicated ones
+ *     already above; the Peace of Westphalia question offered "Eighty Years'
+ *     War" as a wrong answer even though that treaty also ended that war
+ *     (real ambiguity, not just a distractor); and the "word that's its own
+ *     opposite" question offered "contronym" and "auto-antonym" as if only
+ *     one were correct when they're synonyms for the same thing.
+ *
+ * Unlike an earlier version of this bank, these aren't restricted to
+ * post-2000 works/events or split into a nerd/general-knowledge half — it's
+ * straight trivia-night material instead.
  *
  * Keep each question single-answer and unambiguous: no "which of these are
- * also true" traps, since credit depends on reacting with exactly one emoji.
+ * also true" traps, since credit depends on clicking exactly one button.
  */
 const triviaQuestions = () => [
-    // ---- Nerd (sci-fi / fantasy / gaming / anime / tech), 2000+ ----
     {
-        question: "In the Game of Thrones episode \"The Long Night\" (2019), who kills the Night King?",
-        options: { A: 'Arya Stark', B: 'Jon Snow', C: 'Brienne of Tarth', D: 'Daenerys Targaryen' },
+        question: "Who was the first person to swim the English Channel?",
+        options: { A: "Matthew Webb", B: "Michael Phelps", C: "Robert Matthew", D: "John Davis" },
         correct: 'A',
     },
     {
-        question: "In The Mandalorian, what is the real name of the character nicknamed \"Baby Yoda\"?",
-        options: { A: 'Yaddle', B: 'Grogu', C: 'Kuiil', D: 'Din Djarin' },
+        question: "What is the rarest blood type in the world?",
+        options: { A: "A-positive", B: "AB-negative", C: "B-negative", D: "O-negative" },
         correct: 'B',
     },
     {
-        question: "What year did Halo: Combat Evolved launch alongside the original Xbox?",
-        options: { A: '1999', B: '2003', C: '2001', D: '2005' },
+        question: "In what year was the first computer mouse patented?",
+        options: { A: "1975", B: "1960", C: "1967", D: "1980" },
         correct: 'C',
     },
     {
-        question: "In the 2007 video game Portal, what is the name of the protagonist controlled by the player?",
-        options: { A: 'GLaDOS', B: 'Alyx Vance', C: 'Wheatley', D: 'Chell' },
+        question: "Who wrote the first computer program?",
+        options: { A: "Alan Turing", B: "Grace Hopper", C: "Charles Babbage", D: "Ada Lovelace" },
         correct: 'D',
     },
     {
-        question: "Which 2011 sandbox video game was created by Swedish developer Markus \"Notch\" Persson?",
-        options: { A: 'Minecraft', B: 'Terraria', C: 'Roblox', D: "Garry's Mod" },
+        question: "What is the capital of Mongolia?",
+        options: { A: "Ulaanbaatar", B: "Bishkek", C: "Almaty", D: "Tashkent" },
         correct: 'A',
     },
     {
-        question: "In Elden Ring (2022), what title do players ultimately seek to claim by the game's end?",
-        options: { A: 'Chosen Undead', B: 'Elden Lord', C: 'Ashen One', D: 'Bearer of the Curse' },
+        question: "What is the heaviest element on the periodic table?",
+        options: { A: "Uranium", B: "Oganesson", C: "Plutonium", D: "Radium" },
         correct: 'B',
     },
     {
-        question: "In Red Dead Redemption 2 (2018), what is the name of the outlaw gang protagonist Arthur Morgan belongs to?",
-        options: { A: 'The Del Lobos', B: "The O'Driscoll Boys", C: 'The Van der Linde gang', D: 'The Lemoyne Raiders' },
+        question: "What is the smallest country in the world?",
+        options: { A: "Monaco", B: "San Marino", C: "Vatican City", D: "Liechtenstein" },
         correct: 'C',
     },
     {
-        question: "Which 2020 video game by CD Projekt Red is set in the fictional Night City?",
-        options: { A: 'The Witcher 3', B: 'Deus Ex', C: 'Watch Dogs', D: 'Cyberpunk 2077' },
+        question: "What is the capital of Australia?",
+        options: { A: "Brisbane", B: "Melbourne", C: "Sydney", D: "Canberra" },
         correct: 'D',
     },
     {
-        question: "In Baldur's Gate 3 (2023), what parasite is implanted in the player character's brain at the start of the game?",
-        options: { A: 'An illithid tadpole', B: 'A Brain Slug', C: 'A symbiote', D: 'A Cordyceps spore' },
+        question: "What is the smallest bone in the human body?",
+        options: { A: "Stapes", B: "Malleus", C: "Incus", D: "Metacarpal" },
         correct: 'A',
     },
     {
-        question: "The 2015 game Undertale, by Toby Fox, is notable for letting players complete it without ever doing what?",
-        options: { A: 'Saving', B: 'Killing any enemies', C: 'Leveling up', D: 'Speaking to NPCs' },
+        question: "What is the coldest planet in the solar system?",
+        options: { A: "Uranus", B: "Neptune", C: "Saturn", D: "Pluto" },
         correct: 'B',
     },
     {
-        question: "In Overwatch (2016), what is the profession of the Swedish support hero Torbjörn?",
-        options: { A: 'Doctor', B: 'Scientist', C: 'Engineer', D: 'Architect' },
+        question: "What is the hottest planet in the solar system?",
+        options: { A: "Jupiter", B: "Mars", C: "Venus", D: "Mercury" },
         correct: 'C',
     },
     {
-        question: "Which 2013 game follows survivors Joel and Ellie across a fungus-ravaged post-apocalyptic United States?",
-        options: { A: 'Days Gone', B: 'Dying Light', C: 'State of Decay', D: 'The Last of Us' },
+        question: "What is the largest country in Asia?",
+        options: { A: "Kazakhstan", B: "India", C: "China", D: "Russia" },
         correct: 'D',
     },
     {
-        question: "In the 2022 anime/manga Chainsaw Man, what devil does protagonist Denji merge with to gain his powers?",
-        options: { A: 'The Chainsaw Devil', B: 'The Gun Devil', C: 'The Blood Devil', D: 'The Control Devil' },
+        question: "What is the national animal of Scotland?",
+        options: { A: "Unicorn", B: "Thistle", C: "Lion", D: "Eagle" },
         correct: 'A',
     },
     {
-        question: "Attack on Titan (manga began 2009) is primarily set within what defensive structure protecting humanity?",
-        options: { A: 'The Great Wall', B: 'Three concentric walls (Maria, Rose, Sina)', C: 'An underground bunker', D: 'A floating city' },
+        question: "What is the most common blood type?",
+        options: { A: "AB positive", B: "O positive", C: "B negative", D: "A positive" },
         correct: 'B',
     },
     {
-        question: "In Demon Slayer (2019 anime), what is the name of protagonist Tanjiro Kamado's demon sister?",
-        options: { A: 'Shinobu', B: 'Mitsuri', C: 'Nezuko', D: 'Kanao' },
+        question: "What is the rarest naturally occurring element on Earth?",
+        options: { A: "Iridium", B: "Gold", C: "Astatine", D: "Plutonium" },
         correct: 'C',
     },
     {
-        question: "Death Note (2006 anime) follows a student who gains the power to kill anyone by writing their name in a notebook — what is his name?",
-        options: { A: 'L', B: 'Near', C: 'Ryuk', D: 'Light Yagami' },
+        question: "What is Bhutan's capital city?",
+        options: { A: "Dhaka", B: "Lhasa", C: "Kathmandu", D: "Thimphu" },
         correct: 'D',
     },
     {
-        question: "In the 2020 anime/manga Jujutsu Kaisen, what does protagonist Yuji Itadori swallow to gain cursed powers?",
-        options: { A: 'A finger of Sukuna', B: 'A cursed doll', C: 'A sealed sword', D: "A demon's eye" },
+        question: "What is the only country in the world with a flag with a unique shape and not a rectangular or square design?",
+        options: { A: "Nepal", B: "Japan", C: "Brazil", D: "Switzerland" },
         correct: 'A',
     },
     {
-        question: "In Arcane (2021), which two sisters are the central protagonists, later becoming League of Legends champions Vi and Jinx?",
-        options: { A: 'Caitlyn and Vi', B: 'Vi and Powder', C: 'Jinx and Caitlyn', D: 'Ekko and Vi' },
+        question: "Which planet in our solar system has the shortest day?",
+        options: { A: "Earth", B: "Jupiter", C: "Venus", D: "Mars" },
         correct: 'B',
     },
     {
-        question: "What was the first cryptocurrency, introduced via a 2008 whitepaper by the pseudonymous \"Satoshi Nakamoto\"?",
-        options: { A: 'Ethereum', B: 'Litecoin', C: 'Bitcoin', D: 'Dogecoin' },
+        question: "Who was the last Byzantine Emperor, and when did the Byzantine Empire fall?",
+        options: { A: "Justinian I, 565 AD", B: "Michael VIII Palaiologos, 1261 AD", C: "Constantine XI Palaiologos, 1453 AD", D: "Alexios IV Angelos, 1204 AD" },
         correct: 'C',
     },
     {
-        question: "In what year was the first iPhone released by Apple?",
-        options: { A: '2005', B: '2009', C: '2010', D: '2007' },
+        question: "What is the official language of Burundi, an African country?",
+        options: { A: "Swahili", B: "French", C: "Arabic", D: "Kirundi" },
         correct: 'D',
     },
     {
-        question: "ChatGPT, developed by OpenAI, was publicly released in what month and year?",
-        options: { A: 'November 2022', B: 'June 2022', C: 'March 2023', D: 'January 2021' },
+        question: "Which historical figure is credited with inventing the first practical telephone?",
+        options: { A: "Alexander Graham Bell", B: "Thomas Edison", C: "Guglielmo Marconi", D: "Nikola Tesla" },
         correct: 'A',
     },
     {
-        question: "Which social media platform, launched in 2016, popularized short-form vertical video and is owned by China's ByteDance?",
-        options: { A: 'Vine', B: 'TikTok', C: 'Instagram Reels', D: 'Snapchat' },
+        question: "Which ancient civilization is credited with creating the first known writing system?",
+        options: { A: "Romans", B: "Sumerians", C: "Egyptians", D: "Greeks" },
         correct: 'B',
     },
     {
-        question: "In Christopher Nolan's Inception (2010), what object does protagonist Cobb spin to test whether he is dreaming?",
-        options: { A: 'A coin', B: 'A pocket watch', C: 'A top', D: 'A ring' },
+        question: "What chemical element is named after the Scandinavian region?",
+        options: { A: "Copper", B: "Zinc", C: "Scandium", D: "Iron" },
         correct: 'C',
     },
     {
-        question: "In Denis Villeneuve's Dune (2021), what is the name of the desert planet where most of the film is set?",
-        options: { A: 'Caladan', B: 'Giedi Prime', C: 'Kaitain', D: 'Arrakis' },
+        question: "What is the name of the longest river in Europe?",
+        options: { A: "Seine", B: "Thames", C: "Danube", D: "Volga" },
         correct: 'D',
     },
     {
-        question: "In the 2018 animated film Spider-Man: Into the Spider-Verse, what is the name of the teenage protagonist who becomes Spider-Man?",
-        options: { A: 'Miles Morales', B: 'Peter Parker', C: "Miguel O'Hara", D: 'Peter B. Parker' },
+        question: "Which element has the highest atomic number that naturally occurs on Earth?",
+        options: { A: "Uranium", B: "Oganesson", C: "Plutonium", D: "Neon" },
         correct: 'A',
     },
     {
-        question: "In Breaking Bad (2008–2013), what alias does Walter White adopt as a drug manufacturer?",
-        options: { A: 'Gray Matter', B: 'Heisenberg', C: 'Los Pollos', D: 'The Cook' },
+        question: "What is the only U.S. state that does not have a sales tax?",
+        options: { A: "California", B: "Alaska", C: "New York", D: "Texas" },
         correct: 'B',
     },
     {
-        question: "Westworld (2016) is set in a futuristic theme park populated by lifelike androids referred to as what?",
-        options: { A: 'Replicants', B: 'Synths', C: 'Hosts', D: 'Constructs' },
+        question: "Which sea is known as the 'Dead Sea' due to its high salinity?",
+        options: { A: "Red Sea", B: "Caspian Sea", C: "Dead Sea", D: "Mediterranean Sea" },
         correct: 'C',
     },
     {
-        question: "In The Witcher, what is the name of the keep where witchers like Geralt are trained?",
-        options: { A: 'Cintra', B: 'Novigrad', C: 'Skellige', D: 'Kaer Morhen' },
+        question: "What unique feature does the pangolin have that is different from other mammals?",
+        options: { A: "Horns", B: "Fur", C: "Feathers", D: "Scales" },
         correct: 'D',
     },
     {
-        question: "In Avengers: Infinity War (2018) and Endgame (2019), how many Infinity Stones does Thanos need to control the universe?",
-        options: { A: 'Six', B: 'Four', C: 'Five', D: 'Seven' },
+        question: "Which famous physicist developed the theory of quantum mechanics?",
+        options: { A: "Max Planck", B: "Albert Einstein", C: "Isaac Newton", D: "James Clerk Maxwell" },
         correct: 'A',
     },
     {
-        question: "Stranger Things (2016) is set in the fictional town of what?",
-        options: { A: 'Derry', B: 'Hawkins', C: 'Castle Rock', D: 'Silent Hill' },
+        question: "What is the term for a fear of heights?",
+        options: { A: "Claustrophobia", B: "Acrophobia", C: "Aerophobia", D: "Nyctophobia" },
         correct: 'B',
     },
     {
-        question: "In Rick and Morty (2013), what is the designation of Rick Sanchez's home dimension?",
-        options: { A: 'C-500A', B: 'Cronenberg World', C: 'C-137', D: "Evil Morty's dimension" },
+        question: "What is the chemical symbol for the element with the atomic number 79?",
+        options: { A: "Ag", B: "Pt", C: "Au", D: "Pb" },
         correct: 'C',
     },
     {
-        question: "The Boys (2019) satirizes corporate-controlled superheroes; what company manages \"The Seven\"?",
-        options: { A: 'Stark Industries', B: 'OsCorp', C: 'LexCorp', D: 'Vought International' },
+        question: "Which Greek philosopher is known for his method of questioning as a form of teaching?",
+        options: { A: "Plato", B: "Epicurus", C: "Aristotle", D: "Socrates" },
         correct: 'D',
     },
     {
-        question: "In Severance (2022), what is the name of the procedure that splits employees' memories between work and home life?",
-        options: { A: 'Severance', B: 'Bifurcation', C: 'Compartmentalization', D: 'The Split' },
+        question: "Which country has the longest coastline in the world?",
+        options: { A: "Canada", B: "Russia", C: "Australia", D: "United States" },
         correct: 'A',
     },
     {
-        question: "What mundane business do protagonist Evelyn Wang and her family run in Everything Everywhere All at Once (2022)?",
-        options: { A: 'A restaurant', B: 'A laundromat', C: 'A bakery', D: 'A grocery store' },
-        correct: 'B',
-    },
-    {
-        question: "In Invincible (2021 animated series), what is the real name of the teenage superhero protagonist?",
-        options: { A: 'Nolan Grayson', B: 'Clark Kent', C: 'Mark Grayson', D: 'Damien Darkblood' },
-        correct: 'C',
-    },
-    {
-        question: "My Hero Academia (2016) takes place in a world where roughly what percentage of the population is said to possess superpowers called \"Quirks\"?",
-        options: { A: '50%', B: '60%', C: '99%', D: '80%' },
-        correct: 'D',
-    },
-    {
-        question: "One Punch Man (2015) follows Saitama, a hero who can defeat any enemy with what limitation?",
-        options: { A: 'A single punch', B: 'Only at night', C: 'Only using a sword', D: 'Only when angry' },
+        question: "Who sang the title song for the latest Bond film, No Time to Die?",
+        options: { A: "Billie Eilish", B: "Dua Lipa", C: "Sam Smith", D: "Adele" },
         correct: 'A',
     },
     {
-        question: "In Fullmetal Alchemist: Brotherhood (2009), what is the fundamental law forbidding alchemists from creating something from nothing?",
-        options: { A: 'The Law of Conservation', B: 'Equivalent Exchange', C: 'The First Law of Alchemy', D: "The Philosopher's Rule" },
+        question: "Which flies a green, white, and orange (in that order) tricolor flag?",
+        options: { A: "India", B: "Ireland", C: "Ivory Coast", D: "Italy" },
         correct: 'B',
     },
     {
-        question: "Which 2004 MMORPG by Blizzard Entertainment, set in the Warcraft universe, became one of the best-selling PC games of all time?",
-        options: { A: 'EverQuest', B: 'Final Fantasy XI', C: 'World of Warcraft', D: 'Guild Wars' },
+        question: "What company makes the Xperia model of smartphone?",
+        options: { A: "Samsung", B: "LG", C: "Sony", D: "Nokia" },
         correct: 'C',
     },
     {
-        question: "In The Legend of Zelda: Breath of the Wild (2017), what is the name of the ancient evil force Link must defeat?",
-        options: { A: 'Ganon', B: 'Demise', C: 'Vaati', D: 'Calamity Ganon' },
+        question: "Which city is home to the Brandenburg Gate?",
+        options: { A: "Munich", B: "Zurich", C: "Vienna", D: "Berlin" },
         correct: 'D',
     },
     {
-        question: "God of War (2018 reboot) relocates protagonist Kratos from Greek mythology to what mythological setting?",
-        options: { A: 'Norse', B: 'Egyptian', C: 'Celtic', D: 'Aztec' },
+        question: "Which of the following is NOT a fruit?",
+        options: { A: "Rhubarb", B: "Tomatoes", C: "Avocados", D: "Cucumbers" },
         correct: 'A',
     },
     {
-        question: "Hades (2020), the roguelike by Supergiant Games, casts the player as which Greek god attempting to escape the Underworld?",
-        options: { A: 'Ares', B: 'Zagreus', C: 'Hermes', D: 'Dionysus' },
+        question: "Where was the first example of paper money used?",
+        options: { A: "Rome", B: "China", C: "Turkey", D: "Greece" },
         correct: 'B',
     },
     {
-        question: "Which 2001 online encyclopedia, editable by anyone, was co-founded by Jimmy Wales and Larry Sanger?",
-        options: { A: 'Encarta', B: 'Britannica Online', C: 'Wikipedia', D: 'Everipedia' },
+        question: "Who is generally considered the inventor of the motor car?",
+        options: { A: "Rudolf Diesel", B: "Henry Ford", C: "Karl Benz", D: "Henry M. Leland" },
         correct: 'C',
     },
     {
-        question: "In Christopher Nolan's The Dark Knight (2008), what is the real identity of the villain Two-Face before his transformation?",
-        options: { A: 'Jim Gordon', B: 'Alfred Pennyworth', C: 'Lucius Fox', D: 'Harvey Dent' },
+        question: "If you were looking at Iguazu Falls, on what continent would you be?",
+        options: { A: "North America", B: "Africa", C: "Asia", D: "South America" },
         correct: 'D',
     },
     {
-        question: "James Cameron's Avatar (2009) is set on a lush alien moon called what?",
-        options: { A: 'Pandora', B: 'Endor', C: 'Arrakis', D: 'Kashyyyk' },
+        question: "What number was the Apollo mission that successfully put a man on the moon?",
+        options: { A: "Apollo 11", B: "Apollo 12", C: "Apollo 13", D: "Apollo 10" },
         correct: 'A',
     },
     {
-        question: "In the Netflix series Squid Game (2021), what color tracksuits do the contestants wear?",
-        options: { A: 'Blue', B: 'Green', C: 'Red', D: 'Gray' },
+        question: "Which of the following languages has the longest alphabet?",
+        options: { A: "Hebrew", B: "Russian", C: "Greek", D: "Arabic" },
         correct: 'B',
     },
     {
-        question: "HBO's Watchmen (2019), a sequel/remix of the original graphic novel, is primarily set in which American city?",
-        options: { A: 'Chicago', B: 'Gotham', C: 'Tulsa', D: 'New York' },
+        question: "Who was the lead singer of the band The Who?",
+        options: { A: "Don Henley", B: "Ozzy Osbourne", C: "Roger Daltrey", D: "Robert Plant" },
         correct: 'C',
     },
     {
-        question: "Fortnite's Battle Royale mode, launched in 2017, drops 100 players onto an island where the play area shrinks due to what environmental hazard?",
-        options: { A: 'Rising lava', B: 'A sandstorm', C: 'Toxic gas', D: 'A storm' },
+        question: "What spirit is used in making a Tom Collins?",
+        options: { A: "Rum", B: "Whiskey", C: "Vodka", D: "Gin" },
         correct: 'D',
     },
     {
-        question: "Pokémon GO (2016), the augmented-reality mobile game, was developed by which company in partnership with Nintendo/The Pokémon Company?",
-        options: { A: 'Niantic', B: 'Bungie', C: 'Riot Games', D: 'Supercell' },
+        question: "The fear of insects is known as what?",
+        options: { A: "Entomophobia", B: "Ornithophobia", C: "Ailurophobia", D: "Arachnophobia" },
         correct: 'A',
     },
     {
-        question: "In Persona 5 (2016), the protagonist and allies form a group of supernatural thieves known as what?",
-        options: { A: 'The Shadow Society', B: 'The Phantom Thieves', C: 'The Velvet Room', D: 'The Metaverse Guild' },
+        question: "What was the name of the Franco-British supersonic commercial plane that operated from 1976-2003?",
+        options: { A: "Mirage", B: "Concorde", C: "Comet", D: "Accord" },
         correct: 'B',
     },
-    // ---- General knowledge, 2000+ ----
     {
-        question: "The Human Genome Project announced it had completed sequencing the human genome in what year?",
-        options: { A: '2000', B: '2006', C: '2003', D: '2010' },
+        question: "Which horoscope sign is a fish?",
+        options: { A: "Aquarius", B: "Scorpio", C: "Pisces", D: "Cancer" },
         correct: 'C',
     },
     {
-        question: "In 2012, scientists at CERN announced the discovery of which long-sought subatomic particle?",
-        options: { A: 'The neutrino', B: 'The graviton', C: 'The tau lepton', D: 'The Higgs boson' },
+        question: "What is the largest US state (by landmass)?",
+        options: { A: "Montana", B: "Texas", C: "California", D: "Alaska" },
         correct: 'D',
     },
     {
-        question: "Which dwarf planet did NASA's New Horizons spacecraft perform a historic flyby of in 2015?",
-        options: { A: 'Pluto', B: 'Ceres', C: 'Eris', D: 'Makemake' },
+        question: "Which app has the most total users?",
+        options: { A: "Instagram", B: "TikTok", C: "YouTube", D: "Snapchat" },
         correct: 'A',
     },
     {
-        question: "In 2019, scientists released the first-ever direct image of what astronomical object, located in the galaxy M87?",
-        options: { A: 'A neutron star', B: 'A black hole', C: 'A pulsar', D: 'A quasar' },
+        question: "Which Game of Thrones character is known as the Young Wolf?",
+        options: { A: "Sansa Stark", B: "Robb Stark", C: "Arya Stark", D: "Jon Snow" },
         correct: 'B',
     },
     {
-        question: "NASA's James Webb Space Telescope launched in December of what year?",
-        options: { A: '2019', B: '2020', C: '2021', D: '2022' },
+        question: "How many plays do people (generally) believe that Shakespeare wrote?",
+        options: { A: "39", B: "27", C: "37", D: "47" },
         correct: 'C',
     },
     {
-        question: "The 2011 secession of what nation made it the world's newest internationally recognized country?",
-        options: { A: 'Kosovo', B: 'Montenegro', C: 'East Timor', D: 'South Sudan' },
+        question: "Which of the following was considered one of the Seven Ancient Wonders?",
+        options: { A: "Colosseum", B: "Great Wall of China", C: "Leaning Tower of Pisa", D: "Colossus of Rhodes" },
         correct: 'D',
     },
     {
-        question: "The Burj Khalifa, the tallest building in the world, officially opened in Dubai in what year?",
-        options: { A: '2010', B: '2008', C: '2012', D: '2014' },
+        question: "Who directed the Academy Award-winning movie, Gladiator?",
+        options: { A: "Ridley Scott", B: "James Cameron", C: "Steven Spielberg", D: "Steven Soderbergh" },
         correct: 'A',
     },
     {
-        question: "Which country hosted the 2008 Summer Olympics?",
-        options: { A: 'Greece', B: 'China', C: 'United Kingdom', D: 'Brazil' },
+        question: "How long did dinosaurs live on the earth?",
+        options: { A: "100-150 million years", B: "150-200 million years", C: "200+ million years", D: "50-100 million years" },
         correct: 'B',
     },
     {
-        question: "The United Kingdom's referendum to leave the European Union, commonly called Brexit, was held in what year?",
-        options: { A: '2014', B: '2018', C: '2016', D: '2019' },
+        question: "What Italian city is famous for its system of canals?",
+        options: { A: "Florence", B: "Rome", C: "Venice", D: "Naples" },
         correct: 'C',
     },
     {
-        question: "Barack Obama, the first African American U.S. president, was elected in November of what year?",
-        options: { A: '2004', B: '2009', C: '2012', D: '2008' },
+        question: "What is the strongest muscle in the human body?",
+        options: { A: "Tongue", B: "Glutes", C: "Heart", D: "Jaw" },
         correct: 'D',
     },
     {
-        question: "SpaceX achieved a historic first in December 2015 by successfully doing what with an orbital rocket booster?",
-        options: { A: 'Landing it vertically for reuse', B: 'Launching it without fuel', C: 'Sending it to Mars', D: 'Docking it with the ISS' },
+        question: "What is the longest-running Broadway show ever?",
+        options: { A: "The Phantom of the Opera", B: "Les Miserables", C: "The Lion King", D: "Chicago" },
         correct: 'A',
     },
     {
-        question: "Tesla's first mass-market sedan, the Model S, was released to customers starting in what year?",
-        options: { A: '2008', B: '2012', C: '2010', D: '2015' },
+        question: "Where was the earliest documented case of the Spanish flu?",
+        options: { A: "Spain", B: "USA", C: "France", D: "Mexico" },
         correct: 'B',
     },
     {
-        question: "The COVID-19 outbreak was officially declared a global pandemic by the WHO in what month and year?",
-        options: { A: 'December 2019', B: 'June 2020', C: 'March 2020', D: 'January 2021' },
+        question: "Which of the following languages is NOT derived from Latin?",
+        options: { A: "Portuguese", B: "Spanish", C: "English", D: "French" },
         correct: 'C',
     },
     {
-        question: "How many hijacked planes were involved in the September 11, 2001 attacks?",
-        options: { A: 'Two', B: 'Three', C: 'Five', D: 'Four' },
+        question: "Arnold Schwarzenegger was married to a member of what famous US political family?",
+        options: { A: "The Bushes", B: "The Rockefellers", C: "The Clintons", D: "The Kennedys" },
         correct: 'D',
     },
     {
-        question: "The 2008 global financial crisis is closely linked to the September bankruptcy of which major U.S. investment bank?",
-        options: { A: 'Lehman Brothers', B: 'Goldman Sachs', C: 'Bear Stearns', D: 'Merrill Lynch' },
+        question: "Which element has the chemical symbol W?",
+        options: { A: "Tungsten", B: "Tellurium", C: "Tin", D: "Tantalum" },
         correct: 'A',
     },
     {
-        question: "The wave of pro-democracy uprisings across the Arab world beginning in late 2010 is commonly known as what?",
-        options: { A: 'The Velvet Revolution', B: 'The Arab Spring', C: 'The Jasmine Uprising', D: 'The Cedar Revolution' },
+        question: "Who composed the opera *The Magic Flute*?",
+        options: { A: "Joseph Haydn", B: "Wolfgang Amadeus Mozart", C: "Antonio Salieri", D: "Christoph Willibald Gluck" },
         correct: 'B',
     },
     {
-        question: "Which platform, founded in 2006, limited posts to 140 characters for much of its early history?",
-        options: { A: 'Facebook', B: 'Tumblr', C: 'Twitter', D: 'Reddit' },
+        question: "Which empire was ruled by Mansa Musa in the 14th century?",
+        options: { A: "Kanem-Bornu Empire", B: "Ghana Empire", C: "Mali Empire", D: "Songhai Empire" },
         correct: 'C',
     },
     {
-        question: "Facebook was originally founded in 2004 under what more limited name, restricted to Harvard students?",
-        options: { A: 'FaceConnect', B: 'HarvardBook', C: 'MyFace', D: 'TheFacebook' },
+        question: "What is the smallest prime number greater than 100?",
+        options: { A: "109", B: "103", C: "107", D: "101" },
         correct: 'D',
     },
     {
-        question: "Which US swimmer won a record eight gold medals at a single Olympics, the 2008 Beijing Games?",
-        options: { A: 'Michael Phelps', B: 'Ryan Lochte', C: 'Caeleb Dressel', D: 'Mark Spitz' },
+        question: "Which philosopher wrote *Critique of Pure Reason*?",
+        options: { A: "Immanuel Kant", B: "David Hume", C: "Arthur Schopenhauer", D: "Georg Wilhelm Friedrich Hegel" },
         correct: 'A',
     },
     {
-        question: "Usain Bolt set his still-standing 100m world record of 9.58 seconds at which event?",
-        options: { A: 'The 2008 Beijing Olympics', B: 'The 2009 World Championships in Berlin', C: 'The 2012 London Olympics', D: 'The 2016 Rio Olympics' },
+        question: "What is the SI derived unit of capacitance?",
+        options: { A: "Tesla", B: "Farad", C: "Henry", D: "Weber" },
         correct: 'B',
     },
     {
-        question: "Which country won the FIFA World Cup in 2010, hosted in South Africa?",
-        options: { A: 'Brazil', B: 'Netherlands', C: 'Spain', D: 'Germany' },
+        question: "Which moon of Neptune is notable for its retrograde orbit and likely captured origin?",
+        options: { A: "Nereid", B: "Larissa", C: "Triton", D: "Proteus" },
         correct: 'C',
     },
     {
-        question: "The 2014 FIFA World Cup was hosted by which country, where the hosts suffered a famous 7-1 semifinal defeat to Germany?",
-        options: { A: 'Argentina', B: 'Chile', C: 'Mexico', D: 'Brazil' },
+        question: "Who painted *Las Meninas*?",
+        options: { A: "Francisco Goya", B: "El Greco", C: "Bartolomé Esteban Murillo", D: "Diego Velázquez" },
         correct: 'D',
     },
     {
-        question: "Leicester City's 2015–16 Premier League title win is one of the biggest upsets in sports history — their pre-season title odds with some bookmakers were roughly what?",
-        options: { A: '5000 to 1', B: '500 to 1', C: '1000 to 1', D: '10000 to 1' },
+        question: "Which language family does Hungarian belong to?",
+        options: { A: "Uralic", B: "Kartvelian", C: "Altaic", D: "Indo-European" },
         correct: 'A',
     },
     {
-        question: "Tom Brady won his seventh and final Super Bowl in February 2021 while playing for which team?",
-        options: { A: 'New England Patriots', B: 'Tampa Bay Buccaneers', C: 'Kansas City Chiefs', D: 'Green Bay Packers' },
+        question: "What is the deepest known point in Earth's oceans called?",
+        options: { A: "Horizon Deep", B: "Challenger Deep", C: "Tonga Deep", D: "Milwaukee Deep" },
         correct: 'B',
     },
     {
-        question: "Which streaming music service, founded in Sweden in 2006, launched publicly in 2008 and became one of the world's largest music platforms?",
-        options: { A: 'Pandora', B: 'Tidal', C: 'Spotify', D: 'Deezer' },
+        question: "Which mathematician is associated with the incompleteness theorems?",
+        options: { A: "David Hilbert", B: "Bernhard Riemann", C: "Kurt Gödel", D: "Emmy Noether" },
         correct: 'C',
     },
     {
-        question: "Beyoncé's 2016 visual album, exploring themes of infidelity and Black womanhood, is titled what?",
-        options: { A: 'Homecoming', B: 'Renaissance', C: '4', D: 'Lemonade' },
+        question: "Which country was formerly known as Abyssinia?",
+        options: { A: "Eritrea", B: "Sudan", C: "Somalia", D: "Ethiopia" },
         correct: 'D',
     },
     {
-        question: "Taylor Swift's 2021 re-recorded album \"Red (Taylor's Version)\" was released amid a dispute over ownership of her earlier masters — whose album was it?",
-        options: { A: 'Taylor Swift', B: 'Adele', C: 'Olivia Rodrigo', D: 'Billie Eilish' },
+        question: "What is the largest internal organ in the human body?",
+        options: { A: "Liver", B: "Kidney", C: "Lung", D: "Spleen" },
         correct: 'A',
     },
     {
-        question: "The 2010 Nobel Peace Prize was awarded to dissident Liu Xiaobo, who was imprisoned in which country and unable to accept it in person?",
-        options: { A: 'Russia', B: 'China', C: 'Myanmar', D: 'North Korea' },
+        question: "Which novel begins with the line often translated as 'Someone must have been telling lies about Josef K.'?",
+        options: { A: "The Castle", B: "The Trial", C: "The Metamorphosis", D: "Amerika" },
         correct: 'B',
     },
     {
-        question: "Malala Yousafzai became the youngest-ever Nobel Peace Prize laureate in what year?",
-        options: { A: '2012', B: '2013', C: '2014', D: '2015' },
+        question: "What is the name of the boundary around a black hole beyond which light cannot escape?",
+        options: { A: "Ergosphere", B: "Accretion boundary", C: "Event horizon", D: "Photon sphere" },
         correct: 'C',
     },
     {
-        question: "Which billionaire reached space in July 2021 aboard his own company's New Shepard rocket, days after a rival's suborbital flight?",
-        options: { A: 'Elon Musk', B: 'Richard Branson', C: 'Mark Zuckerberg', D: 'Jeff Bezos' },
+        question: "Which Roman emperor issued the Edict of Milan with Licinius in 313 CE?",
+        options: { A: "Theodosius I", B: "Diocletian", C: "Aurelian", D: "Constantine I" },
         correct: 'D',
     },
     {
-        question: "The 2016 \"Panama Papers\" leak exposed a massive trove of documents from which entity, revealing offshore financial dealings of world leaders?",
-        options: { A: 'A Panamanian law firm (Mossack Fonseca)', B: 'A Swiss bank', C: 'The IMF', D: 'A Cayman Islands hedge fund' },
+        question: "What is the only naturally occurring element with a liquid state near room temperature besides mercury?",
+        options: { A: "Bromine", B: "Cesium", C: "Gallium", D: "Francium" },
         correct: 'A',
     },
     {
-        question: "Which hashtag-driven movement went viral in 2017, encouraging survivors of sexual harassment and assault to share their stories?",
-        options: { A: '#TimesUp', B: '#MeToo', C: '#BLM', D: '#NeverAgain' },
+        question: "Which artist created the sculpture *The Thinker*?",
+        options: { A: "Constantin Brâncuși", B: "Auguste Rodin", C: "Camille Claudel", D: "Aristide Maillol" },
         correct: 'B',
     },
     {
-        question: "The Black Lives Matter movement originated in 2013 following the acquittal of George Zimmerman in the shooting death of which teenager?",
-        options: { A: 'Michael Brown', B: 'Eric Garner', C: 'Trayvon Martin', D: 'Tamir Rice' },
+        question: "Which strait separates Asia from North America?",
+        options: { A: "Luzon Strait", B: "Davis Strait", C: "Bering Strait", D: "Bosphorus" },
         correct: 'C',
     },
     {
-        question: "Which 2010 volcanic eruption caused massive disruption to European air travel due to its ash cloud?",
-        options: { A: 'Mount St. Helens', B: 'Krakatoa', C: 'Mount Etna', D: 'Eyjafjallajökull' },
+        question: "What is the name of the process by which a solid changes directly into a gas?",
+        options: { A: "Vaporization", B: "Deliquescence", C: "Deposition", D: "Sublimation" },
         correct: 'D',
     },
     {
-        question: "The 2011 earthquake and tsunami that caused the Fukushima nuclear disaster struck off the coast of which country?",
-        options: { A: 'Japan', B: 'Indonesia', C: 'Chile', D: 'Philippines' },
+        question: "Which Byzantine emperor is associated with the codification known as the *Corpus Juris Civilis*?",
+        options: { A: "Justinian I", B: "Basil II", C: "Heraclius", D: "Constantine XI" },
         correct: 'A',
     },
     {
-        question: "Which messaging app, founded in 2009 and acquired by Facebook in 2014 for roughly $19 billion, focused on simple cross-platform texting?",
-        options: { A: 'Snapchat', B: 'WhatsApp', C: 'WeChat', D: 'Telegram' },
+        question: "Which blood type is considered the universal red-cell donor?",
+        options: { A: "AB negative", B: "O negative", C: "O positive", D: "A negative" },
         correct: 'B',
     },
     {
-        question: "NASA's Curiosity rover, searching for signs of ancient microbial life on Mars, touched down in what year?",
-        options: { A: '2004', B: '2008', C: '2012', D: '2016' },
+        question: "Which physicist formulated the uncertainty principle?",
+        options: { A: "Erwin Schrödinger", B: "Max Born", C: "Werner Heisenberg", D: "Wolfgang Pauli" },
         correct: 'C',
     },
     {
-        question: "In 2020, gene-editing pioneers Jennifer Doudna and Emmanuelle Charpentier won a Nobel Prize for CRISPR-Cas9 in what field?",
-        options: { A: 'Physics', B: 'Medicine', C: 'Peace', D: 'Chemistry' },
+        question: "Which ancient city was destroyed by the eruption of Mount Vesuvius in 79 CE alongside Pompeii?",
+        options: { A: "Ravenna", B: "Ostia", C: "Capua", D: "Herculaneum" },
         correct: 'D',
     },
     {
-        question: "Which country became the first in the world to legalize same-sex marriage nationwide, in 2001?",
-        options: { A: 'Netherlands', B: 'Belgium', C: 'Spain', D: 'Canada' },
+        question: "What is the largest moon in the Solar System?",
+        options: { A: "Ganymede", B: "Titan", C: "Callisto", D: "Io" },
         correct: 'A',
     },
     {
-        question: "The 2004 Indian Ocean earthquake and tsunami, one of the deadliest disasters in recorded history, was centered off the coast of which island?",
-        options: { A: 'Java', B: 'Sumatra', C: 'Sri Lanka', D: 'Bali' },
+        question: "Which composer wrote *The Rite of Spring*?",
+        options: { A: "Claude Debussy", B: "Igor Stravinsky", C: "Maurice Ravel", D: "Sergei Prokofiev" },
         correct: 'B',
     },
     {
-        question: "SpaceX, founded in 2002, achieved the first privately-funded liquid-fueled rocket to reach orbit with which rocket in 2008?",
-        options: { A: 'Falcon Heavy', B: 'Falcon 9', C: 'Falcon 1', D: 'Starship' },
+        question: "Which country has the most time zones when its overseas territories are included?",
+        options: { A: "United Kingdom", B: "Russia", C: "France", D: "United States" },
         correct: 'C',
     },
     {
-        question: "Which country split into two separate nations after a 2006 independence referendum?",
-        options: { A: 'Czechoslovakia', B: 'Yugoslavia', C: 'The USSR', D: 'Serbia and Montenegro' },
+        question: "What is the mathematical constant approximately equal to 2.71828?",
+        options: { A: "π", B: "φ", C: "γ", D: "e" },
         correct: 'D',
     },
     {
-        question: "Kosovo unilaterally declared independence from Serbia in what year?",
-        options: { A: '2008', B: '1999', C: '2003', D: '2012' },
+        question: "Which scientist discovered pulsars jointly with Jocelyn Bell Burnell?",
+        options: { A: "Antony Hewish", B: "James Chadwick", C: "Fred Hoyle", D: "Martin Ryle" },
         correct: 'A',
     },
     {
-        question: "The 2010 WikiLeaks release of a massive trove of U.S. diplomatic cables was sourced in large part from which former U.S. Army intelligence analyst?",
-        options: { A: 'Edward Snowden', B: 'Chelsea Manning', C: 'Reality Winner', D: 'Julian Assange' },
+        question: "Which treaty formally ended World War I between Germany and the Allied Powers?",
+        options: { A: "Treaty of Brest-Litovsk", B: "Treaty of Versailles", C: "Treaty of Trianon", D: "Treaty of Saint-Germain" },
         correct: 'B',
     },
     {
-        question: "In 2013, Edward Snowden leaked classified documents revealing mass surveillance programs run by which U.S. agency?",
-        options: { A: 'The CIA', B: 'The FBI', C: 'The NSA', D: 'The DHS' },
+        question: "What is the longest cranial nerve in the human body?",
+        options: { A: "Trigeminal nerve", B: "Hypoglossal nerve", C: "Vagus nerve", D: "Facial nerve" },
         correct: 'C',
     },
     {
-        question: "Which company's 2004 IPO made it a publicly traded search-engine giant?",
-        options: { A: 'Yahoo', B: 'Amazon', C: 'eBay', D: 'Google' },
+        question: "Which playwright wrote *The Duchess of Malfi*?",
+        options: { A: "Christopher Marlowe", B: "Thomas Middleton", C: "Ben Jonson", D: "John Webster" },
         correct: 'D',
     },
     {
-        question: "Instagram, founded in 2010, was acquired by Facebook in what year for roughly $1 billion?",
-        options: { A: '2012', B: '2010', C: '2014', D: '2016' },
+        question: "Which African lake is the world's second-largest freshwater lake by surface area?",
+        options: { A: "Lake Victoria", B: "Lake Tanganyika", C: "Lake Malawi", D: "Lake Chad" },
         correct: 'A',
     },
     {
-        question: "The Deepwater Horizon oil spill, one of the largest marine oil spills in history, occurred in the Gulf of Mexico in what year?",
-        options: { A: '2008', B: '2010', C: '2012', D: '2014' },
+        question: "Which civilization developed the quipu as a system of record keeping?",
+        options: { A: "Aztec", B: "Inca", C: "Moche", D: "Maya" },
         correct: 'B',
     },
     {
-        question: "Pluto was reclassified from a planet to a \"dwarf planet\" by the International Astronomical Union in what year?",
-        options: { A: '2003', B: '2009', C: '2006', D: '2012' },
+        question: "Which Nobel Prize category was not among the original prizes established by Alfred Nobel's will?",
+        options: { A: "Literature", B: "Physics", C: "Economics", D: "Chemistry" },
         correct: 'C',
     },
     {
-        question: "Queen Elizabeth II's Platinum Jubilee, marking 70 years on the British throne, was celebrated in what year?",
-        options: { A: '2020', B: '2021', C: '2023', D: '2022' },
+        question: "What is the approximate Schwarzschild radius of a one-solar-mass black hole?",
+        options: { A: "300 meters", B: "300 kilometers", C: "30 kilometers", D: "3 kilometers" },
         correct: 'D',
+    },
+    {
+        question: "Which English king was defeated and killed at the Battle of Bosworth Field in 1485?",
+        options: { A: "Richard III", B: "Edward IV", C: "Henry VI", D: "John" },
+        correct: 'A',
+    },
+    {
+        question: "Which metal is the principal component of the mineral hematite?",
+        options: { A: "Manganese", B: "Iron", C: "Aluminum", D: "Copper" },
+        correct: 'B',
+    },
+    {
+        question: "Who wrote the philosophical work *Being and Time*?",
+        options: { A: "Ludwig Wittgenstein", B: "Edmund Husserl", C: "Martin Heidegger", D: "Jean-Paul Sartre" },
+        correct: 'C',
+    },
+    {
+        question: "What is the name of the ancient supercontinent that existed before the breakup into Laurasia and Gondwana?",
+        options: { A: "Gondwana", B: "Laurasia", C: "Rodinia", D: "Pangaea" },
+        correct: 'D',
+    },
+    {
+        question: "Which painter is associated with the technique of sfumato and the *Mona Lisa*?",
+        options: { A: "Leonardo da Vinci", B: "Caravaggio", C: "Titian", D: "Raphael" },
+        correct: 'A',
+    },
+    {
+        question: "What is the largest desert on Earth by area?",
+        options: { A: "Sahara Desert", B: "Antarctic Desert", C: "Gobi Desert", D: "Arabian Desert" },
+        correct: 'B',
+    },
+    {
+        question: "Which mathematician proved Fermat's Last Theorem in the 1990s?",
+        options: { A: "John Nash", B: "Grigori Perelman", C: "Andrew Wiles", D: "Terence Tao" },
+        correct: 'C',
+    },
+    {
+        question: "Which city was historically known as Constantinople?",
+        options: { A: "Izmir", B: "Thessaloniki", C: "Athens", D: "Istanbul" },
+        correct: 'D',
+    },
+    {
+        question: "What is the term for the study of fungi?",
+        options: { A: "Mycology", B: "Bryology", C: "Phycology", D: "Entomology" },
+        correct: 'A',
+    },
+    {
+        question: "Which element has the highest melting point of all pure metals?",
+        options: { A: "Rhenium", B: "Tungsten", C: "Iridium", D: "Osmium" },
+        correct: 'B',
     },
 ];
 

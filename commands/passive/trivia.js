@@ -18,6 +18,12 @@
  * The random start time only lands on a 15-minute boundary within the window
  * (9:00, 9:15, 9:30, ...), chosen fresh once a day.
  *
+ * Seasonal reskin: during Halloween season, a round may draw from a separate
+ * spooky question bank (flavor_text/halloweenTriviaQuestions.js) instead of
+ * the usual one, with a matching in-character reskin of the question/results
+ * posts (see flavor_text/halloweenTriviaFlavor.js and SEASONAL_CHANCE_BY_MONTH
+ * below for the odds by month). Same rules, same points, just spookier.
+ *
  * Exposes:
  *   scheduleTrivia(client) - registers the daily randomized timer (call once, on ready)
  *   runTrivia(client, opts) - runs one round; reused by the /trivia preview command
@@ -56,6 +62,14 @@ let scheduledFireAt = null;
 const getScheduledFireTime = () => scheduledFireAt;
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
+const HALLOWEEN_EMBED_COLOR = 0xff7518; // jack-o'-lantern orange
+
+// Chance a given day's round draws from the Halloween bank instead of the
+// usual one, keyed by Date#getMonth() (0-indexed: 8 = September, 9 =
+// October). Any month not listed here never rolls seasonal.
+const SEASONAL_CHANCE_BY_MONTH = { 8: 0.33, 9: 1 };
+
+const isSeasonalToday = () => Math.random() < (SEASONAL_CHANCE_BY_MONTH[new Date().getMonth()] || 0);
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 
@@ -76,8 +90,8 @@ const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 // cost a read; `null` means "not yet loaded from persistence".
 let usedQuestions = null;
 
-const nextQuestion = async (consumeBag) => {
-    const allQuestions = flavor.triviaQuestions();
+const nextQuestion = async (consumeBag, seasonal) => {
+    const allQuestions = seasonal ? flavor.halloweenTriviaQuestions() : flavor.triviaQuestions();
     if (!consumeBag) {
         return allQuestions[Math.floor(Math.random() * allQuestions.length)];
     }
@@ -122,12 +136,13 @@ const buildOptionRow = (disabled = false) =>
         )
     );
 
-const buildQuestionPost = (question) => {
+const buildQuestionPost = (question, seasonal) => {
     const optionLines = LETTERS.map((letter) => `**${letter}.** ${question.options[letter]}`).join('\n');
+    const introLine = seasonal ? pick(flavor.halloweenTriviaIntroLines()) : 'Hear ye! A test of knowledge for the court:';
     const embed = new EmbedBuilder()
-        .setColor(EMBED_COLOR)
-        .setTitle("The Herald's Daily Trivia")
-        .setDescription(`Hear ye! A test of knowledge for the court:\n\n**${question.question}**\n\n${optionLines}`)
+        .setColor(seasonal ? HALLOWEEN_EMBED_COLOR : EMBED_COLOR)
+        .setTitle(seasonal ? "The Herald's All Hallows' Trivia" : "The Herald's Daily Trivia")
+        .setDescription(`${introLine}\n\n**${question.question}**\n\n${optionLines}`)
         .setFooter({ text: `Click the button matching thy answer within ${ANSWER_WINDOW_MS / 60000} minutes — thy choice stays secret 'til the round closes, and thou mayest change it 'til then. Scrying the Great Web for answers is known to invite a curse upon thy house name!` })
         .setTimestamp();
 
@@ -214,18 +229,19 @@ const lambastFor = (participants, correctLetter) => {
     return `\n\n${pick(flavor.triviaLambastLines(mentions, losers.length))}`;
 };
 
-const buildResultsPost = (question, winners, participants, persist) => {
+const buildResultsPost = (question, winners, participants, persist, seasonal) => {
     const answerLine = `The correct answer was **${question.correct}. ${question.options[question.correct]}**.`;
     const previewNote = persist ? '' : '\n*(This be but a rehearsal — no points were truly bestowed.)*';
     const lambastLine = lambastFor(participants, question.correct);
+    const closingLine = seasonal ? `\n\n*${pick(flavor.halloweenTriviaClosingLines())}*` : '';
 
     if (winners.length === 0) {
-        return `${answerLine}\n\nAlas, none of the court answered true and true alone. Sharper wits next time!${lambastLine}${previewNote}${SIGNUP_NOTE}`;
+        return `${answerLine}\n\nAlas, none of the court answered true and true alone. Sharper wits next time!${lambastLine}${previewNote}${closingLine}${SIGNUP_NOTE}`;
     }
 
     const mentions = winners.map((w) => `<@${w.userId}>`).join(', ');
     const nobleWord = winners.length === 1 ? 'noble' : 'nobles';
-    return `${answerLine}\n\nLet it be proclaimed: ${mentions} — ${winners.length === 1 ? 'this' : 'these'} wise ${nobleWord} answered true and true alone, earning ${TRIVIA_POINTS} points apiece!${lambastLine}${previewNote}${SIGNUP_NOTE}`;
+    return `${answerLine}\n\nLet it be proclaimed: ${mentions} — ${winners.length === 1 ? 'this' : 'these'} wise ${nobleWord} answered true and true alone, earning ${TRIVIA_POINTS} points apiece!${lambastLine}${previewNote}${closingLine}${SIGNUP_NOTE}`;
 };
 
 // ---- entry points -------------------------------------------------------------
@@ -238,6 +254,9 @@ const buildResultsPost = (question, winners, participants, persist) => {
  *   consumeBag    - whether this round draws from (and advances) the
  *                    no-repeat shuffle bag, vs. a plain random pick
  *                    (default: same as persist)
+ *   seasonal      - force this round to draw from the Halloween bank (true)
+ *                    or the usual one (false); omit to roll the odds for
+ *                    today per SEASONAL_CHANCE_BY_MONTH
  *   runLabel      - tags CloudWatch log lines (default: "scheduled" if
  *                    persist, else "preview")
  */
@@ -247,11 +266,13 @@ const runTrivia = async function (client, options = {}) {
         targetChannel,
         persist = false,
         consumeBag = persist,
+        seasonal = isSeasonalToday(),
         runLabel = persist ? 'scheduled' : 'preview',
     } = options;
     const guilds = guild ? [guild] : Array.from(client.guilds.cache.values());
 
-    const question = await nextQuestion(consumeBag);
+    const question = await nextQuestion(consumeBag, seasonal);
+    if (seasonal) console.log(`Trivia: today's round is seasonal (Halloween bank) [${runLabel}].`);
 
     for (const g of guilds) {
         try {
@@ -263,7 +284,7 @@ const runTrivia = async function (client, options = {}) {
 
             // Only the real scheduled round pings signed-up members
             // (/trivia_signup) — preview runs shouldn't spam them.
-            const post = buildQuestionPost(question);
+            const post = buildQuestionPost(question, seasonal);
             if (persist) {
                 const role = findTriviaRole(g);
                 if (role) post.content = `<@&${role.id}>`;
@@ -287,7 +308,7 @@ const runTrivia = async function (client, options = {}) {
                 }
             }
 
-            await channel.send(buildResultsPost(question, winners, participants, persist));
+            await channel.send(buildResultsPost(question, winners, participants, persist, seasonal));
         } catch (guildError) {
             console.error(`Trivia round failed for guild "${g.name}":`, guildError);
         }
