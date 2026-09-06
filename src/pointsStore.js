@@ -13,11 +13,20 @@
  *     ID (always purely numeric), so it's safely excluded from
  *     getLeaderboard's results (see recordDuelHistory/getDuelHistory).
  *
- * A real user's item also carries totalVoiceSeconds (lifetime, never reset —
- * what voice points are computed from) and weeklyVoiceSeconds (reset after
- * each weekly recap — what the recap's voice podium ranks on). See
- * addVoiceSeconds/getWeeklyVoiceStats/resetWeeklyVoiceSeconds and
- * commands/passive/voiceTime.js.
+ * A real user's item also carries totalVoiceSeconds (lifetime real seconds
+ * spent in voice, never reset) and weeklyVoiceSeconds (same, reset after each
+ * weekly recap — what the recap's voice podium ranks on), plus
+ * totalWeightedVoiceSeconds (lifetime, never reset — what voice points are
+ * actually computed from; see addVoiceSeconds). See
+ * getWeeklyVoiceStats/resetWeeklyVoiceSeconds and commands/passive/voiceTime.js.
+ *
+ * One more per-guild item shape: pairings, keyed (guildId, "PAIR#<idA>#<idB>")
+ * with the two lower/higher Discord user IDs sorted into the sort key so a
+ * pair only ever has one item regardless of call order. Tracks
+ * weeklyPairSeconds — how long two members have shared a voice channel this
+ * week, reset after each recap — behind the recap's "Most Inseparable
+ * Companions" display. See addPairSeconds/getWeeklyPairStats/
+ * resetWeeklyPairSeconds and commands/passive/voiceTime.js.
  *
  * One more synthetic item, keyed (TRIVIA_STATE_PARTITION, "BAG") rather than
  * a real guildId — the daily trivia's shared no-repeat cycle isn't
@@ -47,11 +56,21 @@ const DUEL_HISTORY_PREFIX = 'DUEL#';
 
 // Voice-chat points: awarded continuously as members spend time connected to
 // a voice channel (see commands/passive/voiceTime.js), independent of the
-// weekly recap's schedule. Expressed as seconds-per-point (rather than a
-// fraction) so addVoiceSeconds can compute earned points with integer floor
-// division against the running totalVoiceSeconds counter.
-const VOICE_POINTS_PER_HOUR = 2;
+// weekly recap's schedule. Anti-exploit: a lone member in a channel earns
+// nothing, and the rate scales with how many (non-bot) members are actually
+// there together — (occupancy - 1) points per hour, so a pair earns
+// VOICE_POINTS_PER_HOUR, a call of 4 earns 3x that, etc. voiceTime.js does
+// the per-second weighting and passes addVoiceSeconds the resulting
+// "weighted seconds" (real seconds * (occupancy-1) at the time), separately
+// from the real seconds used for totalVoiceSeconds/weeklyVoiceSeconds.
+// Expressed as seconds-per-point (rather than a fraction) so addVoiceSeconds
+// can compute earned points with integer floor division against the running
+// totalWeightedVoiceSeconds counter.
+const VOICE_POINTS_PER_HOUR = 1;
 const VOICE_SECONDS_PER_POINT = 3600 / VOICE_POINTS_PER_HOUR;
+
+// Sort-key prefix for pairing items — see the module comment above.
+const PAIR_PREFIX = 'PAIR#';
 
 // Synthetic partition for the daily trivia's used-question state (see
 // commands/passive/trivia.js). Not a real guildId — Discord guild IDs are
@@ -124,11 +143,11 @@ const getLeaderboard = async function (guildId, limit = 10) {
 
     const items = result.Items || [];
     return items
-        // Duel-history items live in the same partition under a "DUEL#..."
-        // sort key rather than a real Discord user ID — DynamoDB won't let a
-        // Query's FilterExpression reference a key attribute like userId, so
-        // this exclusion has to happen client-side instead.
-        .filter((item) => !String(item.userId).startsWith(DUEL_HISTORY_PREFIX))
+        // Duel-history and pairing items live in the same partition under
+        // synthetic sort keys rather than a real Discord user ID — DynamoDB
+        // won't let a Query's FilterExpression reference a key attribute like
+        // userId, so this exclusion has to happen client-side instead.
+        .filter((item) => !String(item.userId).startsWith(DUEL_HISTORY_PREFIX) && !String(item.userId).startsWith(PAIR_PREFIX))
         .map((item) => ({
             userId: item.userId,
             displayName: item.displayName || 'a noble',
@@ -156,25 +175,32 @@ const getPoints = async function (guildId, userId) {
     return (result.Item && result.Item.points) || 0;
 };
 
-/* Credit a member with `seconds` of voice-channel time: adds to their
- * running totalVoiceSeconds (never reset — this is what points are computed
- * from) and their weeklyVoiceSeconds (reset after each weekly recap — see
- * resetWeeklyVoiceSeconds — and used only to rank the recap's voice podium).
- * Points are floor(newTotal / VOICE_SECONDS_PER_POINT) -
- * floor(priorTotal / VOICE_SECONDS_PER_POINT), so fractional time always
- * carries forward to the next call rather than being dropped.
+/* Credit a member with `seconds` of real voice-channel time and
+ * `weightedSeconds` of exploit-adjusted time for points purposes (real
+ * seconds * (occupancy-1) at the time — see voiceTime.js; defaults to
+ * `seconds` if omitted, i.e. no weighting).
+ *
+ * `seconds` adds to totalVoiceSeconds (lifetime, never reset) and
+ * weeklyVoiceSeconds (reset after each weekly recap — see
+ * resetWeeklyVoiceSeconds — and used only to rank the recap's voice podium,
+ * which cares about time spent, not the anti-exploit weighting).
+ *
+ * `weightedSeconds` adds to totalWeightedVoiceSeconds (lifetime, never
+ * reset), and points are floor(newWeightedTotal / VOICE_SECONDS_PER_POINT) -
+ * floor(priorWeightedTotal / VOICE_SECONDS_PER_POINT), so fractional time
+ * always carries forward to the next call rather than being dropped.
  *
  * Not a single atomic DynamoDB update (needs a read first to compute the
  * points delta), but the bot only ever runs one task at a time, and a given
  * member's voice sessions are only ever flushed from one place in that one
  * process, so there's no concurrent writer to race against.
  */
-const addVoiceSeconds = async function (guildId, userId, displayName, seconds) {
+const addVoiceSeconds = async function (guildId, userId, displayName, seconds, weightedSeconds = seconds) {
     if (!isConfigured()) {
         console.log('POINTS_TABLE_NAME not set; skipping voice time persistence.');
         return;
     }
-    if (!seconds || seconds <= 0) return;
+    if ((!seconds || seconds <= 0) && (!weightedSeconds || weightedSeconds <= 0)) return;
 
     const client = getClient();
 
@@ -182,24 +208,25 @@ const addVoiceSeconds = async function (guildId, userId, displayName, seconds) {
         TableName: TABLE_NAME,
         Key: { guildId, userId },
     }));
-    const priorTotal = (existing.Item && existing.Item.totalVoiceSeconds) || 0;
-    const newTotal = priorTotal + seconds;
-    const pointsEarned = Math.floor(newTotal / VOICE_SECONDS_PER_POINT) - Math.floor(priorTotal / VOICE_SECONDS_PER_POINT);
+    const priorWeightedTotal = (existing.Item && existing.Item.totalWeightedVoiceSeconds) || 0;
+    const newWeightedTotal = priorWeightedTotal + (weightedSeconds || 0);
+    const pointsEarned = Math.floor(newWeightedTotal / VOICE_SECONDS_PER_POINT) - Math.floor(priorWeightedTotal / VOICE_SECONDS_PER_POINT);
 
     await client.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { guildId, userId },
-        UpdateExpression: 'SET #dn = :n, #tvs = :newTotal ADD #wvs :s, #pts :p',
+        UpdateExpression: 'SET #dn = :n, #twvs = :newWeightedTotal ADD #tvs :s, #wvs :s, #pts :p',
         ExpressionAttributeNames: {
             '#dn': 'displayName',
+            '#twvs': 'totalWeightedVoiceSeconds',
             '#tvs': 'totalVoiceSeconds',
             '#wvs': 'weeklyVoiceSeconds',
             '#pts': 'points',
         },
         ExpressionAttributeValues: {
             ':n': displayName || 'a noble',
-            ':newTotal': newTotal,
-            ':s': seconds,
+            ':newWeightedTotal': newWeightedTotal,
+            ':s': seconds || 0,
             ':p': pointsEarned,
         },
     }));
@@ -226,7 +253,7 @@ const getWeeklyVoiceStats = async function (guildId) {
 
     const items = result.Items || [];
     return items
-        .filter((item) => !String(item.userId).startsWith(DUEL_HISTORY_PREFIX))
+        .filter((item) => !String(item.userId).startsWith(DUEL_HISTORY_PREFIX) && !String(item.userId).startsWith(PAIR_PREFIX))
         .filter((item) => (item.weeklyVoiceSeconds || 0) > 0)
         .map((item) => ({
             userId: item.userId,
@@ -251,6 +278,100 @@ const resetWeeklyVoiceSeconds = async function (guildId, userIds) {
             Key: { guildId, userId },
             UpdateExpression: 'SET #wvs = :zero',
             ExpressionAttributeNames: { '#wvs': 'weeklyVoiceSeconds' },
+            ExpressionAttributeValues: { ':zero': 0 },
+        }));
+    }
+};
+
+// Deterministic sort key for a pairing item — the two IDs sorted so the pair
+// (A, B) and (B, A) always land on the same item.
+const pairSortKey = (userIdA, userIdB) => {
+    const [lo, hi] = userIdA < userIdB ? [userIdA, userIdB] : [userIdB, userIdA];
+    return `${PAIR_PREFIX}${lo}#${hi}`;
+};
+
+/* Credit `seconds` of simultaneous voice-channel presence to the pairing of
+ * userIdA and userIdB (order doesn't matter). Backs the weekly recap's "Most
+ * Inseparable Companions" display — see getWeeklyPairStats/
+ * resetWeeklyPairSeconds and commands/passive/voiceTime.js. Display-only, no
+ * points attached.
+ */
+const addPairSeconds = async function (guildId, userIdA, displayNameA, userIdB, displayNameB, seconds) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping pair time persistence.');
+        return;
+    }
+    if (!seconds || seconds <= 0 || userIdA === userIdB) return;
+
+    const [loName, hiName] = userIdA < userIdB ? [displayNameA, displayNameB] : [displayNameB, displayNameA];
+    const client = getClient();
+
+    await client.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId: pairSortKey(userIdA, userIdB) },
+        UpdateExpression: 'SET #a = :a, #b = :b ADD #wps :s',
+        ExpressionAttributeNames: {
+            '#a': 'userAName',
+            '#b': 'userBName',
+            '#wps': 'weeklyPairSeconds',
+        },
+        ExpressionAttributeValues: {
+            ':a': loName || 'a noble',
+            ':b': hiName || 'a noble',
+            ':s': seconds,
+        },
+    }));
+};
+
+/* Return every pairing with co-presence time logged since the last weekly
+ * reset, as [{ pairKey, userIdA, displayNameA, userIdB, displayNameB,
+ * weeklyPairSeconds }]. Backs the weekly recap (commands/passive/weeklyRecap.js).
+ */
+const getWeeklyPairStats = async function (guildId) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; returning empty pair stats.');
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: '#g = :g AND begins_with(#u, :pairPrefix)',
+        ExpressionAttributeNames: { '#g': 'guildId', '#u': 'userId' },
+        ExpressionAttributeValues: { ':g': guildId, ':pairPrefix': PAIR_PREFIX },
+    }));
+
+    return (result.Items || [])
+        .filter((item) => (item.weeklyPairSeconds || 0) > 0)
+        .map((item) => {
+            const [, userIdA, userIdB] = item.userId.split('#');
+            return {
+                pairKey: item.userId,
+                userIdA,
+                displayNameA: item.userAName || 'a noble',
+                userIdB,
+                displayNameB: item.userBName || 'a noble',
+                weeklyPairSeconds: item.weeklyPairSeconds,
+            };
+        });
+};
+
+/* Zero out weeklyPairSeconds for the given pairing items (by their pairKey,
+ * i.e. the "PAIR#<idA>#<idB>" sort key). Called by the weekly recap right
+ * after it reads and displays the pairing standings.
+ */
+const resetWeeklyPairSeconds = async function (guildId, pairKeys) {
+    if (!isConfigured() || !pairKeys.length) return;
+
+    const client = getClient();
+
+    for (const pairKey of pairKeys) {
+        await client.send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId: pairKey },
+            UpdateExpression: 'SET #wps = :zero',
+            ExpressionAttributeNames: { '#wps': 'weeklyPairSeconds' },
             ExpressionAttributeValues: { ':zero': 0 },
         }));
     }
@@ -401,6 +522,9 @@ module.exports = {
     addVoiceSeconds,
     getWeeklyVoiceStats,
     resetWeeklyVoiceSeconds,
+    addPairSeconds,
+    getWeeklyPairStats,
+    resetWeeklyPairSeconds,
     VOICE_POINTS_PER_HOUR,
     getUsedTriviaQuestions,
     setUsedTriviaQuestions,

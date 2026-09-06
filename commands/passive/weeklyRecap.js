@@ -17,6 +17,15 @@
  * third), so a podium can hold more than three members. Points persist in
  * DynamoDB via ../../src/pointsStore.
  *
+ * A fifth, display-only category — "Most Inseparable Companions" — surfaces
+ * the pair(s) of members who spent the most time sharing a voice channel
+ * this week (weeklyPairSeconds, tallied by commands/passive/voiceTime.js and
+ * reset here after each recap). It's just for fun; no points attached.
+ *
+ * Right after the recap embed, the Herald also proclaims the updated peerage
+ * (the same listing /nobility produces — see commands/prompts/nobility.js's
+ * buildNobilityChunks) so the week's new standings are visible immediately.
+ *
  * Exposes:
  *   scheduleWeeklyRecap(client) - registers the cron job (call once, on ready)
  *   runWeeklyRecap(client, opts) - runs one recap; reused by the !recap preview
@@ -26,6 +35,7 @@ const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { buildNobilityChunks } = require('../prompts/nobility');
 
 // Sunday at 12:00, interpreted in Eastern local time (DST-aware) so it stays at
 // local noon year-round.
@@ -67,6 +77,10 @@ const VOICE_POINTS_BY_RANK = [5, 3, 1];
 // REACTIONS_PER_POINT); this section just surfaces the biggest earners.
 const TOP_REACTED_SIZE = 3;
 
+// How many pairings the display-only "Most Inseparable Companions" section
+// shows (ties beyond this are still kept whole — see rankWithTies).
+const BUDDY_PAIRS_SIZE = 3;
+
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 
 // ---- helpers ---------------------------------------------------------------
@@ -103,7 +117,8 @@ const findRecapChannel = findAnnounceChannel;
 // emoji used) and return the count of distinct members — not the raw
 // reaction-event count, which double-counts a member who reacted with
 // several different emoji on the same post. Mirrors the users.fetch pattern
-// in commands/prompts/reactions.js.
+// in commands/prompts/reactions.js. The author's own reaction to their own
+// post (if any) doesn't count as a mark of favor from someone else.
 const countUniqueReactors = async (message) => {
     const reactorIds = new Set();
     await Promise.all(
@@ -112,6 +127,7 @@ const countUniqueReactors = async (message) => {
             users.forEach((user) => reactorIds.add(user.id));
         })
     );
+    reactorIds.delete(message.author.id);
     return reactorIds.size;
 };
 
@@ -257,6 +273,16 @@ const topVoiceOf = (voiceStats) =>
         VOICE_POINTS_BY_RANK.length
     );
 
+// The week's top voice-channel pairings with competition ranks; display only
+// — `pairStats` is pointsStore.getWeeklyPairStats's [{ pairKey, userIdA,
+// displayNameA, userIdB, displayNameB, weeklyPairSeconds }].
+const topPairsOf = (pairStats) =>
+    rankWithTies(
+        [...pairStats].sort((a, b) => b.weeklyPairSeconds - a.weeklyPairSeconds),
+        (entry) => entry.weeklyPairSeconds,
+        BUDDY_PAIRS_SIZE
+    );
+
 const formatHours = (seconds) => `${(seconds / 3600).toFixed(1)}h`;
 
 const displayNameOf = (message) => message.member?.displayName || message.author.username;
@@ -395,17 +421,19 @@ const fitFieldLines = (lines) => {
 
 // `weeklyPoints` maps userId -> points earned by THIS run (from computeAwards),
 // shown as a (+X) delta beside each member's running total.
-const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = [], weeklyPoints = new Map(), topVoice = []) => {
-    // All four weekly categories crown winners — proclamations, voices,
-    // favor, and time in voice chat alike — so everyone who topped any of
-    // them gets pinged. Each is already @mentioned in their own podium line
-    // below (see postsText / chattersText / favoredText / voiceText), so the
-    // intro stays a short, generic ping — it doesn't re-narrate who won what.
+const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = [], weeklyPoints = new Map(), topVoice = [], topPairs = []) => {
+    // All five weekly categories crown winners — proclamations, voices,
+    // favor, time in voice chat, and companionship alike — so everyone who
+    // topped any of them gets pinged. Each is already @mentioned in their own
+    // podium line below (see postsText / chattersText / favoredText /
+    // voiceText / buddiesText), so the intro stays a short, generic ping — it
+    // doesn't re-narrate who won what.
     const winnerIds = [...new Set([
         ...topPosts.map((post) => post.message.author.id),
         ...topChatters.map((entry) => entry.userId),
         ...topReacted.map((entry) => entry.userId),
         ...topVoice.map((entry) => entry.userId),
+        ...topPairs.flatMap((entry) => [entry.userIdA, entry.userIdB]),
     ])];
 
     const content = winnerIds.length
@@ -445,6 +473,12 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
           )
         : 'No one held court in voice this past sennight.';
 
+    const buddiesText = topPairs.length
+        ? fitFieldLines(
+              topPairs.map((entry) => `**${rankWordOf(entry.rank)}:** <@${entry.userIdA}> & <@${entry.userIdB}> — ${formatHours(entry.weeklyPairSeconds)} together in voice`)
+          )
+        : 'No pairing shared the council chamber long enough to be noticed this past sennight.';
+
     const boardText = leaderboard.length
         ? fitFieldLines(
               leaderboard.map((entry, index) => {
@@ -465,9 +499,10 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
             { name: 'Most Prolific Voices', value: chattersText },
             { name: 'Most Showered in Favor', value: favoredText },
             { name: 'Longest Time Spent in Council', value: voiceText },
+            { name: 'Most Inseparable Companions', value: buddiesText },
             { name: 'Running Tally of Honor', value: boardText }
         )
-        .setFooter({ text: `Points each Sunday: 5/3/1 for the top proclamations, 5/3/1 for the most messages, 5/3/1 for the most time in voice, plus 1 per ${REACTIONS_PER_POINT} marks of favor received. Voice chat itself earns ${pointsStore.VOICE_POINTS_PER_HOUR} points per hour as it happens. Ties share a rank and consume the next.` })
+        .setFooter({ text: `Points each Sunday: 5/3/1 for the top proclamations, 5/3/1 for the most messages, 5/3/1 for the most time in voice, plus 1 per ${REACTIONS_PER_POINT} marks of favor received. Voice chat itself earns ${pointsStore.VOICE_POINTS_PER_HOUR} point(s) per hour as it happens, per other member sharing the call. Ties share a rank and consume the next.` })
         .setTimestamp();
 
     return {
@@ -514,6 +549,14 @@ const runWeeklyRecap = async function (client, options = {}) {
             }
             const topVoice = topVoiceOf(voiceStats);
 
+            let pairStats = [];
+            try {
+                pairStats = await pointsStore.getWeeklyPairStats(g.id);
+            } catch (storeError) {
+                console.error('Weekly recap: failed to load pair stats:', storeError.message);
+            }
+            const topPairs = topPairsOf(pairStats);
+
             const awards = computeAwards(topPosts, reactionsByAuthor, messagesByAuthor, voiceStats);
             logAwardBreakdown(g.id, awards, runLabel);
 
@@ -543,6 +586,17 @@ const runWeeklyRecap = async function (client, options = {}) {
                 }
             }
 
+            // Same reset treatment as the voice podium above: pairings are
+            // display-only, but the window still needs zeroing regardless of
+            // whether a pair made the top BUDDY_PAIRS_SIZE this run.
+            if (persist && pairStats.length) {
+                try {
+                    await pointsStore.resetWeeklyPairSeconds(g.id, pairStats.map((entry) => entry.pairKey));
+                } catch (storeError) {
+                    console.error('Weekly recap: failed to reset pair stats:', storeError.message);
+                }
+            }
+
             let leaderboard = [];
             try {
                 leaderboard = await pointsStore.getLeaderboard(g.id, LEADERBOARD_SIZE);
@@ -550,8 +604,19 @@ const runWeeklyRecap = async function (client, options = {}) {
                 console.error('Weekly recap: failed to load leaderboard:', storeError.message);
             }
 
-            await channel.send(buildRecapPost(topPosts, leaderboard, topChatters, topReacted, weeklyPoints, topVoice));
+            await channel.send(buildRecapPost(topPosts, leaderboard, topChatters, topReacted, weeklyPoints, topVoice, topPairs));
             console.log(`Weekly recap posted to #${channel.name} in "${g.name}" [${runLabel}] (${topPosts.length} honored, persist=${persist}).`);
+
+            // Proclaim the updated peerage right after the recap itself, so
+            // the week's new standings (including points just persisted
+            // above) are visible immediately rather than waiting for someone
+            // to run /nobility.
+            const nobilityChunks = buildNobilityChunks(leaderboard);
+            if (nobilityChunks) {
+                for (const chunk of nobilityChunks) {
+                    await channel.send(chunk);
+                }
+            }
         } catch (guildError) {
             console.error(`Weekly recap failed for guild "${g.name}":`, guildError);
         }
@@ -579,4 +644,4 @@ const scheduleWeeklyRecap = function (client) {
     console.log(`Weekly recap scheduled: "${CRON_EXPRESSION}" (${TIMEZONE}) — Sundays at noon Eastern.`);
 };
 
-module.exports = { scheduleWeeklyRecap, runWeeklyRecap, computeAwards, findRecapChannel, rankWithTies, topVoiceOf };
+module.exports = { scheduleWeeklyRecap, runWeeklyRecap, computeAwards, findRecapChannel, rankWithTies, topVoiceOf, topPairsOf };
