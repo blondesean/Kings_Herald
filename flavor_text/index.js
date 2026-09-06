@@ -24,4 +24,5 @@ module.exports = {
     ...require('./duelFlavor'),
     ...require('./wowTriviaFlavor'),
     ...require('./patchNotesFlavor'),
+    ...require('./triviaFlavor'),
 };

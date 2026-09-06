@@ -10,7 +10,10 @@
  * the round closes. Clicking again changes the recorded answer — only the
  * last click before the window closes counts. Five minutes after posting,
  * the round closes and anyone whose final answer was correct earns
- * TRIVIA_POINTS.
+ * TRIVIA_POINTS. Anyone whose final answer was wrong gets lightly lambasted
+ * by name in the results post (see flavor_text/triviaFlavor.js) - safe to do
+ * once the round's over and answers are being revealed anyway, unlike
+ * mid-round where they're kept secret.
  *
  * The random start time only lands on a 15-minute boundary within the window
  * (9:00, 9:15, 9:30, ...), chosen fresh once a day.
@@ -53,6 +56,8 @@ let scheduledFireAt = null;
 const getScheduledFireTime = () => scheduledFireAt;
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
+
+const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 
 // ---- question selection -----------------------------------------------------
 
@@ -198,17 +203,29 @@ const logRoundBreakdown = (guildId, question, participants, winners, runLabel) =
 
 const SIGNUP_NOTE = '\n\n*Wish to be summoned the instant future questions are posed? Use /trivia_signup!*';
 
-const buildResultsPost = (question, winners, persist) => {
+// Lightly lambasts anyone who answered incorrectly — safe to name now that
+// the round is over and everyone's final answer is already being revealed
+// (unlike during the round, where answers stay secret; see collectAnswers).
+const lambastFor = (participants, correctLetter) => {
+    const losers = participants.filter((p) => p.letter !== correctLetter);
+    if (!losers.length) return '';
+
+    const mentions = losers.map((l) => `<@${l.userId}>`).join(', ');
+    return `\n\n${pick(flavor.triviaLambastLines(mentions, losers.length))}`;
+};
+
+const buildResultsPost = (question, winners, participants, persist) => {
     const answerLine = `The correct answer was **${question.correct}. ${question.options[question.correct]}**.`;
     const previewNote = persist ? '' : '\n*(This be but a rehearsal — no points were truly bestowed.)*';
+    const lambastLine = lambastFor(participants, question.correct);
 
     if (winners.length === 0) {
-        return `${answerLine}\n\nAlas, none of the court answered true and true alone. Sharper wits next time!${previewNote}${SIGNUP_NOTE}`;
+        return `${answerLine}\n\nAlas, none of the court answered true and true alone. Sharper wits next time!${lambastLine}${previewNote}${SIGNUP_NOTE}`;
     }
 
     const mentions = winners.map((w) => `<@${w.userId}>`).join(', ');
     const nobleWord = winners.length === 1 ? 'noble' : 'nobles';
-    return `${answerLine}\n\nLet it be proclaimed: ${mentions} — ${winners.length === 1 ? 'this' : 'these'} wise ${nobleWord} answered true and true alone, earning ${TRIVIA_POINTS} points apiece!${previewNote}${SIGNUP_NOTE}`;
+    return `${answerLine}\n\nLet it be proclaimed: ${mentions} — ${winners.length === 1 ? 'this' : 'these'} wise ${nobleWord} answered true and true alone, earning ${TRIVIA_POINTS} points apiece!${lambastLine}${previewNote}${SIGNUP_NOTE}`;
 };
 
 // ---- entry points -------------------------------------------------------------
@@ -270,7 +287,7 @@ const runTrivia = async function (client, options = {}) {
                 }
             }
 
-            await channel.send(buildResultsPost(question, winners, persist));
+            await channel.send(buildResultsPost(question, winners, participants, persist));
         } catch (guildError) {
             console.error(`Trivia round failed for guild "${g.name}":`, guildError);
         }
