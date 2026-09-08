@@ -11,14 +11,16 @@
  * actually talking it through together rather than everyone spamming
  * guesses independently.
  *
- * A correct guess reveals that group's category and awards the guesser
- * POINTS_PER_SOLVE points immediately (not batched to the end, since
- * different groups are typically solved by different people at different
- * times) — see pointsStore.addPuzzlePoints, which feeds both the regular
- * leaderboard and the weekly recap's display-only "puzzle podium"
- * (getWeeklyPuzzleStats/resetWeeklyPuzzlePoints), shared with any future
- * puzzle game in this directory, not just this one. Up to POINTS_PER_SOLVE *
- * 4 points are on the table per puzzle; a guess that's 3-of-4 right gets a
+ * A correct guess reveals that group's category and credits the guesser
+ * with a pending POINTS_PER_SOLVE-point award — but that award is only
+ * actually persisted (see pointsStore.addPuzzlePoints, feeding both the
+ * regular leaderboard and the weekly recap's puzzle podium) if the whole
+ * puzzle ends up fully solved. Solving a group and then running out of
+ * chances, or having the window time out before the rest is found, earns
+ * nothing for anyone — this is an all-or-nothing team result, not a
+ * per-group payout, even though credit for *which* group each solver found
+ * is still tracked individually. Up to POINTS_PER_SOLVE * 4 points are on
+ * the table per fully-solved puzzle; a guess that's 3-of-4 right gets a
  * gentler "so close" hint (mirroring real Connections) but still costs a
  * chance like any other wrong guess. The puzzle ends the moment either all
  * four groups are found or the shared chances run out; otherwise it stays
@@ -204,6 +206,12 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
         displayOrder: words,
         remainingWordSet: new Set(words.map(normalize)),
         triesLeft: STARTING_TRIES,
+        // { userId, displayName } per correctly-solved group, in solve order.
+        // Held here rather than persisted immediately on each solve — points
+        // only actually pay out if the whole puzzle gets solved (see the
+        // 'end' handler below); a group solved right before the court runs
+        // out of chances, or before the window closes, earns nothing.
+        pendingAwards: [],
     };
 
     return new Promise((resolve) => {
@@ -218,15 +226,13 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
             const solverName = message.member?.displayName || message.author.username;
 
             if (outcome.type === 'correct') {
-                console.log(`Connections (${runLabel}) (guild ${guild.id}): ${solverName} (${message.author.id}) solved "${outcome.group.category}".`);
+                // Recorded (not yet persisted) before any await, same
+                // synchronous-first-then-async discipline as the 'collect'
+                // handler above — see the 'end' handler for when/whether
+                // these actually get paid out.
+                session.pendingAwards.push({ userId: message.author.id, displayName: solverName });
 
-                if (persist) {
-                    try {
-                        await pointsStore.addPuzzlePoints(guild.id, message.author.id, solverName, POINTS_PER_SOLVE);
-                    } catch (error) {
-                        console.error('Connections: failed to persist puzzle points:', error.message);
-                    }
-                }
+                console.log(`Connections (${runLabel}) (guild ${guild.id}): ${solverName} (${message.author.id}) solved "${outcome.group.category}" (point pending on a full solve).`);
 
                 await channel.send(pick(flavor.connectionsCorrectLines(solverName, outcome.group.category, outcome.group.words)));
 
@@ -291,8 +297,10 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
         });
 
         collector.on('end', async () => {
+            const fullySolved = session.remainingGroups.length === 0;
+
             try {
-                if (session.remainingGroups.length === 0) {
+                if (fullySolved) {
                     await channel.send(pick(flavor.connectionsWinLines()));
                 } else {
                     const revealLines = session.remainingGroups.map(solvedLine).join('\n');
@@ -303,7 +311,22 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
                 console.error(`Connections (${runLabel}) (guild ${guild.id}): failed to post final reveal:`, error.message);
             }
 
-            console.log(`Connections (${runLabel}) (guild ${guild.id}): session ended — ${session.solvedGroups.length}/4 solved, ${session.triesLeft} chance(s) remained.`);
+            // Points only pay out on a full solve — a group solved along the
+            // way earns nothing if the court runs out of chances or the
+            // window closes first. persist gates it the same way as every
+            // other puzzle side effect (a preview run never inflates anyone's
+            // total).
+            if (fullySolved && persist) {
+                for (const award of session.pendingAwards) {
+                    try {
+                        await pointsStore.addPuzzlePoints(guild.id, award.userId, award.displayName, POINTS_PER_SOLVE);
+                    } catch (error) {
+                        console.error('Connections: failed to persist puzzle points:', error.message);
+                    }
+                }
+            }
+
+            console.log(`Connections (${runLabel}) (guild ${guild.id}): session ended — ${session.solvedGroups.length}/4 solved, ${session.triesLeft} chance(s) remained${fullySolved ? `, ${session.pendingAwards.length} point(s) awarded` : ', no points awarded'}.`);
             resolve();
         });
 
