@@ -12,17 +12,20 @@
  * guesses independently.
  *
  * A correct guess reveals that group's category and credits the guesser
- * with a pending POINTS_PER_SOLVE-point award — but that award is only
+ * towards a pending POINTS_PER_SOLVE-point award — but that award is only
  * actually persisted (see pointsStore.addPuzzlePoints, feeding both the
  * regular leaderboard and the weekly recap's puzzle podium) if the whole
- * puzzle ends up fully solved. Solving a group and then running out of
- * chances, or having the window time out before the rest is found, earns
- * nothing for anyone — this is an all-or-nothing team result, not a
- * per-group payout, even though credit for *which* group each solver found
- * is still tracked individually. Up to POINTS_PER_SOLVE * 4 points are on
- * the table per fully-solved puzzle; a guess that's 3-of-4 right gets a
- * gentler "so close" hint (mirroring real Connections) but still costs a
- * chance like any other wrong guess. The puzzle ends the moment either all
+ * puzzle ends up fully solved, and only once per unique participant: a
+ * member who personally solves 2 or more of the 4 groups still only earns
+ * POINTS_PER_SOLVE once for that puzzle, not once per group. Solving a
+ * group and then running out of chances, or having the window time out
+ * before the rest is found, earns nothing for anyone — this is an
+ * all-or-nothing team result, not a per-group payout, even though credit
+ * for *which* group each solver found is still tracked individually. Up to
+ * 4 different members can each earn POINTS_PER_SOLVE from one puzzle (one
+ * per group, capped per person); a guess that's 3-of-4 right gets a gentler
+ * "so close" hint (mirroring real Connections) but still costs a chance
+ * like any other wrong guess. The puzzle ends the moment either all
  * four groups are found or the shared chances run out; otherwise it stays
  * open for GUESS_WINDOW_MS so people trickle in over the day.
  *
@@ -313,11 +316,17 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
 
             // Points only pay out on a full solve — a group solved along the
             // way earns nothing if the court runs out of chances or the
-            // window closes first. persist gates it the same way as every
-            // other puzzle side effect (a preview run never inflates anyone's
-            // total).
+            // window closes first. Capped at POINTS_PER_SOLVE per unique
+            // participant, not per group: someone who personally solved 2
+            // (or more) of the 4 groups still only earns it once — the 4
+            // chances to earn points are about rewarding everyone who
+            // contributed, not about letting one person quadruple-dip.
+            // persist gates it the same way as every other puzzle side
+            // effect (a preview run never inflates anyone's total).
+            const uniqueParticipants = [...new Map(session.pendingAwards.map((a) => [a.userId, a])).values()];
+
             if (fullySolved && persist) {
-                for (const award of session.pendingAwards) {
+                for (const award of uniqueParticipants) {
                     try {
                         await pointsStore.addPuzzlePoints(guild.id, award.userId, award.displayName, POINTS_PER_SOLVE);
                     } catch (error) {
@@ -326,7 +335,7 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
                 }
             }
 
-            console.log(`Connections (${runLabel}) (guild ${guild.id}): session ended — ${session.solvedGroups.length}/4 solved, ${session.triesLeft} chance(s) remained${fullySolved ? `, ${session.pendingAwards.length} point(s) awarded` : ', no points awarded'}.`);
+            console.log(`Connections (${runLabel}) (guild ${guild.id}): session ended — ${session.solvedGroups.length}/4 solved, ${session.triesLeft} chance(s) remained${fullySolved ? `, ${uniqueParticipants.length} participant(s) awarded ${POINTS_PER_SOLVE} point(s) each` : ', no points awarded'}.`);
             resolve();
         });
 
