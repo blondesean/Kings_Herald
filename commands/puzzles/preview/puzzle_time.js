@@ -1,9 +1,14 @@
-/* /connections_time - report when today's scheduled Connections puzzle is
- * set to fire.
+/* /puzzle_time - report when today's scheduled Connections puzzle is set to
+ * fire.
  *
  * Preview/admin command beside the scheduled `connections` passive
  * behavior. adminOnly + hidden, matching connections.js's own preview
  * command. ephemeral keeps the reply visible only to the admin who ran it.
+ * Named generically ("puzzle", not "connections") to match /puzzle_signup's
+ * naming — Connections is the only puzzle game today, but this command (and
+ * the role it's paired with) is meant to cover whichever one is currently
+ * scheduled as new puzzle games join commands/puzzles/.
+ *
  * Reports the in-memory fire time armed at the 9 AM Eastern window open
  * (see scheduleConnectionsPuzzle in ../connections.js) — that state isn't
  * persisted, so right after a restart it reads as "not yet armed" until the
@@ -27,24 +32,24 @@ const formatEastern = (date) =>
         timeZoneName: 'short',
     }).format(date);
 
-const connectionsTime = async function (interaction) {
+const puzzleTime = async function (interaction) {
     const fireAt = getScheduledFireTime();
 
     if (!fireAt) {
         await interaction.editReply(
-            "No Connections puzzle is armed at present, Milord — either today's window hasn't opened yet (9 AM Eastern), or today's puzzle has already run."
+            "No puzzle is armed at present, Milord — either today's window hasn't opened yet (9 AM Eastern), or today's puzzle has already run."
         );
         return;
     }
 
-    await interaction.editReply(`Today's Connections puzzle is armed to fire at ${formatEastern(fireAt)}.`);
+    await interaction.editReply(`Today's puzzle is armed to fire at ${formatEastern(fireAt)}.`);
 };
 
 module.exports = {
-    description: "Report when today's scheduled Connections puzzle is set to fire, in Eastern time (visible only to you)",
+    description: "Report when today's scheduled puzzle is set to fire, in Eastern time (visible only to you)",
     category: 'ROYAL CHRONICLES',
     hidden: true, // out of the generated /help
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     ephemeral: true, // visible only to whoever ran it
-    run: connectionsTime,
+    run: puzzleTime,
 };

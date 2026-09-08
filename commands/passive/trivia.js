@@ -8,9 +8,10 @@
  * later answerers just copy whoever went first. A button click instead gets
  * an ephemeral reply that only the clicker sees, so choices stay secret until
  * the round closes. Clicking again changes the recorded answer — only the
- * last click before the window closes counts. Fifteen minutes after posting
- * (matching the daily Connections puzzle's window — see
- * commands/puzzles/connections.js — so the two line up), the round closes
+ * last click before the window closes counts. Thirty minutes after posting
+ * (half the daily Connections puzzle's 60-minute window — see
+ * commands/puzzles/connections.js — since a single button click needs less
+ * runway than a group talking out a 4-category puzzle), the round closes
  * and anyone whose final answer was correct earns
  * TRIVIA_POINTS. Anyone whose final answer was wrong gets lightly lambasted
  * by name in the results post (see flavor_text/triviaFlavor.js) - safe to do
@@ -51,7 +52,7 @@ const TIMEZONE = 'America/New_York';
 const SLOT_MINUTES = 15;
 const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES; // 60 possible start times
 
-const ANSWER_WINDOW_MS = 15 * 60 * 1000; // how long the question stays open — matches the daily Connections puzzle's window (see commands/puzzles/connections.js)
+const ANSWER_WINDOW_MS = 30 * 60 * 1000; // how long the question stays open — half the daily Connections puzzle's window (see commands/puzzles/connections.js)
 const TRIVIA_POINTS = 2;
 
 const LETTERS = ['A', 'B', 'C', 'D'];

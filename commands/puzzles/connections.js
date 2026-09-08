@@ -32,11 +32,16 @@
  * guessed what) lives only in memory for as long as the message collector
  * runs — same restart caveat as commands/passive/voiceTime.js and the daily
  * trivia's scheduledFireAt: a Fargate Spot reclaim mid-puzzle loses that
- * day's game entirely, with no resume. GUESS_WINDOW_MS is kept short (15
- * minutes, matching the daily trivia's own answer window — see
- * commands/passive/trivia.js) specifically to bound how much a reclaim
- * could lose, rather than trying to solve persistence for a "let's
- * experiment" feature.
+ * day's game entirely, with no resume. GUESS_WINDOW_MS is kept bounded (60
+ * minutes — longer than the daily trivia's 30-minute answer window, since
+ * collaboratively talking out a 4-group puzzle takes more back-and-forth
+ * than a single button click) rather than "open most of the day," to limit
+ * how much a reclaim could lose without trying to solve persistence for a
+ * "let's experiment" feature. AWS gives no fixed interruption rate for
+ * Fargate Spot, but capacity pools AWS considers healthy are typically
+ * bucketed under 5% interruption *per month* of runtime, so any given
+ * hour-long window escaping a reclaim is likely well above 99% in practice
+ * — an inference from how Spot generally behaves, not a guarantee.
  *
  * Scheduling mirrors the daily trivia exactly (see scheduleTrivia in
  * commands/passive/trivia.js): a cron job opens a daily window, then a
@@ -56,6 +61,7 @@ const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { findPuzzleRole } = require('../../src/puzzleRole');
 const connectionsPuzzles = require('./connectionsPuzzles');
 const flavor = require('../../flavor_text');
 
@@ -75,7 +81,7 @@ const POINTS_PER_SOLVE = 1;
 // How long the puzzle stays open for guesses if it's neither fully solved
 // nor out of chances first — see the module comment above for why this is
 // deliberately short rather than "open most of the day."
-const GUESS_WINDOW_MS = 15 * 60 * 1000;
+const GUESS_WINDOW_MS = 60 * 60 * 1000;
 
 // The Date today's puzzle is armed to fire, set when the window opens and
 // cleared once it actually runs. In memory only — not persisted, so a
@@ -301,7 +307,12 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
             resolve();
         });
 
-        channel.send(pick(flavor.connectionsIntroLines()))
+        // Only the real scheduled puzzle pings signed-up members
+        // (/puzzle_signup) — preview runs shouldn't spam them.
+        const role = persist ? findPuzzleRole(guild) : null;
+        const introContent = role ? `<@&${role.id}> ${pick(flavor.connectionsIntroLines())}` : pick(flavor.connectionsIntroLines());
+
+        channel.send(introContent)
             .then(() => channel.send({ embeds: [buildBoardEmbed(session)] }))
             .catch((error) => console.error(`Connections (${runLabel}) (guild ${guild.id}): failed to post the puzzle:`, error.message));
     });
