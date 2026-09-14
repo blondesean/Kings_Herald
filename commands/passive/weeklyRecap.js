@@ -17,10 +17,13 @@
  * third), so a podium can hold more than three members. Points persist in
  * DynamoDB via ../../src/pointsStore.
  *
- * A fifth, display-only category — "Most Inseparable Companions" — surfaces
- * the pair(s) of members who spent the most time sharing a voice channel
- * this week (weeklyPairSeconds, tallied by commands/passive/voiceTime.js and
- * reset here after each recap). It's just for fun; no points attached.
+ * A fun, non-scoring aside — "A Whisper From the Court" — names whichever
+ * pair of members spent the most time sharing a voice channel this week
+ * (weeklyPairSeconds, tallied by commands/passive/voiceTime.js and reset
+ * here after each recap). It's not a podium and never was meant to carry
+ * points, so it's tacked on after the real rankings rather than sitting
+ * among them, and only ever names the single top pairing (ties included),
+ * never a top-3 list.
  *
  * A sixth, independent points scale — the puzzle podium (5/3/1, same as the
  * others) — rewards the top weekly earner(s) from any puzzle game in
@@ -43,6 +46,7 @@ const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { buildNobilityChunks } = require('../prompts/nobility');
+const flavor = require('../../flavor_text');
 
 // Sunday at 12:00, interpreted in Eastern local time (DST-aware) so it stays at
 // local noon year-round.
@@ -50,7 +54,9 @@ const CRON_EXPRESSION = '0 12 * * 0';
 const TIMEZONE = 'America/New_York';
 
 const WINDOW_DAYS = 7;
-const LEADERBOARD_SIZE = 10;
+const LEADERBOARD_SIZE = 15;
+
+const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 
 // Points awarded to the authors of the 1st / 2nd / 3rd most-reacted posts.
 const POINTS_BY_RANK = [5, 3, 1];
@@ -84,8 +90,9 @@ const VOICE_POINTS_BY_RANK = [5, 3, 1];
 // REACTIONS_PER_POINT); this section just surfaces the biggest earners.
 const TOP_REACTED_SIZE = 3;
 
-// How many pairings the display-only "Most Inseparable Companions" section
-// shows (ties beyond this are still kept whole — see rankWithTies).
+// Internal ranking depth for topPairsOf below — buddyRumorTextOf only ever
+// reads rank 1 back out of it, but topPairsOf stays exported and generally
+// useful (e.g. for tests) at the same depth as the other podium helpers.
 const BUDDY_PAIRS_SIZE = 3;
 
 // Fifth, independent points scale: podium points for the members who earned
@@ -313,6 +320,24 @@ const topPuzzleOf = (puzzleStats) =>
 
 const formatHours = (seconds) => `${(seconds / 3600).toFixed(1)}h`;
 
+// Unlike the other categories, "closest companions" isn't a real podium —
+// no points ride on it, it's just a fun fact — so it only ever mentions
+// whoever's tied for the single top spot (rank 1), never a top-3 list.
+// Returns null if no pairing logged any time together this week.
+const buddyRumorTextOf = (topPairs) => {
+    const topRank = topPairs.filter((entry) => entry.rank === 1);
+    if (!topRank.length) return null;
+
+    const pairLabels = topRank.map((entry) => `<@${entry.userIdA}> & <@${entry.userIdB}>`);
+    const pairsText = pairLabels.length === 1
+        ? pairLabels[0]
+        : pairLabels.length === 2
+            ? `${pairLabels[0]} and ${pairLabels[1]}`
+            : `${pairLabels.slice(0, -1).join(', ')}, and ${pairLabels[pairLabels.length - 1]}`;
+
+    return pick(flavor.buddyRumorLines(pairsText, formatHours(topRank[0].weeklyPairSeconds)));
+};
+
 const displayNameOf = (message) => message.member?.displayName || message.author.username;
 
 /* Merge the five independent points scales into one award per member:
@@ -513,12 +538,6 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
           )
         : 'No one held court in voice this past sennight.';
 
-    const buddiesText = topPairs.length
-        ? fitFieldLines(
-              topPairs.map((entry) => `**${rankWordOf(entry.rank)}:** <@${entry.userIdA}> & <@${entry.userIdB}> — ${formatHours(entry.weeklyPairSeconds)} together in voice`)
-          )
-        : 'No pairing shared the council chamber long enough to be noticed this past sennight.';
-
     const puzzleText = topPuzzle.length
         ? fitFieldLines(
               topPuzzle.map((entry) => {
@@ -532,26 +551,49 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
         ? fitFieldLines(
               leaderboard.map((entry, index) => {
                   const points = entry.points === 1 ? 'point' : 'points';
-                  const earned = weeklyPoints.get(entry.userId);
-                  const delta = earned ? ` (+${earned})` : '';
+                  const recapAwards = weeklyPoints.get(entry.userId) || 0;
+                  // "Extra" is just the podium/reaction awards this run
+                  // computed (see computeAwards). "Total" is the full
+                  // picture — that plus whatever was already earned
+                  // continuously all week from voice/puzzle points, and any
+                  // manual /point_adjust — via the snapshot taken at the end
+                  // of last week's recap (see pointsStore.setPointsSnapshot).
+                  // Only shown when it differs from the extra-only figure,
+                  // so a member with no continuous-earning activity doesn't
+                  // see the same number twice.
+                  const weeklyTotal = entry.points - entry.pointsAtLastRecap;
+                  const parts = [];
+                  if (recapAwards) parts.push(`+${recapAwards} extra`);
+                  if (weeklyTotal !== recapAwards) parts.push(`${weeklyTotal >= 0 ? '+' : ''}${weeklyTotal} total`);
+                  const delta = parts.length ? ` (${parts.join(', ')})` : '';
                   return `${index + 1}. ${entry.displayName} — ${entry.points} ${points}${delta}`;
               })
           )
         : 'The royal ledger is yet unwritten.';
 
+    const fields = [
+        { name: 'Most Celebrated Proclamations', value: postsText },
+        { name: 'Most Prolific Voices', value: chattersText },
+        { name: 'Most Showered in Favor', value: favoredText },
+        { name: 'Longest Time Spent in Council', value: voiceText },
+        { name: 'Sharpest Wits at the Riddle Board', value: puzzleText },
+        { name: 'Running Tally of Honor', value: boardText },
+    ];
+
+    // Not a podium — just a fun aside, so it's tacked on after the real
+    // rankings (and thus still above the footer) rather than sitting among
+    // them, and omitted entirely rather than showing empty filler when no
+    // pairing logged any time together this week.
+    const buddyRumor = buddyRumorTextOf(topPairs);
+    if (buddyRumor) {
+        fields.push({ name: 'A Whisper From the Court', value: buddyRumor });
+    }
+
     const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle("The King's Weekly Herald")
         .setDescription('A chronicle of the realm\'s most celebrated words this past sennight, and the standings of honor.')
-        .addFields(
-            { name: 'Most Celebrated Proclamations', value: postsText },
-            { name: 'Most Prolific Voices', value: chattersText },
-            { name: 'Most Showered in Favor', value: favoredText },
-            { name: 'Longest Time Spent in Council', value: voiceText },
-            { name: 'Most Inseparable Companions', value: buddiesText },
-            { name: 'Sharpest Wits at the Riddle Board', value: puzzleText },
-            { name: 'Running Tally of Honor', value: boardText }
-        )
+        .addFields(...fields)
         .setFooter({ text: `Points each Sunday: 5/3/1 for the top proclamations, 5/3/1 for the most messages, 5/3/1 for the most time in voice, 5/3/1 for the most puzzle points, plus 1 per ${REACTIONS_PER_POINT} marks of favor received. Voice chat itself earns ${pointsStore.VOICE_POINTS_PER_HOUR} point(s) per hour as it happens, per other member sharing the call. Ties share a rank and consume the next.` })
         .setTimestamp();
 
@@ -618,9 +660,14 @@ const runWeeklyRecap = async function (client, options = {}) {
             const awards = computeAwards(topPosts, reactionsByAuthor, messagesByAuthor, voiceStats, puzzleStats);
             logAwardBreakdown(g.id, awards, runLabel);
 
-            // userId -> points earned this run, for the (+X) column beside the
-            // running tally. On preview runs (persist=false) the running total
-            // doesn't include these yet; on scheduled runs it does.
+            // userId -> points from THIS run's podium/reaction awards, for
+            // the "+X this recap" column beside the running tally (see
+            // buildRecapPost's boardText, which also shows a separate
+            // "+Y this week" figure covering the full week — continuous
+            // voice/puzzle accrual included — via pointsStore's per-member
+            // pointsAtLastRecap snapshot). On preview runs (persist=false)
+            // the running total doesn't include these yet; on scheduled
+            // runs it does.
             const weeklyPoints = new Map(awards.map((award) => [award.userId, award.points]));
 
             if (persist && awards.length) {
@@ -686,6 +733,27 @@ const runWeeklyRecap = async function (client, options = {}) {
                     await channel.send(chunk);
                 }
             }
+
+            // Snapshot every point-holding member's final total (not just
+            // the displayed top LEADERBOARD_SIZE) so next week's "earned
+            // this week" figure (see buildRecapPost's boardText) stays
+            // accurate for everyone — including someone who isn't in this
+            // week's visible board but might climb into it next week.
+            if (persist) {
+                let allMembers = [];
+                try {
+                    allMembers = await pointsStore.getLeaderboard(g.id, Infinity);
+                } catch (storeError) {
+                    console.error('Weekly recap: failed to load full member list for points snapshot:', storeError.message);
+                }
+                for (const entry of allMembers) {
+                    try {
+                        await pointsStore.setPointsSnapshot(g.id, entry.userId, entry.points);
+                    } catch (storeError) {
+                        console.error(`Weekly recap: failed to snapshot points for ${entry.userId}:`, storeError.message);
+                    }
+                }
+            }
         } catch (guildError) {
             console.error(`Weekly recap failed for guild "${g.name}":`, guildError);
         }
@@ -713,4 +781,4 @@ const scheduleWeeklyRecap = function (client) {
     console.log(`Weekly recap scheduled: "${CRON_EXPRESSION}" (${TIMEZONE}) — Sundays at noon Eastern.`);
 };
 
-module.exports = { scheduleWeeklyRecap, runWeeklyRecap, computeAwards, findRecapChannel, rankWithTies, topVoiceOf, topPairsOf, topPuzzleOf };
+module.exports = { scheduleWeeklyRecap, runWeeklyRecap, computeAwards, findRecapChannel, rankWithTies, topVoiceOf, topPairsOf, topPuzzleOf, buildRecapPost };

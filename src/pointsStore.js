@@ -157,9 +157,33 @@ const getLeaderboard = async function (guildId, limit = 10) {
             userId: item.userId,
             displayName: item.displayName || 'a noble',
             points: item.points || 0,
+            pointsAtLastRecap: item.pointsAtLastRecap || 0,
         }))
         .sort((a, b) => b.points - a.points)
         .slice(0, limit);
+};
+
+/* Snapshot a member's current `points` total as of this recap, so next
+ * week's recap can compute how many points they actually earned this week —
+ * (their points now) minus (this snapshot) — as a single number covering
+ * everything: continuous voice/puzzle accrual through the week, this week's
+ * podium/reaction awards, and any manual /point_adjust in between. Called
+ * once per leaderboard member at the end of each weekly recap
+ * (see commands/passive/weeklyRecap.js), after that run's awards are
+ * persisted, so the next snapshot always reflects the true end-of-week total.
+ */
+const setPointsSnapshot = async function (guildId, userId, points) {
+    if (!isConfigured()) return;
+
+    const client = getClient();
+
+    await client.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+        UpdateExpression: 'SET #palr = :p',
+        ExpressionAttributeNames: { '#palr': 'pointsAtLastRecap' },
+        ExpressionAttributeValues: { ':p': points },
+    }));
 };
 
 /* Return a single member's point total (0 if they have none, or if the
@@ -647,6 +671,7 @@ const getDuelHistory = async function (guildId, limit = 10) {
 module.exports = {
     addPoints,
     getLeaderboard,
+    setPointsSnapshot,
     getPoints,
     addVoiceSeconds,
     getWeeklyVoiceStats,
