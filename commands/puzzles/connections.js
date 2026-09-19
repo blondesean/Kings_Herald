@@ -9,7 +9,11 @@
  * whole guild shares one pool of STARTING_TRIES wrong guesses — a bad guess
  * from any one member costs everyone a chance, so solving it well means
  * actually talking it through together rather than everyone spamming
- * guesses independently.
+ * guesses independently. Reinforcing that: each member gets exactly one
+ * guess attempt for the whole puzzle (right, wrong, or close all count) —
+ * see session.guessedUserIds — so nobody can solo the board by just typing
+ * combination after combination; a repeat attempt is rejected outright,
+ * lightheartedly, before it's even judged for correctness.
  *
  * A correct guess reveals that group's category and credits the guesser
  * towards a pending POINTS_PER_SOLVE-point award — but that award is only
@@ -215,6 +219,12 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
         // 'end' handler below); a group solved right before the court runs
         // out of chances, or before the window closes, earns nothing.
         pendingAwards: [],
+        // userIds who've already spent their one guess attempt this puzzle
+        // (see the 'collect' handler below) — Connections is meant to be a
+        // group effort, so nobody gets to solo the whole board themselves;
+        // once you've made your one attempt (right, wrong, or close), it's
+        // someone else's turn until this puzzle ends.
+        guessedUserIds: new Set(),
     };
 
     return new Promise((resolve) => {
@@ -227,6 +237,12 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
         // together race on session.remainingGroups/triesLeft.
         const handleOutcome = async (message, outcome) => {
             const solverName = message.member?.displayName || message.author.username;
+
+            if (outcome.type === 'alreadyGuessed') {
+                console.log(`Connections (${runLabel}) (guild ${guild.id}): ignored a repeat guess from ${solverName} (${message.author.id}) — one attempt per puzzle.`);
+                await channel.send(pick(flavor.connectionsAlreadyGuessedLines(solverName)));
+                return;
+            }
 
             if (outcome.type === 'correct') {
                 // Recorded (not yet persisted) before any await, same
@@ -269,6 +285,17 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
             // ignored rather than burning a chance.
             if (uniqueNormalized.size !== 4) return;
             if (![...uniqueNormalized].every((w) => session.remainingWordSet.has(w))) return;
+
+            // One guess attempt per person per puzzle (see session.guessedUserIds
+            // above) — a repeat attempt is rejected outright, before it's even
+            // judged for correctness, and doesn't cost the group a shared chance.
+            if (session.guessedUserIds.has(message.author.id)) {
+                handleOutcome(message, { type: 'alreadyGuessed' }).catch((error) =>
+                    console.error(`Connections (${runLabel}) (guild ${guild.id}): error handling a repeat guess:`, error)
+                );
+                return;
+            }
+            session.guessedUserIds.add(message.author.id);
 
             // ---- synchronous state resolution (no awaits above this point) ----
             const matchedGroup = session.remainingGroups.find((g) => {
