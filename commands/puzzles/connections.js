@@ -1,8 +1,8 @@
 /* Passive behavior: the Herald's daily Connections-style word puzzle.
  *
- * Once a day, the Herald posts sixteen words drawn from a hand-authored bank
- * (see connectionsPuzzles.js in this directory) that secretly split into
- * four groups of four. Unlike the daily trivia (private, per-user answers
+ * Once a day, the Herald posts twenty-four words drawn from a hand-authored
+ * bank (see connectionsPuzzles.js in this directory) that secretly split
+ * into six groups of four. Unlike the daily trivia (private, per-user answers
  * via ephemeral button clicks) this game is fully public and collaborative:
  * anyone in the channel can call out a guess by typing four of the board's
  * words separated by commas (case-insensitive, whitespace trimmed), and the
@@ -20,17 +20,17 @@
  * actually persisted (see pointsStore.addPuzzlePoints, feeding both the
  * regular leaderboard and the weekly recap's puzzle podium) if the whole
  * puzzle ends up fully solved, and only once per unique participant: a
- * member who personally solves 2 or more of the 4 groups still only earns
+ * member who personally solves 2 or more of the 6 groups still only earns
  * POINTS_PER_SOLVE once for that puzzle, not once per group. Solving a
  * group and then running out of chances, or having the window time out
  * before the rest is found, earns nothing for anyone — this is an
  * all-or-nothing team result, not a per-group payout, even though credit
  * for *which* group each solver found is still tracked individually. Up to
- * 4 different members can each earn POINTS_PER_SOLVE from one puzzle (one
+ * 6 different members can each earn POINTS_PER_SOLVE from one puzzle (one
  * per group, capped per person); a guess that's 3-of-4 right gets a gentler
  * "so close" hint (mirroring real Connections) but still costs a chance
  * like any other wrong guess. The puzzle ends the moment either all
- * four groups are found or the shared chances run out; otherwise it stays
+ * six groups are found or the shared chances run out; otherwise it stays
  * open for GUESS_WINDOW_MS so people trickle in over the day.
  *
  * Like /trivia and /recap, a manual preview run defaults to persist: false
@@ -43,7 +43,7 @@
  * trivia's scheduledFireAt: a Fargate Spot reclaim mid-puzzle loses that
  * day's game entirely, with no resume. GUESS_WINDOW_MS is kept bounded (60
  * minutes — longer than the daily trivia's 30-minute answer window, since
- * collaboratively talking out a 4-group puzzle takes more back-and-forth
+ * collaboratively talking out a 6-group puzzle takes more back-and-forth
  * than a single button click) rather than "open most of the day," to limit
  * how much a reclaim could lose without trying to solve persistence for a
  * "let's experiment" feature. AWS gives no fixed interruption rate for
@@ -84,6 +84,8 @@ const TIMEZONE = 'America/New_York';
 const SLOT_MINUTES = 15;
 const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES; // 60 possible start times
 
+// Kept at 3 even though the board grew from 4 groups to 6 — deliberately
+// tighter than a proportional scale-up would suggest.
 const STARTING_TRIES = 3;
 const POINTS_PER_SOLVE = 1;
 
@@ -99,7 +101,10 @@ let scheduledFireAt = null;
 const getScheduledFireTime = () => scheduledFireAt;
 
 const DIFFICULTY_EMOJI = { yellow: '🟨', green: '🟩', blue: '🟦', purple: '🟪' };
-const WORDS_PER_ROW = 4;
+// 3 wide (not 4) so the board's monospace grid stays readable on a phone
+// screen — 8 rows of 3 to start (24 words), shrinking (occasionally
+// raggedly, since 4 isn't a multiple of 3) as each 4-word group is solved.
+const WORDS_PER_ROW = 3;
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 
@@ -345,9 +350,9 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
             // way earns nothing if the court runs out of chances or the
             // window closes first. Capped at POINTS_PER_SOLVE per unique
             // participant, not per group: someone who personally solved 2
-            // (or more) of the 4 groups still only earns it once — the 4
+            // (or more) of the groups still only earns it once — the several
             // chances to earn points are about rewarding everyone who
-            // contributed, not about letting one person quadruple-dip.
+            // contributed, not about letting one person hog them all.
             // persist gates it the same way as every other puzzle side
             // effect (a preview run never inflates anyone's total).
             const uniqueParticipants = [...new Map(session.pendingAwards.map((a) => [a.userId, a])).values()];
@@ -362,7 +367,7 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
                 }
             }
 
-            console.log(`Connections (${runLabel}) (guild ${guild.id}): session ended — ${session.solvedGroups.length}/4 solved, ${session.triesLeft} chance(s) remained${fullySolved ? `, ${uniqueParticipants.length} participant(s) awarded ${POINTS_PER_SOLVE} point(s) each` : ', no points awarded'}.`);
+            console.log(`Connections (${runLabel}) (guild ${guild.id}): session ended — ${session.solvedGroups.length}/${puzzle.groups.length} solved, ${session.triesLeft} chance(s) remained${fullySolved ? `, ${uniqueParticipants.length} participant(s) awarded ${POINTS_PER_SOLVE} point(s) each` : ', no points awarded'}.`);
             resolve();
         });
 
