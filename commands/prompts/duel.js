@@ -80,7 +80,7 @@ const buildChallengeEmbed = (challenger, target, method, wager) =>
 const buildChallengeRow = (disabled = false) =>
     new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('duel_accept').setLabel('Accept Thy Challenge').setStyle(ButtonStyle.Success).setDisabled(disabled),
-        new ButtonBuilder().setCustomId('duel_decline_respectful').setLabel('Decline with Honor').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+        new ButtonBuilder().setCustomId('duel_decline_respectful').setLabel('Decline with Honor').setStyle(ButtonStyle.Primary).setDisabled(disabled),
         new ButtonBuilder().setCustomId('duel_decline_scoff').setLabel('Scoff and Decline').setStyle(ButtonStyle.Danger).setDisabled(disabled)
     );
 
