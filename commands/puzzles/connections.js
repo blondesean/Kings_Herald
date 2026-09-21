@@ -9,19 +9,19 @@
  * whole guild shares one pool of STARTING_TRIES wrong guesses — a bad guess
  * from any one member costs everyone a chance, so solving it well means
  * actually talking it through together rather than everyone spamming
- * guesses independently. Reinforcing that: each member gets exactly one
- * guess attempt for the whole puzzle (right, wrong, or close all count) —
- * see session.guessedUserIds — so nobody can solo the board by just typing
- * combination after combination; a repeat attempt is rejected outright,
- * lightheartedly, before it's even judged for correctness.
+ * guesses independently. Reinforcing that: each member can land exactly one
+ * correct guess for the whole puzzle — see session.solverUserIds — so nobody
+ * can solo the board; once you've solved a group, any further guess from you
+ * is rejected outright, lightheartedly, before it's even judged. Wrong and
+ * near-miss guesses don't use up your turn. Note this means a full solve
+ * takes as many different people as there are groups (six).
  *
  * A correct guess reveals that group's category and credits the guesser
  * towards a pending POINTS_PER_SOLVE-point award — but that award is only
  * actually persisted (see pointsStore.addPuzzlePoints, feeding both the
  * regular leaderboard and the weekly recap's puzzle podium) if the whole
- * puzzle ends up fully solved, and only once per unique participant: a
- * member who personally solves 2 or more of the 6 groups still only earns
- * POINTS_PER_SOLVE once for that puzzle, not once per group. Solving a
+ * puzzle ends up fully solved, and only once per unique participant (which
+ * the one-correct-guess-per-person rule above already guarantees). Solving a
  * group and then running out of chances, or having the window time out
  * before the rest is found, earns nothing for anyone — this is an
  * all-or-nothing team result, not a per-group payout, even though credit
@@ -224,12 +224,12 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
         // 'end' handler below); a group solved right before the court runs
         // out of chances, or before the window closes, earns nothing.
         pendingAwards: [],
-        // userIds who've already spent their one guess attempt this puzzle
-        // (see the 'collect' handler below) — Connections is meant to be a
-        // group effort, so nobody gets to solo the whole board themselves;
-        // once you've made your one attempt (right, wrong, or close), it's
-        // someone else's turn until this puzzle ends.
-        guessedUserIds: new Set(),
+        // userIds who've already solved a group this puzzle (see the
+        // 'collect' handler below) — Connections is meant to be a group
+        // effort, so nobody gets to solo the whole board themselves; once
+        // you've landed a correct guess, it's someone else's turn until this
+        // puzzle ends. Wrong and near-miss guesses don't lock anyone out.
+        solverUserIds: new Set(),
     };
 
     return new Promise((resolve) => {
@@ -244,7 +244,7 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
             const solverName = message.member?.displayName || message.author.username;
 
             if (outcome.type === 'alreadyGuessed') {
-                console.log(`Connections (${runLabel}) (guild ${guild.id}): ignored a repeat guess from ${solverName} (${message.author.id}) — one attempt per puzzle.`);
+                console.log(`Connections (${runLabel}) (guild ${guild.id}): ignored a guess from ${solverName} (${message.author.id}) — already solved a group this puzzle.`);
                 await channel.send(pick(flavor.connectionsAlreadyGuessedLines(solverName)));
                 return;
             }
@@ -291,16 +291,16 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
             if (uniqueNormalized.size !== 4) return;
             if (![...uniqueNormalized].every((w) => session.remainingWordSet.has(w))) return;
 
-            // One guess attempt per person per puzzle (see session.guessedUserIds
-            // above) — a repeat attempt is rejected outright, before it's even
-            // judged for correctness, and doesn't cost the group a shared chance.
-            if (session.guessedUserIds.has(message.author.id)) {
+            // One correct guess per person per puzzle (see session.solverUserIds
+            // above) — someone who's already solved a group is rejected
+            // outright, before their guess is even judged, and it doesn't
+            // cost the group a shared chance.
+            if (session.solverUserIds.has(message.author.id)) {
                 handleOutcome(message, { type: 'alreadyGuessed' }).catch((error) =>
                     console.error(`Connections (${runLabel}) (guild ${guild.id}): error handling a repeat guess:`, error)
                 );
                 return;
             }
-            session.guessedUserIds.add(message.author.id);
 
             // ---- synchronous state resolution (no awaits above this point) ----
             const matchedGroup = session.remainingGroups.find((g) => {
@@ -313,6 +313,7 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
                 session.remainingGroups = session.remainingGroups.filter((g) => g !== matchedGroup);
                 matchedGroup.words.forEach((w) => session.remainingWordSet.delete(normalize(w)));
                 session.solvedGroups.push(matchedGroup);
+                session.solverUserIds.add(message.author.id);
                 outcome = { type: 'correct', group: matchedGroup, solvedOut: session.remainingGroups.length === 0 };
             } else {
                 let bestOverlap = 0;
@@ -349,10 +350,8 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
             // Points only pay out on a full solve — a group solved along the
             // way earns nothing if the court runs out of chances or the
             // window closes first. Capped at POINTS_PER_SOLVE per unique
-            // participant, not per group: someone who personally solved 2
-            // (or more) of the groups still only earns it once — the several
-            // chances to earn points are about rewarding everyone who
-            // contributed, not about letting one person hog them all.
+            // participant; solverUserIds already limits everyone to one
+            // correct guess, so the dedupe below is just a safety net.
             // persist gates it the same way as every other puzzle side
             // effect (a preview run never inflates anyone's total).
             const uniqueParticipants = [...new Map(session.pendingAwards.map((a) => [a.userId, a])).values()];

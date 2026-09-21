@@ -66,16 +66,16 @@ const connectionsTimeoutLines = () => [
     'The puzzle window closes with mysteries yet unsolved. Let it be revealed:',
 ];
 
-// A member tries to guess again after already spending their one attempt
-// this puzzle (see session.guessedUserIds in connections.js) — Connections
-// is a group effort, so this is a light, good-natured nudge to make room
-// for someone else, never a scolding.
+// A member tries to guess again after already solving a group this puzzle
+// (see session.solverUserIds in connections.js) — Connections is a group
+// effort, so this is a light, good-natured nudge to make room for someone
+// else, never a scolding.
 const connectionsAlreadyGuessedLines = (solverName) => [
-    `Patience, ${solverName} — thou hast already had thy say this round! Let another voice be heard.`,
-    `Nay, ${solverName}, one guess per noble per puzzle! Step aside and let the rest of the court have a turn.`,
-    `The Herald gently waves ${solverName} back: "Thy turn has passed, good sir — the floor belongs to another now!"`,
+    `Patience, ${solverName} — thou hast already cracked a kinship this round! Let another voice be heard.`,
+    `Nay, ${solverName}, one true answer per noble per puzzle! Step aside and let the rest of the court have a turn.`,
+    `The Herald gently waves ${solverName} back: "Thou hast done thy part, good sir — the floor belongs to another now!"`,
     `Ah-ah, ${solverName} — this be a puzzle for the whole court, not just thee. Someone else's turn!`,
-    `"Once per noble, ${solverName}!" the Herald chuckles. "Rally thy fellows to speak up!"`,
+    `"One triumph per noble, ${solverName}!" the Herald chuckles. "Rally thy fellows to speak up!"`,
 ];
 
 module.exports = {
