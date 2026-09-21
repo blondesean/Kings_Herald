@@ -32,10 +32,6 @@
  * podium: a bonus on top of points already earned continuously as puzzles
  * are solved (see pointsStore.addPuzzlePoints), not a replacement for them.
  *
- * Right after the recap embed, the Herald also proclaims the updated peerage
- * (the same listing /nobility produces — see commands/prompts/nobility.js's
- * buildNobilityChunks) so the week's new standings are visible immediately.
- *
  * Exposes:
  *   scheduleWeeklyRecap(client) - registers the cron job (call once, on ready)
  *   runWeeklyRecap(client, opts) - runs one recap; reused by the !recap preview
@@ -45,7 +41,6 @@ const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
-const { buildNobilityChunks } = require('../prompts/nobility');
 const flavor = require('../../flavor_text');
 
 // Sunday at 12:00, interpreted in Eastern local time (DST-aware) so it stays at
@@ -552,21 +547,18 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
               leaderboard.map((entry, index) => {
                   const points = entry.points === 1 ? 'point' : 'points';
                   const recapAwards = weeklyPoints.get(entry.userId) || 0;
-                  // "Extra" is just the podium/reaction awards this run
-                  // computed (see computeAwards). "Total" is the full
-                  // picture — that plus whatever was already earned
-                  // continuously all week from voice/puzzle points, and any
-                  // manual /point_adjust — via the snapshot taken at the end
-                  // of last week's recap (see pointsStore.setPointsSnapshot).
-                  // Only shown when it differs from the extra-only figure,
-                  // so a member with no continuous-earning activity doesn't
-                  // see the same number twice.
-                  const weeklyTotal = entry.points - entry.pointsAtLastRecap;
-                  const parts = [];
-                  if (recapAwards) parts.push(`+${recapAwards} extra`);
-                  if (weeklyTotal !== recapAwards) parts.push(`${weeklyTotal >= 0 ? '+' : ''}${weeklyTotal} total`);
-                  const delta = parts.length ? ` (${parts.join(', ')})` : '';
-                  return `${index + 1}. ${entry.displayName} — ${entry.points} ${points}${delta}`;
+                  // "Podium" is just the podium/reaction awards this run
+                  // computed (see computeAwards). "WoW" is week over week:
+                  // the member's total now minus their total as of the end
+                  // of last week's recap (see pointsStore.setPointsSnapshot),
+                  // so it also covers points earned continuously all week
+                  // from voice/puzzles, duels, and any manual /point_adjust.
+                  // Both are always shown. The very first recap after the
+                  // snapshot existed had no baseline yet (missing = 0), so
+                  // WoW read as the whole balance that one time.
+                  const weekOverWeek = entry.points - entry.pointsAtLastRecap;
+                  const wow = `${weekOverWeek >= 0 ? '+' : ''}${weekOverWeek}`;
+                  return `${index + 1}. ${entry.displayName} — ${entry.points} ${points} (+${recapAwards} podium, ${wow} WoW)`;
               })
           )
         : 'The royal ledger is yet unwritten.';
@@ -661,9 +653,9 @@ const runWeeklyRecap = async function (client, options = {}) {
             logAwardBreakdown(g.id, awards, runLabel);
 
             // userId -> points from THIS run's podium/reaction awards, for
-            // the "+X this recap" column beside the running tally (see
+            // the "+X podium" column beside the running tally (see
             // buildRecapPost's boardText, which also shows a separate
-            // "+Y this week" figure covering the full week — continuous
+            // "+Y WoW" figure covering the full week — continuous
             // voice/puzzle accrual included — via pointsStore's per-member
             // pointsAtLastRecap snapshot). On preview runs (persist=false)
             // the running total doesn't include these yet; on scheduled
@@ -722,17 +714,6 @@ const runWeeklyRecap = async function (client, options = {}) {
 
             await channel.send(buildRecapPost(topPosts, leaderboard, topChatters, topReacted, weeklyPoints, topVoice, topPairs, topPuzzle));
             console.log(`Weekly recap posted to #${channel.name} in "${g.name}" [${runLabel}] (${topPosts.length} honored, persist=${persist}).`);
-
-            // Proclaim the updated peerage right after the recap itself, so
-            // the week's new standings (including points just persisted
-            // above) are visible immediately rather than waiting for someone
-            // to run /nobility.
-            const nobilityChunks = buildNobilityChunks(leaderboard);
-            if (nobilityChunks) {
-                for (const chunk of nobilityChunks) {
-                    await channel.send(chunk);
-                }
-            }
 
             // Snapshot every point-holding member's final total (not just
             // the displayed top LEADERBOARD_SIZE) so next week's "earned
