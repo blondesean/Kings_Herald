@@ -178,7 +178,7 @@ Within ~3 minutes of merge, the change is live in the friends' production server
 For a quick mental model — full details in the main [README](README.md):
 
 - **The bot** is a Node.js / `discord.js` process maintaining a WebSocket connection to Discord's gateway.
-- **Commands** live in `commands/prompts/*.js` (plus admin-only previews in `commands/passive/preview/`). `src/index.js` auto-loads them by filename, registers them as slash commands with Discord on startup, and routes `/commandname` to the file's exported `run`. See the README's "Adding a new command" for the module shape.
+- **Commands** live in `commands/prompts/*.js` (plus admin-only previews in `commands/passive/preview/` and `commands/puzzles/preview/`). `src/index.js` auto-loads them by filename, registers them as slash commands with Discord on startup, and routes `/commandname` to the file's exported `run`. See the README's "Adding a new command" for the module shape.
 - **In production**, the bot runs as a single Fargate task on AWS ECS, with the token in SSM Parameter Store and logs in CloudWatch.
 - **Infrastructure** is defined as AWS CDK code in `infra/` (TypeScript).
 - **Deploys** happen automatically on merge to `master` via GitHub Actions, authenticated to AWS via OIDC.
