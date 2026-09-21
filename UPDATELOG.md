@@ -5,8 +5,38 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-09-20
+
+- Bring README and CONTRIBUTING up to date (`24f8804`)
+- Limit Connections to one correct guess per person, not one guess (`5b08baf`)
+- Relabel recap deltas as podium/WoW and drop post-recap nobility (`dbafa75`)
+
+## 2026-09-19
+
+- Grow Connections to 6 groups (24 words) and shrink the board to 3 wide (`2310337`)
+- Limit Connections guesses to one attempt per person per puzzle (`20483e2`)
+- Fix duel decline button blending into dark mode background (`a0c84ee`)
+
+## 2026-09-13
+
+- Show weekly point totals, expand board, and demote buddy pairing to a fun aside (`e1fefc5`)
+
+## 2026-09-07
+
+- Cap Connections points at 1 per participant, not per group solved (`8a78025`)
+- Only award Connections points on a full puzzle solve (`23a76f6`)
+- Add puzzle role/signup, /puzzle_time, and widen guess windows (`a14088b`)
+
+## 2026-09-06
+
+- Puzzle intro, connections (`5de1e04`)
+- trivia revamp in difficulty, added seasonal halloween trivia (`e8b0902`)
+- Lambast for wrong standard trivia answers (`6529972`)
+- 1 voice time exploit fix, 2 /nobility after recap, 3 track best companions for the week 4) no self reactions (`ed4ccfb`)
+
 ## 2026-08-31
 
+- Regenerate UPDATELOG.md (`1724466`)
 - Trim WoW trivia to vanilla-only, fix Alliance ruler lore (`1ba3553`)
 
 ## 2026-08-30
