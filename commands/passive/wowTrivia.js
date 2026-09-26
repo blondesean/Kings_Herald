@@ -52,9 +52,13 @@ const WEDNESDAY_QUESTIONS = 5;
 // bot can't find/post there (e.g. in a guild that doesn't have this channel).
 const WOW_TRIVIA_CHANNEL_ID = '773792644777902080';
 
-const ANSWER_WINDOW_MS = 30 * 1000;
+// How long each question waits for a correct answer. A correct answer ends the
+// question immediately and the session moves on; the full window only elapses
+// when nobody gets it. Long enough that people who aren't glued to the channel
+// still get a real chance.
+const ANSWER_WINDOW_MS = 15 * 60 * 1000;
 const CHAMPION_POINTS = 2; // flat award to the session's champion, regardless of how many questions were asked
-const MAX_QUESTIONS = 15; // 15 * 30s = 7.5 minutes worst case
+const MAX_QUESTIONS = 15; // worst case (nobody answers any) is 15 * 15min = 3.75 hours
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 
@@ -91,7 +95,7 @@ const buildQuestionEmbed = (question, roundNumber, totalRounds) =>
         .setColor(EMBED_COLOR)
         .setTitle(totalRounds > 1 ? `Trivia of the Old Realm — Question ${roundNumber} of ${totalRounds}` : 'Trivia of the Old Realm')
         .setDescription(question.question)
-        .setFooter({ text: `Type thy answer plainly in this very hall — first true answer claims this question! Thou hast ${ANSWER_WINDOW_MS / 1000} seconds.` })
+        .setFooter({ text: `Type thy answer plainly in this very hall — first true answer claims this question! Thou hast ${ANSWER_WINDOW_MS / 60000} minutes.` })
         .setTimestamp();
 
 // Runs one question: posts it, collects chat answers for ANSWER_WINDOW_MS,
@@ -161,7 +165,7 @@ const runWowTriviaSession = async (guild, channel, totalQuestions, persist, runL
             roundsWonBy.set(winnerMember.id, entry);
             console.log(`WoW trivia (${runLabel}) (guild ${guild.id}): [${i + 1}/${roundQuestions.length}] winner ${winnerMember.displayName} (${winnerMember.id}).`);
         } else {
-            console.log(`WoW trivia (${runLabel}) (guild ${guild.id}): [${i + 1}/${roundQuestions.length}] no correct answer within ${ANSWER_WINDOW_MS / 1000}s.`);
+            console.log(`WoW trivia (${runLabel}) (guild ${guild.id}): [${i + 1}/${roundQuestions.length}] no correct answer within ${ANSWER_WINDOW_MS / 60000}m.`);
         }
     }
 
