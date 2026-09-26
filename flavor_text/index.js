@@ -29,4 +29,5 @@ module.exports = {
     ...require('./halloweenTriviaFlavor'),
     ...require('./connectionsFlavor'),
     ...require('./weeklyRecapFlavor'),
+    ...require('./halloweenTreatFlavor'),
 };
