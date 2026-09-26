@@ -22,6 +22,8 @@ module.exports = {
     triviaQuestions: require('./triviaQuestions'),
     wowTriviaQuestions: require('./wowTriviaQuestions'),
     halloweenTriviaQuestions: require('./halloweenTriviaQuestions'),
+    wouldYouRatherQuestions: require('./wouldYouRatherQuestions'),
+    ...require('./wouldYouRatherFlavor'),
     ...require('./duelFlavor'),
     ...require('./wowTriviaFlavor'),
     ...require('./patchNotesFlavor'),

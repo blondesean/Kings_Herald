@@ -84,6 +84,12 @@ const TRIVIA_STATE_SORT_KEY = 'BAG';
 const CONNECTIONS_STATE_PARTITION = 'CONNECTIONS#STATE';
 const CONNECTIONS_STATE_SORT_KEY = 'BAG';
 
+// Same again for the daily "would you rather" round's no-repeat cycle (see
+// commands/passive/wouldYouRather.js). Kept separate from the trivia bag so
+// exhausting this small bank can't reset the trivia cycle, and vice versa.
+const WYR_STATE_PARTITION = 'WYR#STATE';
+const WYR_STATE_SORT_KEY = 'BAG';
+
 // Lazily created so the bot can run locally without AWS credentials configured.
 let docClient = null;
 const getClient = () => {
@@ -570,6 +576,42 @@ const setUsedConnectionsPuzzles = async function (usedPuzzles) {
     }));
 };
 
+/* Same as getUsedTriviaQuestions, but for the "would you rather" round's
+ * no-repeat cycle — a string array of question texts already used this cycle.
+ */
+const getUsedWouldYouRather = async function () {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; returning empty would-you-rather bag state.');
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: WYR_STATE_PARTITION, userId: WYR_STATE_SORT_KEY },
+    }));
+
+    return (result.Item && result.Item.usedQuestions) || [];
+};
+
+/* Overwrite the persisted set of used would-you-rather question texts. Pass
+ * an empty array to start a fresh cycle.
+ */
+const setUsedWouldYouRather = async function (usedQuestions) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping would-you-rather bag persistence.');
+        return;
+    }
+
+    const client = getClient();
+
+    await client.send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: WYR_STATE_PARTITION, userId: WYR_STATE_SORT_KEY, usedQuestions },
+    }));
+};
+
 /* Record a /duel outcome: increments the winner's duelWins and the loser's
  * duelLosses (separate attributes on the same points-table item, so no
  * second table is needed). `winner`/`loser` are { userId, displayName }.
@@ -687,6 +729,8 @@ module.exports = {
     setUsedTriviaQuestions,
     getUsedConnectionsPuzzles,
     setUsedConnectionsPuzzles,
+    getUsedWouldYouRather,
+    setUsedWouldYouRather,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,

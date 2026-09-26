@@ -27,6 +27,15 @@
  * posts (see flavor_text/halloweenTriviaFlavor.js and SEASONAL_CHANCE_BY_MONTH
  * below for the odds by month). Same rules, same points, just spookier.
  *
+ * Subjective days: about half of all days (SUBJECTIVE_CHANCE), the slot goes
+ * to a "would you rather" round instead of a factual question — see
+ * commands/passive/wouldYouRather.js. That's a different game with its own
+ * rules and scoring, so runTrivia just hands off to it. This is rolled first,
+ * so it applies in September and early October too; the Halloween-bank odds
+ * below then only decide the other, factual, days. The exception is the last
+ * stretch of October (SPOOKY_STRETCH_START_DAY through the 31st), which is
+ * always the Halloween bank and never subjective — see rollToday.
+ *
  * Exposes:
  *   scheduleTrivia(client) - registers the daily randomized timer (call once, on ready)
  *   runTrivia(client, opts) - runs one round; reused by the /trivia preview command
@@ -41,6 +50,7 @@ const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { findTriviaRole } = require('../../src/triviaRole');
 const flavor = require('../../flavor_text');
+const { runWouldYouRather } = require('./wouldYouRather');
 
 // Window start (Eastern local time) and length. The window runs 9:00 AM to
 // midnight Eastern, which is 6:00 AM to 9:00 PM Pacific — a 15-hour span
@@ -67,12 +77,45 @@ const getScheduledFireTime = () => scheduledFireAt;
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 const HALLOWEEN_EMBED_COLOR = 0xff7518; // jack-o'-lantern orange
 
-// Chance a given day's round draws from the Halloween bank instead of the
-// usual one, keyed by Date#getMonth() (0-indexed: 8 = September, 9 =
-// October). Any month not listed here never rolls seasonal.
+// Chance a factual round draws from the Halloween bank instead of the usual
+// one, keyed by Date#getMonth() (0-indexed: 8 = September, 9 = October). Any
+// month not listed here never rolls seasonal. This is rolled AFTER the
+// subjective roll below, so it's the chance among the non-subjective days:
+// September is roughly 33% of the factual half, October is all of it (except
+// that the last stretch of the month skips the subjective roll entirely).
 const SEASONAL_CHANCE_BY_MONTH = { 8: 0.33, 9: 1 };
 
-const isSeasonalToday = () => Math.random() < (SEASONAL_CHANCE_BY_MONTH[new Date().getMonth()] || 0);
+// Chance a given day's round is a "would you rather" round instead of a
+// factual question, in any month.
+const SUBJECTIVE_CHANCE = 0.5;
+
+// From this day of October through the 31st, every round is the Halloween
+// bank: no subjective roll, no chance of a normal question.
+const SPOOKY_STRETCH_START_DAY = 21;
+
+// Month (1-12) and day of month in Eastern time. The daily window is
+// Eastern-anchored but the container clock is UTC, whose date is already
+// "tomorrow" for an evening round, which would shift the spooky stretch's edge.
+const easternMonthDay = (date = new Date()) => {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, month: 'numeric', day: 'numeric' }).formatToParts(date);
+    return {
+        month: Number(parts.find((p) => p.type === 'month').value),
+        day: Number(parts.find((p) => p.type === 'day').value),
+    };
+};
+
+// Today's roll: { seasonal, subjective }. In the spooky stretch it's always a
+// Halloween-bank factual round. Otherwise subjective is rolled first, and only
+// a non-subjective day goes on to roll the Halloween bank. Takes the date so
+// the odds can be tested for any day of the year.
+const rollToday = (date = new Date()) => {
+    const { month, day } = easternMonthDay(date);
+    if (month === 10 && day >= SPOOKY_STRETCH_START_DAY) return { seasonal: true, subjective: false };
+
+    const subjective = Math.random() < SUBJECTIVE_CHANCE;
+    const seasonal = !subjective && Math.random() < (SEASONAL_CHANCE_BY_MONTH[month - 1] || 0);
+    return { seasonal, subjective };
+};
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 
@@ -258,21 +301,31 @@ const buildResultsPost = (question, winners, participants, persist, seasonal) =>
  *                    no-repeat shuffle bag, vs. a plain random pick
  *                    (default: same as persist)
  *   seasonal      - force this round to draw from the Halloween bank (true)
- *                    or the usual one (false); omit to roll the odds for
- *                    today per SEASONAL_CHANCE_BY_MONTH
+ *                    or the usual one (false); omit to use today's roll
+ *   subjective    - force this to be a "would you rather" round (true) or a
+ *                    factual one (false); omit to use today's roll (see
+ *                    rollToday). True wins over `seasonal` if both are forced.
  *   runLabel      - tags CloudWatch log lines (default: "scheduled" if
  *                    persist, else "preview")
  */
 const runTrivia = async function (client, options = {}) {
+    const roll = rollToday();
     const {
         guild,
         targetChannel,
         persist = false,
         consumeBag = persist,
-        seasonal = isSeasonalToday(),
+        seasonal = roll.seasonal,
+        subjective = roll.subjective,
         runLabel = persist ? 'scheduled' : 'preview',
     } = options;
     const guilds = guild ? [guild] : Array.from(client.guilds.cache.values());
+
+    if (subjective) {
+        console.log(`Trivia: today's round is a would-you-rather [${runLabel}].`);
+        await runWouldYouRather(client, { guild, targetChannel, persist, consumeBag, runLabel });
+        return;
+    }
 
     const question = await nextQuestion(consumeBag, seasonal);
     if (seasonal) console.log(`Trivia: today's round is seasonal (Halloween bank) [${runLabel}].`);
@@ -355,4 +408,4 @@ const scheduleTrivia = function (client) {
     console.log(`Trivia scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), random ${SLOT_MINUTES}-minute slot across ${WINDOW_HOURS}h.`);
 };
 
-module.exports = { scheduleTrivia, runTrivia, getScheduledFireTime };
+module.exports = { scheduleTrivia, runTrivia, getScheduledFireTime, rollToday };
