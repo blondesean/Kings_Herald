@@ -14,9 +14,11 @@
  * SEASONAL_CHANCE_BY_MONTH in trivia.js) so the spooky reskin can be tested
  * any time of year, not just during its actual September/October window.
  * The `subjective` option does the same for the "would you rather" round
- * (see commands/passive/wouldYouRather.js). Setting either option makes the
- * other default to off, so a test run gets exactly the kind of round asked for
- * rather than a random roll; setting neither rolls the real odds.
+ * (see commands/passive/wouldYouRather.js), and `ranked` for the five-item
+ * ranking round (commands/passive/rankingRound.js); `ranked: true` implies a
+ * subjective round. Setting any option makes the others default to off, so a
+ * test run gets exactly the kind of round asked for rather than a random roll;
+ * setting none rolls the real odds.
  */
 
 const { ApplicationCommandOptionType } = require('discord.js');
@@ -25,7 +27,8 @@ const { runTrivia } = require('../trivia');
 const triviaPreview = async function (interaction) {
     const seasonalOverride = interaction.options.getBoolean('seasonal');
     const subjectiveOverride = interaction.options.getBoolean('subjective');
-    const forced = seasonalOverride !== null || subjectiveOverride !== null;
+    const rankedOverride = interaction.options.getBoolean('ranked');
+    const forced = seasonalOverride !== null || subjectiveOverride !== null || rankedOverride !== null;
 
     await interaction.editReply('Hark! I shall pose a question of trivia to test the waters, good sir!');
 
@@ -34,7 +37,11 @@ const triviaPreview = async function (interaction) {
             guild: interaction.guild,
             targetChannel: interaction.channel,
             persist: false,
-            ...(forced ? { seasonal: Boolean(seasonalOverride), subjective: Boolean(subjectiveOverride) } : {}),
+            ...(forced ? {
+                seasonal: Boolean(seasonalOverride),
+                subjective: Boolean(subjectiveOverride) || Boolean(rankedOverride),
+                subjectiveKind: rankedOverride ? 'ranking' : 'wouldYouRather',
+            } : {}),
         });
     } catch (error) {
         console.error('Error running trivia preview:', error);
@@ -57,6 +64,12 @@ module.exports = {
         {
             name: 'subjective',
             description: 'Force a would-you-rather round on/off (default: roll the odds for today)',
+            type: ApplicationCommandOptionType.Boolean,
+            required: false,
+        },
+        {
+            name: 'ranked',
+            description: 'Force a five-item ranking round on/off (default: roll the odds for today)',
             type: ApplicationCommandOptionType.Boolean,
             required: false,
         },

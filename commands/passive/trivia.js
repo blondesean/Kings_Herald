@@ -28,9 +28,11 @@
  * below for the odds by month). Same rules, same points, just spookier.
  *
  * Subjective days: about half of all days (SUBJECTIVE_CHANCE), the slot goes
- * to a "would you rather" round instead of a factual question — see
- * commands/passive/wouldYouRather.js. That's a different game with its own
- * rules and scoring, so runTrivia just hands off to it. This is rolled first,
+ * to a subjective round instead of a factual question: either a "would you
+ * rather" (commands/passive/wouldYouRather.js) or a five-item ranking
+ * (commands/passive/rankingRound.js), picked by a coin flip (RANKED_SHARE).
+ * Those are different games with their own rules and scoring, so runTrivia
+ * just hands off to them. This is rolled first,
  * so it applies in September and early October too; the Halloween-bank odds
  * below then only decide the other, factual, days. The exception is the last
  * stretch of October (SPOOKY_STRETCH_START_DAY through the 31st), which is
@@ -51,6 +53,7 @@ const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { findTriviaRole } = require('../../src/triviaRole');
 const flavor = require('../../flavor_text');
 const { runWouldYouRather } = require('./wouldYouRather');
+const { runRankingRound } = require('./rankingRound');
 
 // Window start (Eastern local time) and length. The window runs 9:00 AM to
 // midnight Eastern, which is 6:00 AM to 9:00 PM Pacific — a 15-hour span
@@ -88,6 +91,8 @@ const SEASONAL_CHANCE_BY_MONTH = { 8: 0.33, 9: 1 };
 // Chance a given day's round is a "would you rather" round instead of a
 // factual question, in any month.
 const SUBJECTIVE_CHANCE = 0.5;
+// Chance that a subjective day is the ranking round rather than would-you-rather.
+const RANKED_SHARE = 0.5;
 
 // From this day of October through the 31st, every round is the Halloween
 // bank: no subjective roll, no chance of a normal question.
@@ -302,9 +307,12 @@ const buildResultsPost = (question, winners, participants, persist, seasonal) =>
  *                    (default: same as persist)
  *   seasonal      - force this round to draw from the Halloween bank (true)
  *                    or the usual one (false); omit to use today's roll
- *   subjective    - force this to be a "would you rather" round (true) or a
- *                    factual one (false); omit to use today's roll (see
- *                    rollToday). True wins over `seasonal` if both are forced.
+ *   subjective    - force this to be a subjective round (true) or a factual
+ *                    one (false); omit to use today's roll (see rollToday).
+ *                    True wins over `seasonal` if both are forced.
+ *   subjectiveKind - 'wouldYouRather' or 'ranking': which subjective game to
+ *                    run; omit to flip a coin (RANKED_SHARE). Only matters
+ *                    when the round is subjective.
  *   runLabel      - tags CloudWatch log lines (default: "scheduled" if
  *                    persist, else "preview")
  */
@@ -317,13 +325,15 @@ const runTrivia = async function (client, options = {}) {
         consumeBag = persist,
         seasonal = roll.seasonal,
         subjective = roll.subjective,
+        subjectiveKind = Math.random() < RANKED_SHARE ? 'ranking' : 'wouldYouRather',
         runLabel = persist ? 'scheduled' : 'preview',
     } = options;
     const guilds = guild ? [guild] : Array.from(client.guilds.cache.values());
 
     if (subjective) {
-        console.log(`Trivia: today's round is a would-you-rather [${runLabel}].`);
-        await runWouldYouRather(client, { guild, targetChannel, persist, consumeBag, runLabel });
+        console.log(`Trivia: today's round is subjective (${subjectiveKind}) [${runLabel}].`);
+        const runSubjective = subjectiveKind === 'ranking' ? runRankingRound : runWouldYouRather;
+        await runSubjective(client, { guild, targetChannel, persist, consumeBag, runLabel });
         return;
     }
 

@@ -89,6 +89,8 @@ const CONNECTIONS_STATE_SORT_KEY = 'BAG';
 // exhausting this small bank can't reset the trivia cycle, and vice versa.
 const WYR_STATE_PARTITION = 'WYR#STATE';
 const WYR_STATE_SORT_KEY = 'BAG';
+const RANK_STATE_PARTITION = 'RANK#STATE';
+const RANK_STATE_SORT_KEY = 'BAG';
 
 // Lazily created so the bot can run locally without AWS credentials configured.
 let docClient = null;
@@ -612,6 +614,41 @@ const setUsedWouldYouRather = async function (usedQuestions) {
     }));
 };
 
+/* Same as getUsedWouldYouRather, but for the ranking round's no-repeat cycle.
+ */
+const getUsedRanking = async function () {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; returning empty ranking bag state.');
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: RANK_STATE_PARTITION, userId: RANK_STATE_SORT_KEY },
+    }));
+
+    return (result.Item && result.Item.usedQuestions) || [];
+};
+
+/* Overwrite the persisted set of used ranking question texts. Pass an empty
+ * array to start a fresh cycle.
+ */
+const setUsedRanking = async function (usedQuestions) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping ranking bag persistence.');
+        return;
+    }
+
+    const client = getClient();
+
+    await client.send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: RANK_STATE_PARTITION, userId: RANK_STATE_SORT_KEY, usedQuestions },
+    }));
+};
+
 /* Record a /duel outcome: increments the winner's duelWins and the loser's
  * duelLosses (separate attributes on the same points-table item, so no
  * second table is needed). `winner`/`loser` are { userId, displayName }.
@@ -731,6 +768,8 @@ module.exports = {
     setUsedConnectionsPuzzles,
     getUsedWouldYouRather,
     setUsedWouldYouRather,
+    getUsedRanking,
+    setUsedRanking,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,
