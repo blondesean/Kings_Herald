@@ -58,8 +58,14 @@
  * and a timeout fires the actual puzzle at that moment — rather than
  * posting at the same clock time every day.
  *
+ * The daily puzzle slot is shared: on about one day in four (LADDER_CHANCE)
+ * the timer below runs the Word Ladder (commands/puzzles/wordLadder.js)
+ * instead of Connections. The roll happens when the slot fires, so
+ * getScheduledFireTime() and the timing are the same either way.
+ *
  * Exposes:
- *   scheduleConnectionsPuzzle(client) - registers the daily randomized timer (call once, on ready)
+ *   scheduleConnectionsPuzzle(client) - registers the daily randomized timer for the
+ *                            daily puzzle slot, Connections or Word Ladder (call once, on ready)
  *   runConnectionsPuzzle(client, opts) - runs one puzzle; reused by the preview command
  *   getScheduledFireTime() - the Date today's puzzle is armed to fire, or null
  *                            if the window hasn't opened yet or already fired;
@@ -72,6 +78,7 @@ const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { findPuzzleRole } = require('../../src/puzzleRole');
 const connectionsPuzzles = require('./connectionsPuzzles');
+const { runWordLadder } = require('./wordLadder');
 const flavor = require('../../flavor_text');
 
 // Window start (Eastern local time) and length — identical window to the
@@ -83,6 +90,9 @@ const TIMEZONE = 'America/New_York';
 
 const SLOT_MINUTES = 15;
 const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES; // 60 possible start times
+
+// Chance that the day's puzzle is the Word Ladder rather than Connections.
+const LADDER_CHANCE = 0.25;
 
 // Kept at 3 even though the board grew from 4 groups to 6 — deliberately
 // tighter than a proportional scale-up would suggest.
@@ -452,17 +462,19 @@ const scheduleConnectionsPuzzle = function (client) {
             console.log(`Connections: today's puzzle will fire at ~${fireAt.toISOString()} (slot ${slot + 1}/${SLOT_COUNT}).`);
 
             setTimeout(() => {
-                console.log('Running scheduled Connections puzzle...');
                 scheduledFireAt = null;
-                runConnectionsPuzzle(client, { persist: true }).catch((error) =>
-                    console.error('Scheduled Connections puzzle failed:', error)
+                const ladder = Math.random() < LADDER_CHANCE;
+                console.log(`Running scheduled ${ladder ? 'Word Ladder' : 'Connections'} puzzle...`);
+                const run = ladder ? runWordLadder : runConnectionsPuzzle;
+                run(client, { persist: true }).catch((error) =>
+                    console.error(`Scheduled ${ladder ? 'Word Ladder' : 'Connections'} puzzle failed:`, error)
                 );
             }, delayMs);
         },
         { timezone: TIMEZONE }
     );
 
-    console.log(`Connections puzzle scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), random ${SLOT_MINUTES}-minute slot across ${WINDOW_HOURS}h, ${STARTING_TRIES} shared chances, open up to ${GUESS_WINDOW_MS / 60000}m.`);
+    console.log(`Daily puzzle (Connections, or Word Ladder ${LADDER_CHANCE * 100}% of days) scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), random ${SLOT_MINUTES}-minute slot across ${WINDOW_HOURS}h, ${STARTING_TRIES} shared chances, open up to ${GUESS_WINDOW_MS / 60000}m.`);
 };
 
 module.exports = { scheduleConnectionsPuzzle, runConnectionsPuzzle, getScheduledFireTime };

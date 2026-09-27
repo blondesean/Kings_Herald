@@ -32,6 +32,7 @@ module.exports = {
     ...require('./triviaFlavor'),
     ...require('./halloweenTriviaFlavor'),
     ...require('./connectionsFlavor'),
+    ...require('./wordLadderFlavor'),
     ...require('./weeklyRecapFlavor'),
     ...require('./halloweenTreatFlavor'),
 };

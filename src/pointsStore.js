@@ -91,6 +91,8 @@ const WYR_STATE_PARTITION = 'WYR#STATE';
 const WYR_STATE_SORT_KEY = 'BAG';
 const RANK_STATE_PARTITION = 'RANK#STATE';
 const RANK_STATE_SORT_KEY = 'BAG';
+const LADDER_STATE_PARTITION = 'LADDER#STATE';
+const LADDER_STATE_SORT_KEY = 'BAG';
 
 // Lazily created so the bot can run locally without AWS credentials configured.
 let docClient = null;
@@ -649,6 +651,43 @@ const setUsedRanking = async function (usedQuestions) {
     }));
 };
 
+/* Same as getUsedConnectionsPuzzles, but for the Word Ladder's no-repeat
+ * cycle — a string array of puzzle signatures ("START-TARGET") already used
+ * this cycle (see commands/puzzles/wordLadder.js).
+ */
+const getUsedWordLadderPuzzles = async function () {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; returning empty word ladder bag state.');
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: LADDER_STATE_PARTITION, userId: LADDER_STATE_SORT_KEY },
+    }));
+
+    return (result.Item && result.Item.usedPuzzles) || [];
+};
+
+/* Overwrite the persisted set of used Word Ladder puzzle signatures. Pass an
+ * empty array to start a fresh cycle.
+ */
+const setUsedWordLadderPuzzles = async function (usedPuzzles) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping word ladder bag persistence.');
+        return;
+    }
+
+    const client = getClient();
+
+    await client.send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: LADDER_STATE_PARTITION, userId: LADDER_STATE_SORT_KEY, usedPuzzles },
+    }));
+};
+
 /* Record a /duel outcome: increments the winner's duelWins and the loser's
  * duelLosses (separate attributes on the same points-table item, so no
  * second table is needed). `winner`/`loser` are { userId, displayName }.
@@ -770,6 +809,8 @@ module.exports = {
     setUsedWouldYouRather,
     getUsedRanking,
     setUsedRanking,
+    getUsedWordLadderPuzzles,
+    setUsedWordLadderPuzzles,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,

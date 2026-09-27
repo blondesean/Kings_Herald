@@ -5,9 +5,9 @@
  * behavior. adminOnly + hidden, matching connections.js's own preview
  * command. ephemeral keeps the reply visible only to the admin who ran it.
  * Named generically ("puzzle", not "connections") to match /puzzle_signup's
- * naming — Connections is the only puzzle game today, but this command (and
- * the role it's paired with) is meant to cover whichever one is currently
- * scheduled as new puzzle games join commands/puzzles/.
+ * naming: the one daily puzzle slot runs either Connections or the Word
+ * Ladder, and this command (and the role it's paired with) covers whichever
+ * one is scheduled.
  *
  * Reports the in-memory fire time armed at the 9 AM Eastern window open
  * (see scheduleConnectionsPuzzle in ../connections.js) — that state isn't
