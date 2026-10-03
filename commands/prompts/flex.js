@@ -8,8 +8,11 @@ const { renderSheet } = require('../../src/character');
 const flex = async function (interaction) {
     try {
         const member = interaction.member;
-        const character = await pointsStore.getCharacter(interaction.guild.id, member.id);
-        const sheet = renderSheet({ displayName: member.displayName, character });
+        const [character, pose] = await Promise.all([
+            pointsStore.getCharacter(interaction.guild.id, member.id),
+            pointsStore.getPose(interaction.guild.id, member.id),
+        ]);
+        const sheet = renderSheet({ displayName: member.displayName, character: { ...character, pose } });
         await interaction.editReply(`\`\`\`\n${sheet}\n\`\`\``);
     } catch (error) {
         console.error('Error showing the sheet:', error);

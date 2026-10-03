@@ -15,8 +15,18 @@
  */
 
 const { GEAR_SLOTS, DEFAULT_CLASS, findEntry } = require('../commands/passive/shopCatalog');
+const { POSES, poseLines } = require('./poses');
 
 const WIDTH = 42; // inner width of the /flex box, in characters
+
+// The stick figure beside the box (poses live in src/poses.js). Its head sits
+// on the Helm row, four rows below the top of the box.
+const FIGURE_TOP = 4;
+const figureRows = (pose) => {
+    const lines = poseLines(pose);
+    return [...Array(FIGURE_TOP).fill(''), ...lines];
+};
+const FIGURE_WIDTH = Math.max(...POSES.flatMap((pose) => pose.lines.map((line) => line.length)));
 
 const fitScore = (gear = {}) =>
     Object.values(gear)
@@ -62,7 +72,9 @@ const renderSheet = ({ displayName, character = {} }) => {
     lines.push(rule());
     lines.push(row(`Fit score: ${fitScore(character.gear)}`));
     lines.push(rule());
-    return lines.join('\n');
+    // The figure goes beside the box, one figure line per sheet line.
+    const figure = figureRows(character.pose);
+    return lines.map((line, i) => `${(figure[i] || '').padEnd(FIGURE_WIDTH)}  ${line}`).join('\n');
 };
 
 /* Equipping moves the item out of the bag into its slot. Whatever was in the

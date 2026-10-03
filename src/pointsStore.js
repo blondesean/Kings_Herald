@@ -794,9 +794,12 @@ const returnShopStock = async function (guildId, itemId) {
 
 /* Charge `price` points and grant the item, in one conditional update: the
  * points must still cover the price when the write lands, so two purchases
- * racing each other can't overspend. `grant` is either
- *   { bag: itemId }      - gear, appended to the bag
- *   { field, value }     - title, class or race, replacing the old one
+ * racing each other can't overspend. `grant` is one of
+ *   { bag: itemId }                    - gear, appended to the bag
+ *   { equip: { slot, itemId, gear } }  - gear for an empty slot, equipped at once.
+ *                                        `gear` is the member's current gear map,
+ *                                        and the write only lands if it's unchanged
+ *   { field, value }                   - title, class or race, replacing the old one
  * Returns true on success, false if the member can't afford it.
  */
 const buyWithPoints = async function (guildId, userId, displayName, price, grant) {
@@ -805,11 +808,23 @@ const buyWithPoints = async function (guildId, userId, displayName, price, grant
     const names = { '#dn': 'displayName', '#pts': 'points' };
     const values = { ':n': displayName || 'a noble', ':neg': -price, ':price': price };
     let update;
+    let condition = '#pts >= :price';
     if (grant.bag) {
         names['#bag'] = 'bag';
         values[':new'] = [grant.bag];
         values[':empty'] = [];
         update = 'SET #dn = :n, #bag = list_append(if_not_exists(#bag, :empty), :new) ADD #pts :neg';
+    } else if (grant.equip) {
+        const { slot, itemId, gear } = grant.equip;
+        names['#gear'] = 'gear';
+        values[':newGear'] = { ...gear, [slot]: itemId };
+        if (Object.keys(gear).length) {
+            values[':oldGear'] = gear;
+            condition += ' AND #gear = :oldGear';
+        } else {
+            condition += ' AND attribute_not_exists(#gear)';
+        }
+        update = 'SET #dn = :n, #gear = :newGear ADD #pts :neg';
     } else {
         names['#field'] = grant.field;
         values[':value'] = grant.value;
@@ -821,7 +836,7 @@ const buyWithPoints = async function (guildId, userId, displayName, price, grant
             TableName: TABLE_NAME,
             Key: { guildId, userId },
             UpdateExpression: update,
-            ConditionExpression: '#pts >= :price',
+            ConditionExpression: condition,
             ExpressionAttributeNames: names,
             ExpressionAttributeValues: values,
         }));
@@ -875,6 +890,35 @@ const clearTitle = async function (guildId, userId, expectedId) {
         if (error.name === 'ConditionalCheckFailedException') return false;
         throw error;
     }
+};
+
+/* Poses live under their own partition, so anyone can choose one without
+ * getting a ledger entry (which would show up on /nobility with zero points).
+ */
+const POSE_PREFIX = 'POSE#';
+
+// The stick figure pose number a member chose, or null if they never chose one.
+const getPose = async function (guildId, userId) {
+    if (!isConfigured()) return null;
+
+    const result = await getClient().send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: POSE_PREFIX + guildId, userId },
+    }));
+    return (result.Item && result.Item.pose) || null;
+};
+
+// Save a member's pose number. Free, and anyone can change it at any time.
+const setPose = async function (guildId, userId, pose) {
+    if (!isConfigured()) return;
+
+    await getClient().send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: POSE_PREFIX + guildId, userId },
+        UpdateExpression: 'SET #pose = :pose',
+        ExpressionAttributeNames: { '#pose': 'pose' },
+        ExpressionAttributeValues: { ':pose': pose },
+    }));
 };
 
 /* Swap the equipped gear and bag in one write. `expectedBag` must match what's
@@ -1032,6 +1076,8 @@ module.exports = {
     buyWithPoints,
     getCharacter,
     setEquipment,
+    getPose,
+    setPose,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,

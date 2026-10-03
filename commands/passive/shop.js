@@ -1,12 +1,13 @@
 /* Passive behavior: the Herald's daily shop.
  *
- * Once a day, at a random 15-minute slot between 9 AM and midnight Eastern
+ * Once a day, at a random 15-minute slot between 9 AM and 9 PM Eastern
  * (the same window and slot scheme as the daily trivia), the Herald opens the
  * shop and posts its stock:
  *   - 5 gear pieces, drawn at random from the catalog
  *   - 1 title, 1 class and 1 race
- * Each item has 2 copies shared by the whole server. Once they're gone, that
- * item is sold out until the next day. The shop stays open for OPEN_MS (60
+ * Gear and titles have 2 copies (titles: 1) shared by the whole server. Once
+ * they're gone, that item is sold out until the next day. Callings and kindreds
+ * never run out. The shop stays open for OPEN_MS (180
  * minutes) after it posts, and its stock resets at midnight Eastern.
  *
  * Buying uses points from the ledger (see /buy in commands/prompts/buy.js).
@@ -29,15 +30,18 @@ const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { findShopRole } = require('../../src/shopRole');
 const catalog = require('./shopCatalog');
 const flavor = require('../../flavor_text');
 
 const CRON_EXPRESSION = '0 9 * * *';
 const TIMEZONE = 'America/New_York';
-const WINDOW_HOURS = 15;
+// The shop opens between 9 AM and 9 PM, so the three-hour window always ends
+// before midnight, when the stock resets.
+const WINDOW_HOURS = 12;
 const SLOT_MINUTES = 15;
 const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES;
-const OPEN_MS = 60 * 60 * 1000;
+const OPEN_MS = 3 * 60 * 60 * 1000;
 const COPIES_PER_ITEM = 2;
 // Titles are unique: one copy, so only one noble can bear each at a time.
 const COPIES_PER_TITLE = 1;
@@ -75,12 +79,18 @@ const pickDailyStock = (random = Math.random) => {
     ];
 };
 
+// Callings and kindreds have no stock limit, so they get no stock entry.
+const isLimited = (id) => {
+    const entry = catalog.findEntry(id);
+    return Boolean(entry) && kindOf(entry) !== 'class' && kindOf(entry) !== 'race';
+};
+
 const stockRecord = (now = Date.now(), random = Math.random) => {
     const items = pickDailyStock(random);
     return {
         day: easternDay(new Date(now)),
         items,
-        stock: Object.fromEntries(items.map((id) => [id, copiesFor(id)])),
+        stock: Object.fromEntries(items.filter(isLimited).map((id) => [id, copiesFor(id)])),
         openedAt: now,
         closesAt: now + OPEN_MS,
     };
@@ -98,18 +108,18 @@ const shopEmbed = (record) => {
     const linesFor = (kind) => record.items
         .map((id) => catalog.findEntry(id))
         .filter((entry) => entry && kindOf(entry) === kind)
-        .map((entry) => `**${entry.name}** — ${entry.price} points — ${record.stock[entry.id]} left`);
+        .map((entry) => `${entry.slot ? `[${entry.slot[0].toUpperCase()}${entry.slot.slice(1)}] ` : ''}**${entry.name}** — ${entry.price} points`);
 
     const sections = [
-        ['Armour and arms', linesFor('gear')],
-        ['Titles', linesFor('title')],
-        ['Callings', linesFor('class')],
-        ['Kindreds', linesFor('race')],
+        ['=== Armour and Arms ===', linesFor('gear')],
+        ['=== Titles ===', linesFor('title')],
+        ['=== Callings ===', linesFor('class')],
+        ['=== Kindreds ===', linesFor('race')],
     ];
     const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle("The Herald's Shop")
-        .setDescription(`${flavor.shopOpenLines()[0]}\n\nBuy with \`/buy <name>\`. Each item has ${COPIES_PER_ITEM} copies for the whole realm, and each title only one. The shop shuts ${new Date(record.closesAt).toLocaleTimeString('en-US', { timeZone: TIMEZONE, hour: 'numeric', minute: '2-digit' })} Eastern.`);
+        .setDescription(`${flavor.shopOpenLines()[0]}\n\nBuy with \`/buy <name>\`, then show off thy fit with \`/flex\`. Today, gear has ${COPIES_PER_ITEM} copies for the whole realm and titles have one. Callings and kindreds are always available. The merchant packs his wares once the hour hand has made three full turns of the dial.`);
     for (const [name, values] of sections) {
         if (values.length) embed.addFields({ name, value: values.join('\n') });
     }
@@ -136,7 +146,13 @@ const openShopNow = async function (client, options = {}) {
 
             const record = stockRecord();
             if (persist) await pointsStore.openShop(g.id, record);
-            await channel.send({ embeds: [shopEmbed(record)] });
+            // Only the real opening pings the shopaholics; a test shop doesn't.
+            const role = persist ? findShopRole(g) : null;
+            await channel.send({
+                content: role ? `<@&${role.id}> The merchant has thrown open his stalls!` : undefined,
+                embeds: [shopEmbed(record)],
+                allowedMentions: { roles: role ? [role.id] : [] },
+            });
             console.log(`Shop (guild ${g.id}) opened${persist ? '' : ' (rehearsal, not saved)'}: ${record.items.join(', ')}.`);
         } catch (guildError) {
             console.error(`Shop failed to open for guild "${g.name}":`, guildError);

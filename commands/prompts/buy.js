@@ -28,17 +28,28 @@ const FIELD_FOR_KIND = { title: 'title', class: 'class', race: 'race' };
 
 // Takes the copy, charges the points and grants the item. Returns the kind on
 // success, or null (after giving the copy back) if the purchase didn't go through.
-const purchase = async (guildId, day, buyer, entry, kind) => {
-    const taken = await pointsStore.takeShopStock(guildId, day, entry.id, Date.now());
+const purchase = async (guildId, day, buyer, entry, kind, character) => {
+    // Callings and kindreds have no stock limit, so only the rest take a copy.
+    const limited = kind === 'gear' || kind === 'title';
+    const taken = limited ? await pointsStore.takeShopStock(guildId, day, entry.id, Date.now()) : true;
     if (!taken) return { ok: false, reason: 'soldOut' };
 
-    const grant = kind === 'gear' ? { bag: entry.id } : { field: FIELD_FOR_KIND[kind], value: entry.id };
+    let grant;
+    if (kind === 'gear') {
+        // An empty slot takes the piece straight away; otherwise it goes to the bag.
+        const slotEmpty = !(character.gear || {})[entry.slot];
+        grant = slotEmpty
+            ? { equip: { slot: entry.slot, itemId: entry.id, gear: character.gear || {} } }
+            : { bag: entry.id };
+    } else {
+        grant = { field: FIELD_FOR_KIND[kind], value: entry.id };
+    }
     const paid = await pointsStore.buyWithPoints(guildId, buyer.id, buyer.displayName, entry.price, grant);
     if (!paid) {
-        await pointsStore.returnShopStock(guildId, entry.id);
+        if (limited) await pointsStore.returnShopStock(guildId, entry.id);
         return { ok: false, reason: 'cannotAfford' };
     }
-    return { ok: true };
+    return { ok: true, equipped: grant.equip !== undefined };
 };
 
 const buy = async function (interaction) {
@@ -74,7 +85,7 @@ const buy = async function (interaction) {
             const confirmed = await askConfirm(interaction, pick(flavor.titleSwapPromptLines(held.name, entry.name, entry.price)));
             if (!confirmed) return;
 
-            const result = await purchase(guildId, record.day, buyer, entry, kind);
+            const result = await purchase(guildId, record.day, buyer, entry, kind, character);
             if (!result.ok) {
                 const lines = result.reason === 'soldOut' ? flavor.soldOutLines(entry.name) : flavor.cannotAffordLines(entry.name, entry.price);
                 await interaction.followUp(pick(lines));
@@ -89,15 +100,18 @@ const buy = async function (interaction) {
             return;
         }
 
-        const result = await purchase(guildId, record.day, buyer, entry, kind);
+        const result = await purchase(guildId, record.day, buyer, entry, kind, character);
         if (!result.ok) {
             const lines = result.reason === 'soldOut' ? flavor.soldOutLines(entry.name) : flavor.cannotAffordLines(entry.name, entry.price);
             await interaction.editReply(pick(lines));
             return;
         }
 
-        console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) bought ${entry.name} for ${entry.price} (${easternDay()}).`);
-        await interaction.editReply(pick(flavor.purchasedLines(`<@${buyer.id}>`, entry.name, kind)));
+        console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) bought ${entry.name} for ${entry.price}${result.equipped ? ', equipped' : ''} (${easternDay()}).`);
+        const line = result.equipped
+            ? pick(flavor.purchasedEquippedLines(`<@${buyer.id}>`, entry.name))
+            : pick(flavor.purchasedLines(`<@${buyer.id}>`, entry.name, kind));
+        await interaction.editReply(line);
     } catch (error) {
         console.error('Error handling /buy:', error);
         await interaction.editReply('Alack! The merchant\'s ledger is sealed to mine eyes at present. Pray try again anon!');

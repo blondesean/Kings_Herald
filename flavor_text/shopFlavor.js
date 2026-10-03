@@ -4,8 +4,8 @@
  */
 
 const shopOpenLines = () => [
-    'Hear ye! The traveling merchant has unpacked his wares. Be quick, for each treasure has but two copies in all the realm.',
-    'The Herald flings wide the shop doors! Gear, titles, callings and kindreds await thy purse, but only two of each.',
+    'Hear ye! The traveling merchant has unpacked his wares. Be quick, good nobles.',
+    'The Herald flings wide the shop doors! Gear, titles, callings and kindreds await thy purse.',
 ];
 
 const shopClosedLines = () => [
@@ -26,6 +26,12 @@ const soldOutLines = (name) => [
 const cannotAffordLines = (name, price) => [
     `Thy purse is too light for **${name}**, which costs ${price} points.`,
     `The merchant shakes his head: **${name}** costs ${price} points, and thou hast fewer.`,
+];
+
+// Gear bought for an empty slot goes straight on, so it's worn already.
+const purchasedEquippedLines = (buyer, name) => [
+    `${buyer} hands over the coin, and **${name}** is buckled on at once.`,
+    `**${name}** is now worn by ${buyer}. The sheet is all the better for it.`,
 ];
 
 // The purchase went through. `kind` is gear, title, class or race.
@@ -105,6 +111,7 @@ const confirmExpiredLines = () => [
 ];
 
 module.exports = {
+    purchasedEquippedLines,
     titleReturnPromptLines,
     titleSwapPromptLines,
     titleReturnedLines,

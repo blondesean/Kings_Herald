@@ -9,6 +9,9 @@ const flavor = require('../../flavor_text');
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 
+// Room left for the list after the heading and footer, under Discord's limit.
+const MAX_LIST_CHARS = 1800;
+
 const bank = async function (interaction) {
     try {
         const character = await pointsStore.getCharacter(interaction.guild.id, interaction.member.id);
@@ -17,15 +20,29 @@ const bank = async function (interaction) {
             return;
         }
 
+        // Discord caps a message at 2000 characters, so the list stops once it
+        // reaches MAX_LIST_CHARS and says how many items didn't fit.
         const bySlot = bagBySlot(character.bag);
-        const lines = GEAR_SLOTS
-            .filter((slot) => bySlot[slot].length)
-            .map((slot) => {
-                const label = slot.charAt(0).toUpperCase() + slot.slice(1);
-                return `**${label}:** ${bySlot[slot].map((entry) => entry.name).join(', ')}`;
-            });
+        const lines = [];
+        let shown = 0;
+        let length = 0;
+        for (const slot of GEAR_SLOTS) {
+            if (!bySlot[slot].length) continue;
+            const label = slot.charAt(0).toUpperCase() + slot.slice(1);
+            const names = [];
+            for (const entry of bySlot[slot]) {
+                const next = length + entry.name.length + 2;
+                if (next > MAX_LIST_CHARS) break;
+                names.push(entry.name);
+                length = next;
+                shown += 1;
+            }
+            if (names.length) lines.push(`**${label}:** ${names.join(', ')}`);
+        }
 
-        await interaction.editReply(`**Thy bag**\n${lines.join('\n')}\n\nEquip one with \`/equip <name>\`.`);
+        const hidden = character.bag.length - shown;
+        const more = hidden > 0 ? `\n*…and ${hidden} more not shown.*` : '';
+        await interaction.editReply(`**Thy bag**\n${lines.join('\n')}${more}\n\nEquip one with \`/equip <name>\`.`);
     } catch (error) {
         console.error('Error showing the bag:', error);
         await interaction.editReply('Alack! The ledger is sealed to mine eyes at present. Pray try again anon!');
