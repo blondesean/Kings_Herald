@@ -168,6 +168,7 @@ const getLeaderboard = async function (guildId, limit = 10) {
             displayName: item.displayName || 'a noble',
             points: item.points || 0,
             pointsAtLastRecap: item.pointsAtLastRecap || 0,
+            gear: item.gear || {},
         }))
         .sort((a, b) => b.points - a.points)
         .slice(0, limit);
@@ -688,6 +689,217 @@ const setUsedWordLadderPuzzles = async function (usedPuzzles) {
     }));
 };
 
+// ---- the shop and characters (see commands/passive/shop.js and src/character.js) ----
+//
+// Each guild's current shop lives under its own partition, SHOP#<guildId>, so
+// it never shows up in the leaderboard query. Characters live on the member's
+// ledger item (gear, bag, title, class, race), so buying and equipping never
+// needs a second read of the points.
+
+const SHOP_PREFIX = 'SHOP#';
+const SHOP_SORT_KEY = 'CURRENT';
+
+// Today's shop for a guild: { day, items, stock, closesAt, ... }, or null.
+const getShop = async function (guildId) {
+    if (!isConfigured()) return null;
+
+    const result = await getClient().send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: SHOP_PREFIX + guildId, userId: SHOP_SORT_KEY },
+    }));
+    return result.Item || null;
+};
+
+// Replace the guild's shop with a new day's record.
+const openShop = async function (guildId, record) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping shop persistence.');
+        return;
+    }
+
+    await getClient().send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: SHOP_PREFIX + guildId, userId: SHOP_SORT_KEY, ...record },
+    }));
+};
+
+// Take one copy of `itemId` from today's stock. Succeeds only while the shop
+// is still open for `day` and that item has copies left. Returns false otherwise.
+const takeShopStock = async function (guildId, day, itemId, now) {
+    if (!isConfigured()) return false;
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId: SHOP_PREFIX + guildId, userId: SHOP_SORT_KEY },
+            UpdateExpression: 'SET #stock.#item = #stock.#item - :one',
+            ConditionExpression: '#day = :day AND #closes > :now AND #stock.#item > :zero',
+            ExpressionAttributeNames: { '#stock': 'stock', '#item': itemId, '#day': 'day', '#closes': 'closesAt' },
+            ExpressionAttributeValues: { ':one': 1, ':zero': 0, ':day': day, ':now': now },
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
+// Put one copy of `itemId` back on today's shelves: used when a title is
+// returned, and when a purchase fails after the copy was taken. Only works
+// while the shop is open for `day`. Adds the item to the list if it wasn't
+// stocked today. Returns false if the shop is closed.
+const restockShopItem = async function (guildId, day, itemId, now) {
+    if (!isConfigured()) return false;
+
+    const record = await getShop(guildId);
+    if (!record || record.day !== day || now >= record.closesAt) return false;
+
+    const names = { '#stock': 'stock', '#item': itemId, '#day': 'day', '#closes': 'closesAt' };
+    const values = { ':one': 1, ':zero': 0, ':day': day, ':now': now };
+    let update = 'SET #stock.#item = if_not_exists(#stock.#item, :zero) + :one';
+    if (!(record.items || []).includes(itemId)) {
+        names['#items'] = 'items';
+        values[':new'] = [itemId];
+        update += ', #items = list_append(#items, :new)';
+    }
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId: SHOP_PREFIX + guildId, userId: SHOP_SORT_KEY },
+            UpdateExpression: update,
+            ConditionExpression: '#day = :day AND #closes > :now',
+            ExpressionAttributeNames: names,
+            ExpressionAttributeValues: values,
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
+// Put back a copy taken by takeShopStock, used when the purchase then fails.
+const returnShopStock = async function (guildId, itemId) {
+    if (!isConfigured()) return;
+
+    await getClient().send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: SHOP_PREFIX + guildId, userId: SHOP_SORT_KEY },
+        UpdateExpression: 'SET #stock.#item = #stock.#item + :one',
+        ExpressionAttributeNames: { '#stock': 'stock', '#item': itemId },
+        ExpressionAttributeValues: { ':one': 1 },
+    }));
+};
+
+/* Charge `price` points and grant the item, in one conditional update: the
+ * points must still cover the price when the write lands, so two purchases
+ * racing each other can't overspend. `grant` is either
+ *   { bag: itemId }      - gear, appended to the bag
+ *   { field, value }     - title, class or race, replacing the old one
+ * Returns true on success, false if the member can't afford it.
+ */
+const buyWithPoints = async function (guildId, userId, displayName, price, grant) {
+    if (!isConfigured()) return false;
+
+    const names = { '#dn': 'displayName', '#pts': 'points' };
+    const values = { ':n': displayName || 'a noble', ':neg': -price, ':price': price };
+    let update;
+    if (grant.bag) {
+        names['#bag'] = 'bag';
+        values[':new'] = [grant.bag];
+        values[':empty'] = [];
+        update = 'SET #dn = :n, #bag = list_append(if_not_exists(#bag, :empty), :new) ADD #pts :neg';
+    } else {
+        names['#field'] = grant.field;
+        values[':value'] = grant.value;
+        update = 'SET #dn = :n, #field = :value ADD #pts :neg';
+    }
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: update,
+            ConditionExpression: '#pts >= :price',
+            ExpressionAttributeNames: names,
+            ExpressionAttributeValues: values,
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
+// A member's character and points: { points, displayName, gear, bag, title, class, race }.
+const getCharacter = async function (guildId, userId) {
+    const empty = { points: 0, displayName: null, gear: {}, bag: [], title: null, class: null, race: null };
+    if (!isConfigured()) return empty;
+
+    const result = await getClient().send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+    }));
+    const item = result.Item;
+    if (!item) return empty;
+    return {
+        points: item.points || 0,
+        displayName: item.displayName || null,
+        gear: item.gear || {},
+        bag: item.bag || [],
+        title: item.title || null,
+        class: item.class || null,
+        race: item.race || null,
+    };
+};
+
+/* Remove a title from a character, but only if it's still `expectedId` (so
+ * a stale click can't clear a title the member has since swapped). Returns
+ * false if the title doesn't match.
+ */
+const clearTitle = async function (guildId, userId, expectedId) {
+    if (!isConfigured()) return false;
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: 'REMOVE #title',
+            ConditionExpression: '#title = :expected',
+            ExpressionAttributeNames: { '#title': 'title' },
+            ExpressionAttributeValues: { ':expected': expectedId },
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
+/* Swap the equipped gear and bag in one write. `expectedBag` must match what's
+ * stored now, so a stale read can't duplicate or lose an item. Returns false if
+ * the bag changed under us.
+ */
+const setEquipment = async function (guildId, userId, expectedBag, gear, bag) {
+    if (!isConfigured()) return false;
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: 'SET #gear = :gear, #bag = :bag',
+            ConditionExpression: '#bag = :expected',
+            ExpressionAttributeNames: { '#gear': 'gear', '#bag': 'bag' },
+            ExpressionAttributeValues: { ':gear': gear, ':bag': bag, ':expected': expectedBag },
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
 /* Record a /duel outcome: increments the winner's duelWins and the loser's
  * duelLosses (separate attributes on the same points-table item, so no
  * second table is needed). `winner`/`loser` are { userId, displayName }.
@@ -811,6 +1023,15 @@ module.exports = {
     setUsedRanking,
     getUsedWordLadderPuzzles,
     setUsedWordLadderPuzzles,
+    getShop,
+    openShop,
+    takeShopStock,
+    returnShopStock,
+    restockShopItem,
+    clearTitle,
+    buyWithPoints,
+    getCharacter,
+    setEquipment,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,

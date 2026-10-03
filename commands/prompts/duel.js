@@ -1,5 +1,6 @@
 /* /duel <opponent> <method> <wager> - challenge another court member to a
- * wager of points, settled by Coin Flip, Rock Paper Scissors, or Death Roll.
+ * wager of points, settled by Coin Flip, Rock Paper Scissors, Death Roll, or
+ * Fit Duel (the odds follow the two duelists' equipped gear, see fitWinChance).
  *
  * The challenge posts publicly, in the same thread it was declared in, with
  * three buttons — Accept, Decline with Honor, and Scoff and Decline — and
@@ -33,6 +34,7 @@ const {
     MessageFlags,
 } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const { fitScore } = require('../../src/character');
 const flavor = require('../../flavor_text');
 
 // Comma-separated guild IDs where self-dueling is permitted (for testing).
@@ -59,6 +61,7 @@ const EMBED_COLOR = 0xd4af37; // heraldic gold
 const METHOD_COIN_FLIP = 'Coin Flip';
 const METHOD_RPS = 'Rock Paper Scissors';
 const METHOD_DEATH_ROLL = 'Death Roll';
+const METHOD_FIT = 'Fit Duel';
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const displayNameOf = (member) => member.displayName;
@@ -67,12 +70,13 @@ const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 
 // ---- challenge post -----------------------------------------------------
 
-const buildChallengeEmbed = (challenger, target, method, wager) =>
+const buildChallengeEmbed = (challenger, target, method, wager, odds = null) =>
     new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle('A Challenge Is Declared!')
         .setDescription(
             `Hear ye! **${displayNameOf(challenger)}** challenges **${displayNameOf(target)}** to a duel of **${method}**, wagering **${wager}** ${pointsWord(wager)}!\n\n` +
+            (odds ? `${odds}\n\n` : '') +
             `${displayNameOf(target)}, wilt thou accept? Thou hast ${ACCEPT_WINDOW_MS / 60000} minutes to answer.`
         )
         .setTimestamp();
@@ -218,6 +222,38 @@ const resolveDeathRoll = async (channel, challenger, target) => {
     }
 };
 
+// ---- Fit Duel -----------------------------------------------------------------
+
+// The challenger's chance of winning, from the two fit scores: proportional,
+// so 100 against 200 is 1/3 to 2/3. Two zero fits is an even 50%.
+const fitWinChance = (challengerFit, targetFit) => {
+    const total = challengerFit + targetFit;
+    return total === 0 ? 0.5 : challengerFit / total;
+};
+const percent = (chance) => Math.round(chance * 100);
+
+// Settles a Fit Duel. The fits are read fresh, so gear changed during the
+// accept window counts. Returns [winner, loser].
+const resolveFitDuel = async (channel, challenger, target, challengerFit, targetFit) => {
+    await channel.send(pick(flavor.fitDuelOpenLines(displayNameOf(challenger), displayNameOf(target))));
+
+    const challengerWins = Math.random() < fitWinChance(challengerFit, targetFit);
+    const [winner, loser] = challengerWins ? [challenger, target] : [target, challenger];
+    const [winnerFit, loserFit] = challengerWins ? [challengerFit, targetFit] : [targetFit, challengerFit];
+
+    const winnerName = displayNameOf(winner);
+    const loserName = displayNameOf(loser);
+    let line;
+    if (challengerFit === 0 && targetFit === 0) line = pick(flavor.fitDuelBareHandedLines(displayNameOf(challenger), displayNameOf(target)));
+    else if (loserFit === 0) line = pick(flavor.fitDuelUnarmoredLines(loserName, winnerName));
+    else if (winnerFit > loserFit) line = pick(flavor.fitDuelFavoredLines(winnerName, loserName, winnerFit, loserFit));
+    else if (winnerFit < loserFit) line = pick(flavor.fitDuelUpsetLines(winnerName, loserName, winnerFit, loserFit));
+    else line = pick(flavor.fitDuelEvenLines(winnerName, loserName));
+    await channel.send(line);
+
+    return [winner, loser];
+};
+
 // ---- entry point -----------------------------------------------------------
 
 // Every duel gets a "Duel result (...)" audit line, win/lose/no-contest
@@ -263,12 +299,31 @@ const duel = async function (interaction) {
         return;
     }
 
+    let odds = null;
+    if (method === METHOD_FIT) {
+        try {
+            const [challengerChar, targetChar] = await Promise.all([
+                pointsStore.getCharacter(guild.id, challengerMember.id),
+                pointsStore.getCharacter(guild.id, targetMember.id),
+            ]);
+            const challengerFit = fitScore(challengerChar.gear);
+            const targetFit = fitScore(targetChar.gear);
+            const chance = fitWinChance(challengerFit, targetFit);
+            odds = flavor.fitDuelOddsLine(
+                displayNameOf(challengerMember), challengerFit, percent(chance),
+                displayNameOf(targetMember), targetFit, percent(1 - chance)
+            );
+        } catch (error) {
+            console.error('duel: could not read fits for the odds:', error);
+        }
+    }
+
     // Content carries the ping (Discord only notifies on mentions in
     // content, not embed text) so the target is notified even if they
     // aren't watching the channel right now.
     const challengeMessage = await interaction.editReply({
         content: `${targetMember}`,
-        embeds: [buildChallengeEmbed(challengerMember, targetMember, method, wager)],
+        embeds: [buildChallengeEmbed(challengerMember, targetMember, method, wager, odds)],
         components: [buildChallengeRow(false)],
     });
 
@@ -361,6 +416,12 @@ const duel = async function (interaction) {
             [winner, loser] = await resolveCoinFlip(channel, challengerMember, targetMember);
         } else if (method === METHOD_RPS) {
             [winner, loser] = await resolveRps(interaction, respondingInteraction, channel, challengerMember, targetMember);
+        } else if (method === METHOD_FIT) {
+            const [challengerChar, targetChar] = await Promise.all([
+                pointsStore.getCharacter(guild.id, challengerMember.id),
+                pointsStore.getCharacter(guild.id, targetMember.id),
+            ]);
+            [winner, loser] = await resolveFitDuel(channel, challengerMember, targetMember, fitScore(challengerChar.gear), fitScore(targetChar.gear));
         } else {
             [winner, loser] = await resolveDeathRoll(channel, challengerMember, targetMember);
         }
@@ -414,6 +475,11 @@ const duel = async function (interaction) {
 
     logDuel(guild.id, `Duel result: ${method} between ${displayNameOf(challengerMember)} (${challengerMember.id}) and ${displayNameOf(targetMember)} (${targetMember.id}) for ${wager} ${pointsWord(wager)} — winner: ${displayNameOf(winner)} (${winner.id}), loser: ${displayNameOf(loser)} (${loser.id}).`);
 
+    if (method === METHOD_FIT) {
+        await channel.send(`**${wager}** ${pointsWord(wager)} change hands.`);
+        return;
+    }
+
     const winnerIsChallenger = winner.id === challengerMember.id;
     const victoryLines = winnerIsChallenger
         ? flavor.duelVictoryLinesForChallenger(displayNameOf(winner), displayNameOf(loser))
@@ -440,6 +506,7 @@ module.exports = {
                 { name: METHOD_COIN_FLIP, value: METHOD_COIN_FLIP },
                 { name: METHOD_RPS, value: METHOD_RPS },
                 { name: METHOD_DEATH_ROLL, value: METHOD_DEATH_ROLL },
+                { name: METHOD_FIT, value: METHOD_FIT },
             ],
         },
         {
@@ -451,4 +518,5 @@ module.exports = {
         },
     ],
     run: duel,
+    fitWinChance,
 };

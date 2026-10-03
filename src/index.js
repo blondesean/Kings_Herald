@@ -40,6 +40,8 @@ const { scheduleTrivia } = require('./../commands/passive/trivia');
 const { scheduleWowTriviaWednesday } = require('./../commands/passive/wowTrivia');
 const { trackVoiceStateUpdate, startVoiceTracking } = require('./../commands/passive/voiceTime');
 const { scheduleConnectionsPuzzle } = require('./../commands/puzzles/connections');
+const { scheduleBirthdays } = require('./../commands/passive/birthdays');
+const { scheduleShop } = require('./../commands/passive/shop');
 const { scheduleHalloweenTreat } = require('./../commands/passive/halloweenTreat');
 
 //Slash commands are auto-loaded by filename from commands/prompts (user-facing),
@@ -130,6 +132,8 @@ client.on('ready', (c) => {
     scheduleWowTriviaWednesday(client);
     scheduleConnectionsPuzzle(client);
     scheduleHalloweenTreat(client);
+    scheduleBirthdays(client);
+    scheduleShop(client);
     startVoiceTracking(client);
 });
 

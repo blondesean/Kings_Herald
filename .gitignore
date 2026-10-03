@@ -26,3 +26,6 @@ Thumbs.db
 
 # Tool state
 .claude/
+
+# Private data (birthday list, etc.), never committed
+private/

@@ -19,6 +19,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Private data stays out of the image (see commands/passive/birthdays.js)
+private/
+
 # Docs / dev notes (not needed at runtime)
 README.md
 test.txt

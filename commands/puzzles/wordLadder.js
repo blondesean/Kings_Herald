@@ -1,7 +1,7 @@
 /* Passive behavior: the Herald's daily Word Ladder puzzle.
  *
  * The daily puzzle slot (see scheduleConnectionsPuzzle in connections.js)
- * hands itself to this game on about one day in four (LADDER_CHANCE there)
+ * hands itself to this game on half of all days (LADDER_CHANCE there)
  * instead of Connections. The Herald announces a start word and a target word
  * of the same length, e.g. COLD and WARM, and the whole channel builds a
  * ladder between them together: anyone can type a single word that changes

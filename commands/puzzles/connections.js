@@ -58,7 +58,7 @@
  * and a timeout fires the actual puzzle at that moment — rather than
  * posting at the same clock time every day.
  *
- * The daily puzzle slot is shared: on about one day in four (LADDER_CHANCE)
+ * The daily puzzle slot is shared: on half of all days (LADDER_CHANCE)
  * the timer below runs the Word Ladder (commands/puzzles/wordLadder.js)
  * instead of Connections. The roll happens when the slot fires, so
  * getScheduledFireTime() and the timing are the same either way.
@@ -92,7 +92,7 @@ const SLOT_MINUTES = 15;
 const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES; // 60 possible start times
 
 // Chance that the day's puzzle is the Word Ladder rather than Connections.
-const LADDER_CHANCE = 0.25;
+const LADDER_CHANCE = 0.5;
 
 // Kept at 3 even though the board grew from 4 groups to 6 — deliberately
 // tighter than a proportional scale-up would suggest.
