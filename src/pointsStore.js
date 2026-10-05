@@ -122,18 +122,19 @@ const addPoints = async function (guildId, awards) {
             continue;
         }
 
+        // A negative award (a duel loss, a /point_adjust take-away) also adds
+        // to weeklyLost, so the recap can show losses separately from gains.
+        const lost = award.points < 0 ? -award.points : 0;
         await client.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { guildId, userId: award.userId },
-            UpdateExpression: 'SET #dn = :n ADD #pts :p',
-            ExpressionAttributeNames: {
-                '#dn': 'displayName',
-                '#pts': 'points',
-            },
-            ExpressionAttributeValues: {
-                ':n': award.displayName || 'a noble',
-                ':p': award.points,
-            },
+            UpdateExpression: lost ? 'SET #dn = :n ADD #pts :p, #wl :lost' : 'SET #dn = :n ADD #pts :p',
+            ExpressionAttributeNames: lost
+                ? { '#dn': 'displayName', '#pts': 'points', '#wl': 'weeklyLost' }
+                : { '#dn': 'displayName', '#pts': 'points' },
+            ExpressionAttributeValues: lost
+                ? { ':n': award.displayName || 'a noble', ':p': award.points, ':lost': lost }
+                : { ':n': award.displayName || 'a noble', ':p': award.points },
         }));
     }
 };
@@ -169,6 +170,7 @@ const getLeaderboard = async function (guildId, limit = 10) {
             points: item.points || 0,
             pointsAtLastRecap: item.pointsAtLastRecap || 0,
             gear: item.gear || {},
+            weeklyLost: item.weeklyLost || 0,
         }))
         .sort((a, b) => b.points - a.points)
         .slice(0, limit);
@@ -191,9 +193,9 @@ const setPointsSnapshot = async function (guildId, userId, points) {
     await client.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { guildId, userId },
-        UpdateExpression: 'SET #palr = :p',
-        ExpressionAttributeNames: { '#palr': 'pointsAtLastRecap' },
-        ExpressionAttributeValues: { ':p': points },
+        UpdateExpression: 'SET #palr = :p, #wl = :zero',
+        ExpressionAttributeNames: { '#palr': 'pointsAtLastRecap', '#wl': 'weeklyLost' },
+        ExpressionAttributeValues: { ':p': points, ':zero': 0 },
     }));
 };
 
@@ -805,15 +807,15 @@ const returnShopStock = async function (guildId, itemId) {
 const buyWithPoints = async function (guildId, userId, displayName, price, grant) {
     if (!isConfigured()) return false;
 
-    const names = { '#dn': 'displayName', '#pts': 'points' };
-    const values = { ':n': displayName || 'a noble', ':neg': -price, ':price': price };
+    const names = { '#dn': 'displayName', '#pts': 'points', '#wl': 'weeklyLost' };
+    const values = { ':n': displayName || 'a noble', ':neg': -price, ':price': price, ':lost': price };
     let update;
     let condition = '#pts >= :price';
     if (grant.bag) {
         names['#bag'] = 'bag';
         values[':new'] = [grant.bag];
         values[':empty'] = [];
-        update = 'SET #dn = :n, #bag = list_append(if_not_exists(#bag, :empty), :new) ADD #pts :neg';
+        update = 'SET #dn = :n, #bag = list_append(if_not_exists(#bag, :empty), :new) ADD #pts :neg, #wl :lost';
     } else if (grant.equip) {
         const { slot, itemId, gear } = grant.equip;
         names['#gear'] = 'gear';
@@ -824,11 +826,11 @@ const buyWithPoints = async function (guildId, userId, displayName, price, grant
         } else {
             condition += ' AND attribute_not_exists(#gear)';
         }
-        update = 'SET #dn = :n, #gear = :newGear ADD #pts :neg';
+        update = 'SET #dn = :n, #gear = :newGear ADD #pts :neg, #wl :lost';
     } else {
         names['#field'] = grant.field;
         values[':value'] = grant.value;
-        update = 'SET #dn = :n, #field = :value ADD #pts :neg';
+        update = 'SET #dn = :n, #field = :value ADD #pts :neg, #wl :lost';
     }
 
     try {

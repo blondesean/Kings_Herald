@@ -556,9 +556,12 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
                   // Both are always shown. The very first recap after the
                   // snapshot existed had no baseline yet (missing = 0), so
                   // WoW read as the whole balance that one time.
+                  // Δ is the week's net change. GAIN is everything that came in
+                  // (the net change plus what was lost, see weeklyLost).
                   const weekOverWeek = entry.points - entry.pointsAtLastRecap;
-                  const wow = `${weekOverWeek >= 0 ? '+' : ''}${weekOverWeek}`;
-                  return `${index + 1}. ${entry.displayName} — ${entry.points} ${points} (+${recapAwards} podium, ${wow} WoW)`;
+                  const gain = weekOverWeek + (entry.weeklyLost || 0);
+                  const signed = (n) => `${n >= 0 ? '+' : ''}${n}`;
+                  return `${index + 1}. ${entry.displayName} — ${entry.points} ${points} (${signed(recapAwards)} PODIUM, ${signed(gain)} GAIN, ${signed(weekOverWeek)} Δ)`;
               })
           )
         : 'The royal ledger is yet unwritten.';
