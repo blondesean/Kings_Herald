@@ -453,4 +453,15 @@ const ALL = [...GEAR, ...TITLES, ...CLASSES, ...RACES];
 
 const findEntry = (id) => ALL.find((entry) => entry.id === id) || null;
 
-module.exports = { GEAR_SLOTS, DEFAULT_CLASS, GEAR, TITLES, CLASSES, RACES, ALL, findEntry };
+/* Rarity label for gear, from its price alone (so it can't drift from the
+ * price). Common 10, uncommon 15-20, rare 25-30, epic 35-45, legendary 50.
+ */
+const rarityFor = (price) => {
+    if (price >= 50) return 'Legendary';
+    if (price >= 35) return 'Epic';
+    if (price >= 25) return 'Rare';
+    if (price >= 15) return 'Uncommon';
+    return 'Common';
+};
+
+module.exports = { GEAR_SLOTS, DEFAULT_CLASS, GEAR, TITLES, CLASSES, RACES, ALL, findEntry, rarityFor };

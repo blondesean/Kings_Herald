@@ -29,7 +29,7 @@ const FIELD_FOR_KIND = { title: 'title', class: 'class', race: 'race' };
 // Takes the copy, charges the points and grants the item. Returns the kind on
 // success, or null (after giving the copy back) if the purchase didn't go through.
 const purchase = async (guildId, day, buyer, entry, kind, character) => {
-    // Callings and kindreds have no stock limit, so only the rest take a copy.
+    // Classes and races have no stock limit, so only the rest take a copy.
     const limited = kind === 'gear' || kind === 'title';
     const taken = limited ? await pointsStore.takeShopStock(guildId, day, entry.id, Date.now()) : true;
     if (!taken) return { ok: false, reason: 'soldOut' };
@@ -87,7 +87,7 @@ const buy = async function (interaction) {
 
             const result = await purchase(guildId, record.day, buyer, entry, kind, character);
             if (!result.ok) {
-                const lines = result.reason === 'soldOut' ? flavor.soldOutLines(entry.name) : flavor.cannotAffordLines(entry.name, entry.price);
+                const lines = result.reason === 'soldOut' ? flavor.soldOutLines(entry.name, kind === 'title') : flavor.cannotAffordLines(entry.name, entry.price);
                 await interaction.followUp(pick(lines));
                 return;
             }
@@ -102,7 +102,7 @@ const buy = async function (interaction) {
 
         const result = await purchase(guildId, record.day, buyer, entry, kind, character);
         if (!result.ok) {
-            const lines = result.reason === 'soldOut' ? flavor.soldOutLines(entry.name) : flavor.cannotAffordLines(entry.name, entry.price);
+            const lines = result.reason === 'soldOut' ? flavor.soldOutLines(entry.name, kind === 'title') : flavor.cannotAffordLines(entry.name, entry.price);
             await interaction.editReply(pick(lines));
             return;
         }

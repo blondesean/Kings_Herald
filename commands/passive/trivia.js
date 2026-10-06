@@ -43,7 +43,7 @@
  *   runTrivia(client, opts) - runs one round; reused by the /trivia preview command
  *   getScheduledFireTime() - the Date today's round is armed to fire, or null
  *                            if the window hasn't opened yet or already fired;
- *                            backs the /trivia_time preview command
+ *                            backs the /harold_time preview command
  */
 
 const cron = require('node-cron');

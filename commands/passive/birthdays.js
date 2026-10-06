@@ -35,6 +35,7 @@ const path = require('path');
 const cron = require('node-cron');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { atEastern } = require('../../src/easternTime');
 const flavor = require('../../flavor_text');
 
 const CRON_EXPRESSION = '0 9 * * *';
@@ -102,7 +103,13 @@ const readBirthdays = () => {
 
 // The member whose nickname, display name, username or global name matches
 // `name` (case-insensitively), or null. Bots never count.
+// A Discord user ID (17-20 digits) matches exactly. Anything else is matched by
+// name, which is looser: names can change or clash.
+const DISCORD_ID_PATTERN = /^\d{17,20}$/;
 const findMember = (members, name) => {
+    if (DISCORD_ID_PATTERN.test(name)) {
+        return members.find((m) => !m.user.bot && m.id === name) || null;
+    }
     const wanted = name.toLowerCase();
     return members.find((m) =>
         !m.user.bot && [m.nickname, m.displayName, m.user.username, m.user.globalName]
@@ -209,4 +216,12 @@ const scheduleBirthdays = function (client) {
     console.log(`Birthdays scheduled: "${CRON_EXPRESSION}" (${TIMEZONE}), 9 AM Eastern daily, points equal to age on each birthday.`);
 };
 
-module.exports = { scheduleBirthdays, runBirthdays, parseBirthdays, ageOn };
+// Today's 9 AM Eastern check as a Date, or null once it has passed. The cron
+// re-arms it every day, so this reads the schedule rather than stored state.
+const getScheduledFireTime = () => {
+    const now = new Date();
+    const fireAt = atEastern(easternToday(now), 9);
+    return now < fireAt ? fireAt : null;
+};
+
+module.exports = { scheduleBirthdays, runBirthdays, parseBirthdays, ageOn, getScheduledFireTime };

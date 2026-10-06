@@ -21,9 +21,20 @@ const POSES = [
 
 const DEFAULT_POSE = 1;
 
-const poseLines = (number) => {
-    const pose = POSES[(Number(number) || DEFAULT_POSE) - 1] || POSES[DEFAULT_POSE - 1];
+// Each pose's stored key is its name with underscores, e.g. "arms_up". Older
+// saves stored the pose number instead, so both still resolve.
+const poseId = (pose) => pose.name.replace(/ /g, '_');
+
+const findPose = (value) => {
+    if (typeof value === 'number' || /^\d+$/.test(String(value))) {
+        return POSES[Number(value) - 1] || null;
+    }
+    return POSES.find((pose) => poseId(pose) === value) || null;
+};
+
+const poseLines = (value) => {
+    const pose = findPose(value) || POSES[DEFAULT_POSE - 1];
     return pose.lines;
 };
 
-module.exports = { POSES, DEFAULT_POSE, poseLines };
+module.exports = { POSES, DEFAULT_POSE, poseId, findPose, poseLines };

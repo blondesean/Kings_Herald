@@ -79,7 +79,7 @@ const pickDailyStock = (random = Math.random) => {
     ];
 };
 
-// Callings and kindreds have no stock limit, so they get no stock entry.
+// Classes and races have no stock limit, so they get no stock entry.
 const isLimited = (id) => {
     const entry = catalog.findEntry(id);
     return Boolean(entry) && kindOf(entry) !== 'class' && kindOf(entry) !== 'race';
@@ -108,18 +108,24 @@ const shopEmbed = (record) => {
     const linesFor = (kind) => record.items
         .map((id) => catalog.findEntry(id))
         .filter((entry) => entry && kindOf(entry) === kind)
-        .map((entry) => `${entry.slot ? `[${entry.slot[0].toUpperCase()}${entry.slot.slice(1)}] ` : ''}**${entry.name}** — ${entry.price} points`);
+        .map((entry) => {
+            // Gear reads [Slot] [Rarity] Name; the rarity comes from the price.
+            const tag = entry.slot
+                ? `[${entry.slot[0].toUpperCase()}${entry.slot.slice(1)}] [${catalog.rarityFor(entry.price)}] `
+                : '';
+            return `${tag}**${entry.name}** — ${entry.price} pts`;
+        });
 
     const sections = [
-        ['=== Armour and Arms ===', linesFor('gear')],
-        ['=== Titles ===', linesFor('title')],
-        ['=== Callings ===', linesFor('class')],
-        ['=== Kindreds ===', linesFor('race')],
+        [`=== Armor and Arms (${COPIES_PER_ITEM} in stock) ===`, linesFor('gear')],
+        ['=== Titles (unique) ===', linesFor('title')],
+        ['=== Classes (no limit) ===', linesFor('class')],
+        ['=== Races (no limit) ===', linesFor('race')],
     ];
     const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle("The Herald's Shop")
-        .setDescription(`${flavor.shopOpenLines()[0]}\n\nBuy with \`/buy <name>\`, then show off thy fit with \`/flex\`. Today, gear has ${COPIES_PER_ITEM} copies for the whole realm and titles have one. Callings and kindreds are always available. The merchant packs his wares once the hour hand has made three full turns of the dial.`);
+        .setDescription(`${flavor.shopOpenLines()[0]}\n\nBuy with \`/buy <name>\` and bear thy spoils proudly on \`/flex\`. Each piece lends thee fit, reckoned by its fame and, mostly, its weight in coin. Seek the rarest pieces, for the court's duels favor the best-armoured, and a full kit makes thy fit the envy of the realm. The merchant packs up after three turns of the hour hand.\n\n*Wish to be summoned the moment the stalls open? Use /shop_signup!*`);
     for (const [name, values] of sections) {
         if (values.length) embed.addFields({ name, value: values.join('\n') });
     }
@@ -164,6 +170,11 @@ const openShopNow = async function (client, options = {}) {
  * Fires at 9 AM Eastern, then waits a random 15-minute slot before opening,
  * like the daily trivia.
  */
+// The Date today's shop is armed to open, set when the daily cron fires and
+// cleared once it opens. In memory only, like the trivia's.
+let scheduledFireAt = null;
+const getShopScheduledFireTime = () => scheduledFireAt;
+
 const scheduleShop = function (client) {
     if (!cron.validate(CRON_EXPRESSION)) {
         console.error(`Shop: invalid cron expression "${CRON_EXPRESSION}"; not scheduled.`);
@@ -174,8 +185,10 @@ const scheduleShop = function (client) {
         CRON_EXPRESSION,
         () => {
             const delayMs = Math.floor(Math.random() * SLOT_COUNT) * SLOT_MINUTES * 60 * 1000;
+            scheduledFireAt = new Date(Date.now() + delayMs);
             console.log(`Shop: today's shop will open in ${Math.round(delayMs / 60000)} minutes.`);
             setTimeout(() => {
+                scheduledFireAt = null;
                 openShopNow(client, { persist: true }).catch((error) =>
                     console.error('Scheduled shop opening failed:', error)
                 );
@@ -195,4 +208,4 @@ const currentOpenShop = async function (guildId, now = Date.now()) {
     return record;
 };
 
-module.exports = { scheduleShop, openShopNow, pickDailyStock, easternDay, stockRecord, shopEmbed, kindOf, currentOpenShop };
+module.exports = { scheduleShop, openShopNow, pickDailyStock, easternDay, stockRecord, shopEmbed, kindOf, currentOpenShop, getShopScheduledFireTime };

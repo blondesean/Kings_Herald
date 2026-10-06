@@ -4,8 +4,8 @@
  */
 
 const shopOpenLines = () => [
-    'Hear ye! The traveling merchant has unpacked his wares. Be quick, good nobles.',
-    'The Herald flings wide the shop doors! Gear, titles, callings and kindreds await thy purse.',
+    'Hear ye! The merchant has unpacked his wares. Be quick, good nobles.',
+    'The Herald flings wide the shop doors! Gear, titles, classes and races await thy purse.',
 ];
 
 const shopClosedLines = () => [
@@ -18,8 +18,11 @@ const notInShopLines = (name) => [
     `**${name}** is not among today's wares, good noble.`,
 ];
 
-const soldOutLines = (name) => [
-    `**${name}** is sold out for today. The merchant's two copies have found their owners.`,
+// `unique` is true for titles, which have a single copy.
+const soldOutLines = (name, unique = false) => [
+    unique
+        ? `**${name}** is sold out for today. The merchant's only copy has found its owner.`
+        : `**${name}** is sold out for today. The merchant's copies have found their owners.`,
     `Alas, the last of the **${name}** has been bought. Try again on the morrow.`,
 ];
 
@@ -45,12 +48,12 @@ const purchasedLines = (buyer, name, kind) => {
         `A new title for ${buyer}: **${name}**. Let the realm take note.`,
     ];
     if (kind === 'class') return [
-        `${buyer} takes up the calling of **${name}**, leaving the old one behind.`,
-        `The Herald records a new calling for ${buyer}: **${name}**.`,
+        `${buyer} takes up the class of **${name}**, leaving the old one behind.`,
+        `The Herald records a new class for ${buyer}: **${name}**.`,
     ];
     return [
         `${buyer} is reborn as a **${name}**. The Herald records the change.`,
-        `A new kindred for ${buyer}: **${name}**.`,
+        `A new race for ${buyer}: **${name}**.`,
     ];
 };
 

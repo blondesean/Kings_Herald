@@ -14,17 +14,18 @@
  *                                  or null if it isn't in the bag
  */
 
-const { GEAR_SLOTS, DEFAULT_CLASS, findEntry } = require('../commands/passive/shopCatalog');
+const { GEAR_SLOTS, DEFAULT_CLASS, findEntry, rarityFor } = require('../commands/passive/shopCatalog');
 const { POSES, poseLines } = require('./poses');
 
-const WIDTH = 42; // inner width of the /flex box, in characters
+const WIDTH = 32; // width of the /flex box, in characters (kept narrow for phones)
 
 // The stick figure beside the box (poses live in src/poses.js). Its head sits
 // on the Helm row, four rows below the top of the box.
-const FIGURE_TOP = 4;
-const figureRows = (pose) => {
+// The figure's head sits on the Helm row, which moves down by one when the
+// name and title take two rows, so the top offset is passed in.
+const figureRows = (pose, top) => {
     const lines = poseLines(pose);
-    return [...Array(FIGURE_TOP).fill(''), ...lines];
+    return [...Array(top).fill(''), ...lines];
 };
 const FIGURE_WIDTH = Math.max(...POSES.flatMap((pose) => pose.lines.map((line) => line.length)));
 
@@ -55,25 +56,64 @@ const rule = () => `+${'-'.repeat(WIDTH - 2)}+`;
 /* The /flex block. `displayName` is the member's name; `character` is the
  * stored character (may be empty for a brand-new member).
  */
+// Splits text into lines of at most `width` characters, breaking at spaces.
+// A single word longer than the width is split across lines.
+const wrapText = (text, width) => {
+    const out = [];
+    let current = '';
+    for (const word of text.split(' ')) {
+        if (!current) current = word;
+        else if (`${current} ${word}`.length <= width) current += ` ${word}`;
+        else {
+            out.push(current);
+            current = word;
+        }
+    }
+    if (current) out.push(current);
+    return out.flatMap((line) => (line.length <= width ? [line] : line.match(new RegExp(`.{1,${width}}`, 'g'))));
+};
+
 const renderSheet = ({ displayName, character = {} }) => {
     const title = findEntry(character.title);
     const classEntry = findEntry(character.class) || DEFAULT_CLASS;
     const race = findEntry(character.race);
 
-    const nameLine = title ? `${displayName}, ${title.name}` : displayName;
-    const raceClassLine = `${race ? race.name : 'Unknown'}  |  ${classEntry.name}`;
+    // "Name, Title" on one row when it fits; otherwise the title drops to its own row.
+    const joined = title ? `${displayName}, ${title.name}` : displayName;
+    // A long title wraps onto extra rows under the name, like a long gear name.
+    const nameRows = title && joined.length > WIDTH - 4
+        ? [displayName, ...wrapText(title.name, WIDTH - 4)]
+        : [joined];
+    // Name and title are centred. Race and class are each centred in their own
+    // half of the box, with the divider on the middle column.
+    const inner = WIDTH - 4;
+    const centredIn = (text, width) => text.padStart(Math.floor((width + text.length) / 2)).padEnd(width);
+    const centred = (text) => centredIn(text, inner);
+    const leftHalf = Math.floor(inner / 2);
+    const raceName = race ? race.name : 'Unknown';
+    const raceClassLine = `${centredIn(raceName, leftHalf)}|${centredIn(classEntry.name, inner - leftHalf - 1)}`;
 
-    const lines = [rule(), row(nameLine), row(raceClassLine), rule()];
+    const lines = [rule(), ...nameRows.map((text) => row(centred(text))), row(raceClassLine), rule()];
+    const helmRow = lines.length;
     for (const slot of GEAR_SLOTS) {
         const item = findEntry((character.gear || {})[slot]);
         const label = slot.charAt(0).toUpperCase() + slot.slice(1);
-        lines.push(row(`${fit(label, 7)} ${item ? (item.short || item.name) : '(empty)'}`));
+        // The slot label is right-justified, so it sits right against the item name.
+        // A long name wraps onto extra bordered rows under the same slot.
+        // Rarity comes first, in brackets, then the full name.
+        const text = item ? `[${rarityFor(item.price)}] ${item.name}` : '(empty)';
+        const chunks = wrapText(text, WIDTH - 4 - 8);
+        chunks.forEach((chunk, i) => {
+            // The colon sits after the slot label on its first row only.
+            const start = i === 0 ? `${label.padStart(6)}: ` : ' '.repeat(8);
+            lines.push(row(`${start}${chunk}`));
+        });
     }
     lines.push(rule());
     lines.push(row(`Fit score: ${fitScore(character.gear)}`));
     lines.push(rule());
     // The figure goes beside the box, one figure line per sheet line.
-    const figure = figureRows(character.pose);
+    const figure = figureRows(character.pose, helmRow);
     return lines.map((line, i) => `${(figure[i] || '').padEnd(FIGURE_WIDTH)}  ${line}`).join('\n');
 };
 

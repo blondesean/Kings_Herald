@@ -4,7 +4,7 @@
 
 const pointsStore = require('../../src/pointsStore');
 const { bagBySlot } = require('../../src/character');
-const { GEAR_SLOTS } = require('../passive/shopCatalog');
+const { GEAR_SLOTS, rarityFor } = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
@@ -31,9 +31,10 @@ const bank = async function (interaction) {
             const label = slot.charAt(0).toUpperCase() + slot.slice(1);
             const names = [];
             for (const entry of bySlot[slot]) {
-                const next = length + entry.name.length + 2;
+                const text = `[${rarityFor(entry.price)}] ${entry.name}`;
+                const next = length + text.length + 2;
                 if (next > MAX_LIST_CHARS) break;
-                names.push(entry.name);
+                names.push(text);
                 length = next;
                 shown += 1;
             }

@@ -29,6 +29,7 @@
 const cron = require('node-cron');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { easternParts, atEastern } = require('../../src/easternTime');
 const flavor = require('../../flavor_text');
 
 // Noon, October only ("10" in the month field), Eastern local time.
@@ -130,4 +131,14 @@ const scheduleHalloweenTreat = function (client) {
     console.log(`Halloween treat scheduled: "${CRON_EXPRESSION}" (${TIMEZONE}) — noon Eastern every day in October, ${TREAT_POINTS} points to one random member with at least 1 point.`);
 };
 
-module.exports = { scheduleHalloweenTreat, runHalloweenTreat };
+// Today's noon Eastern draw as a Date, or null outside October or once it has
+// passed. Like the birthday check, this reads the schedule, not stored state.
+const getScheduledFireTime = () => {
+    const now = new Date();
+    const today = easternParts(now);
+    if (today.month !== 10) return null;
+    const fireAt = atEastern(today, 12);
+    return now < fireAt ? fireAt : null;
+};
+
+module.exports = { scheduleHalloweenTreat, runHalloweenTreat, getScheduledFireTime };
