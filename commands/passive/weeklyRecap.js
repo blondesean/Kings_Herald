@@ -463,6 +463,15 @@ const snippetOf = (message) => {
 
 const rankWordOf = (rank) => RANK_WORDS[rank - 1] || `Rank ${rank}`;
 
+// The post's link. Normally the snippet text itself is the link. Emoji-only
+// text doesn't render as a clickable label, so there the link gets its own
+// "link" label and the emoji follows it as plain text.
+const hasWords = (text) => /[\p{L}\p{N}]/u.test(text);
+const linkedSnippet = (message) => {
+    const text = snippetOf(message);
+    return hasWords(text) ? `[${text}](${message.url})` : `[link](<${message.url}>) ${text}`;
+};
+
 // Discord rejects the whole message if any embed field value exceeds 1024
 // characters. The podium sections are unbounded now that ties share a rank
 // (an N-way tie keeps all N posts), so drop trailing lines until the field
@@ -504,7 +513,7 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
         ? fitFieldLines(
               topPosts.map((post) => {
                   const marks = post.reactorCount === 1 ? 'mark of favor' : 'marks of favor';
-                  return `**${rankWordOf(post.rank)}:** [${snippetOf(post.message)}](${post.message.url}) — <@${post.message.author.id}> (${post.reactorCount} ${marks})`;
+                  return `**${rankWordOf(post.rank)}:** ${linkedSnippet(post.message)} — <@${post.message.author.id}> (${post.reactorCount} ${marks})`;
               })
           )
         : 'No proclamation earned the people\'s favor this past sennight.';
