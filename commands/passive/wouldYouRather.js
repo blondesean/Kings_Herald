@@ -13,11 +13,9 @@
  *
  * When the window closes, the group's pick is whichever option got more
  * preferences among the members who gave both answers. Only correct
- * predictions score:
- *   - PREDICT_POINTS (2) for predicting the group's pick, or
- *   - CONTRARIAN_POINTS (5) for predicting it when their own preference was
- *     the other side (so it was a genuine read of the room, not just
- *     agreeing with themselves). That is 5 in total, not 2 + 5.
+ * predictions score PREDICT_POINTS (2), whether or not it matched the
+ * predictor's own preference. The reveal still notes when someone called it
+ * against their own taste, for flavor only.
  * An exact tie has no group pick to have predicted, so instead every member
  * who gave both answers earns TIE_POINTS (1). Nothing scores when fewer than
  * MIN_PARTICIPANTS members gave both answers.
@@ -43,9 +41,8 @@ const { findTriviaRole } = require('../../src/triviaRole');
 const flavor = require('../../flavor_text');
 
 // Same length as the daily trivia's answer window.
-const ANSWER_WINDOW_MS = 30 * 60 * 1000;
+const ANSWER_WINDOW_MS = 3 * 60 * 60 * 1000;
 const PREDICT_POINTS = 2;
-const CONTRARIAN_POINTS = 5;
 const TIE_POINTS = 1; // each full participant, when the vote splits exactly evenly
 const MIN_PARTICIPANTS = 2;
 
@@ -125,7 +122,7 @@ const buildQuestionPost = (question) => {
         .setColor(EMBED_COLOR)
         .setTitle("The Herald's Question of Preference")
         .setDescription(`${pick(flavor.wouldYouRatherIntroLines())}\n\n**${question.question}**\n\n${optionLines}`)
-        .setFooter({ text: `Top row: what thou wouldst choose. Bottom row: what thou thinkest the court will choose most. Both are needed to count, both stay secret 'til the round closes (${ANSWER_WINDOW_MS / 60000} minutes), and either may be changed 'til then. Guess right and earn ${PREDICT_POINTS} points, or ${CONTRARIAN_POINTS} if thou guessed against thine own taste.` })
+        .setFooter({ text: `Top row: what thou wouldst choose. Bottom row: what thou thinkest the court will choose most. Both are needed to count, both stay secret 'til the round closes (${ANSWER_WINDOW_MS / 3600000} hours), and either may be changed 'til then. Guess right and earn ${PREDICT_POINTS} points.` })
         .setTimestamp();
 
     return { embeds: [embed], components: buildRows(false) };
@@ -206,7 +203,7 @@ const scoreRound = (votes) => {
         .filter((p) => p.pred === majority)
         .map((p) => {
             const againstOwn = p.pref !== majority;
-            return { userId: p.userId, displayName: p.displayName, points: againstOwn ? CONTRARIAN_POINTS : PREDICT_POINTS, againstOwn };
+            return { userId: p.userId, displayName: p.displayName, points: PREDICT_POINTS, againstOwn };
         });
 
     return { status: winners.length ? 'scored' : 'noWinners', complete, counts, majority, winners };
@@ -284,7 +281,7 @@ const logRoundBreakdown = (guildId, question, votes, result, runLabel) => {
  *   runLabel      - tags CloudWatch log lines (default: "scheduled" if
  *                   persist, else "preview")
  *
- * Every guild's round runs concurrently: each holds a 30-minute window open,
+ * Every guild's round runs concurrently: each holds a 3-hour window open,
  * so awaiting them one after another would delay every guild after the first.
  */
 const runWouldYouRather = async function (client, options = {}) {
@@ -343,4 +340,4 @@ const runWouldYouRather = async function (client, options = {}) {
     }));
 };
 
-module.exports = { runWouldYouRather, scoreRound, PREDICT_POINTS, CONTRARIAN_POINTS, TIE_POINTS, MIN_PARTICIPANTS };
+module.exports = { runWouldYouRather, scoreRound, PREDICT_POINTS, TIE_POINTS, MIN_PARTICIPANTS };
