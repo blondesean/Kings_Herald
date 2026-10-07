@@ -5,8 +5,8 @@
 
 // Opens the puzzle. `start`/`target` are uppercase, `maxSteps` is the word limit.
 const wordLadderIntroLines = (start, target, maxSteps) => [
-    `Hear ye! The Herald sets a ladder before the court: climb from **${start}** to **${target}**, changing but one letter at a time, each rung a true word. The court has ${maxSteps} steps, and each noble may add but one word!`,
-    `A puzzle of steps, good nobles! Carry the word **${start}** to **${target}** by altering one letter per rung, in no more than ${maxSteps} steps. Each noble may lay a single rung, so counsel one another!`,
+    `Hear ye! The Herald sets a ladder before the court: climb from **${start}** to **${target}**, changing but one letter at a time, each rung a true word. The court may lay up to ${maxSteps} words, each one a step (the target counts as the last), and each noble may add but one word!`,
+    `A puzzle of steps, good nobles! Carry the word **${start}** to **${target}** by altering one letter per rung, in no more than ${maxSteps} steps (each new word is one step, the target counted among them). Each noble may lay a single rung, so counsel one another!`,
     `The Herald presents a ladder of words: begin at **${start}**, end at **${target}**, one letter changed per rung, ${maxSteps} rungs at most. Only one word from each of you, so choose well!`,
 ];
 

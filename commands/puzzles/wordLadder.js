@@ -26,8 +26,8 @@
  * rung per puzzle; a ladder of N steps needs N different people.
  *
  * Nothing can be taken back, so a wasted rung is possible. The puzzle bank
- * (wordLadderPuzzles.js) only holds puzzles solvable in 3 or 4 steps, so
- * MAX_STEPS (6) leaves room for a couple of them. After each rung the game
+ * (wordLadderPuzzles.js) holds puzzles solvable in 4, 5 or 6 steps. The
+ * six-step ones leave no room for a wasted word, and the five-step ones leave one. After each rung the game
  * also checks (breadth-first, without reusing words) whether the target is
  * still reachable in the steps left, and ends the puzzle at once if it isn't.
  *
@@ -172,7 +172,7 @@ const buildBoardEmbed = (session) =>
             { name: 'Ladder So Far', value: upper(session.chain).join(' > ') },
             { name: 'Steps', value: `${stepsUsed(session)} of ${MAX_STEPS} used`, inline: true }
         )
-        .setFooter({ text: `Type one word that changes exactly one letter of the last word on the ladder. One rung per noble, and only real words count. Reach ${session.target.toUpperCase()} in ${MAX_STEPS} steps and each of you who laid a rung earns ${POINTS_PER_SOLVE} point.` })
+        .setFooter({ text: `Type one word that changes exactly one letter of the last word on the ladder. One rung per noble, and only real words count. Reach ${session.target.toUpperCase()} within ${MAX_STEPS} steps (one step per new word, the target included), and each of you who laid a rung earns ${POINTS_PER_SOLVE} point.` })
         .setTimestamp();
 
 // ---- one session --------------------------------------------------------------
