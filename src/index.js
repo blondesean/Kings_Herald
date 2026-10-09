@@ -36,12 +36,10 @@ const path = require('path');
 //Passive behaviors live in commands/passive and are wired into client events directly (not slash commands).
 const celebrate = require('./../commands/passive/celebrate');
 const { scheduleWeeklyRecap } = require('./../commands/passive/weeklyRecap');
-const { scheduleTrivia } = require('./../commands/passive/trivia');
+const { scheduleDailyLineup } = require('./dailyLineup'); // trivia, puzzle (Connections/Word Ladder) and shop, placed without overlap
 const { scheduleWowTriviaWednesday } = require('./../commands/passive/wowTrivia');
 const { trackVoiceStateUpdate, startVoiceTracking } = require('./../commands/passive/voiceTime');
-const { scheduleConnectionsPuzzle } = require('./../commands/puzzles/connections');
 const { scheduleBirthdays } = require('./../commands/passive/birthdays');
-const { scheduleShop } = require('./../commands/passive/shop');
 const { scheduleHalloweenTreat } = require('./../commands/passive/halloweenTreat');
 
 //Slash commands are auto-loaded by filename from commands/prompts (user-facing),
@@ -126,14 +124,12 @@ client.on('ready', (c) => {
     //so a deploy refreshes the definitions.
     client.guilds.cache.forEach(registerCommands);
 
-    // Schedule the weekly recap and daily trivia now that the bot is connected.
+    // Schedule the weekly recap and the daily games now that the bot is connected.
     scheduleWeeklyRecap(client);
-    scheduleTrivia(client);
+    scheduleDailyLineup(client);
     scheduleWowTriviaWednesday(client);
-    scheduleConnectionsPuzzle(client);
     scheduleHalloweenTreat(client);
     scheduleBirthdays(client);
-    scheduleShop(client);
     startVoiceTracking(client);
 });
 

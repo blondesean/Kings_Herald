@@ -37,6 +37,7 @@ const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { resolveChannel } = require('../../src/resolveChannel');
 const { findWowTriviaRole } = require('../../src/wowTriviaRole');
 const flavor = require('../../flavor_text');
 
@@ -47,9 +48,12 @@ const CRON_EXPRESSION = '0 21 * * 3';
 const TIMEZONE = 'America/New_York';
 const WEDNESDAY_QUESTIONS = 5;
 
-// WoW trivia always fires in #orgrimmar-meme-patrol rather than each guild's
-// general-purpose announce channel — falls back to findAnnounceChannel if the
-// bot can't find/post there (e.g. in a guild that doesn't have this channel).
+// WoW trivia fires in #orgrimmar-meme-patrol by default, rather than each
+// guild's general-purpose announce channel — falls back to findAnnounceChannel
+// if the bot can't find/post there (e.g. in a guild that doesn't have this
+// channel). This is now just the built-in default: an admin can point the
+// "wow_trivia" scope anywhere with /herald_channel, which wins over both of
+// these (see src/resolveChannel.js).
 const WOW_TRIVIA_CHANNEL_ID = '773792644777902080';
 
 // How long each question waits for a correct answer. A correct answer ends the
@@ -223,7 +227,7 @@ const runWowTrivia = async function (client, options = {}) {
 
     for (const g of guilds) {
         try {
-            const channel = targetChannel || findWowTriviaChannel(g) || findAnnounceChannel(g);
+            const channel = targetChannel || await resolveChannel(g, 'wow_trivia', (guild) => findWowTriviaChannel(guild) || findAnnounceChannel(guild));
             if (!channel) {
                 console.log(`WoW trivia: no channel the herald can post in found in "${g.name}"; skipping.`);
                 continue;

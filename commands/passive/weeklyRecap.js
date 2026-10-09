@@ -41,6 +41,7 @@ const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { resolveChannel } = require('../../src/resolveChannel');
 const flavor = require('../../flavor_text');
 
 // Sunday at 12:00, interpreted in Eastern local time (DST-aware) so it stays at
@@ -627,7 +628,7 @@ const runWeeklyRecap = async function (client, options = {}) {
 
     for (const g of guilds) {
         try {
-            const channel = targetChannel || findRecapChannel(g);
+            const channel = targetChannel || await resolveChannel(g, 'recap', findRecapChannel);
             if (!channel) {
                 console.log(`Weekly recap: no channel the herald can post in found in "${g.name}"; skipping.`);
                 continue;

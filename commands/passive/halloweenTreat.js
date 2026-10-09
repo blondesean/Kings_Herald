@@ -29,6 +29,7 @@
 const cron = require('node-cron');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { resolveChannel } = require('../../src/resolveChannel');
 const { easternParts, atEastern } = require('../../src/easternTime');
 const flavor = require('../../flavor_text');
 
@@ -74,7 +75,7 @@ const runHalloweenTreat = async function (client, options = {}) {
 
     for (const g of guilds) {
         try {
-            const channel = targetChannel || findAnnounceChannel(g);
+            const channel = targetChannel || await resolveChannel(g, 'treat', findAnnounceChannel);
             if (!channel) {
                 console.log(`Halloween treat: no channel the herald can post in found in "${g.name}"; skipping.`);
                 continue;

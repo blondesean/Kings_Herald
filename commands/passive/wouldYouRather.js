@@ -37,6 +37,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { resolveChannel } = require('../../src/resolveChannel');
 const { findTriviaRole } = require('../../src/triviaRole');
 const flavor = require('../../flavor_text');
 
@@ -298,7 +299,7 @@ const runWouldYouRather = async function (client, options = {}) {
 
     await Promise.all(guilds.map(async (g) => {
         try {
-            const channel = targetChannel || findAnnounceChannel(g);
+            const channel = targetChannel || await resolveChannel(g, 'trivia', findAnnounceChannel);
             if (!channel) {
                 console.log(`Would you rather: no channel the herald can post in found in "${g.name}"; skipping.`);
                 return;

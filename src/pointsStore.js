@@ -923,6 +923,49 @@ const setPose = async function (guildId, userId, pose) {
     }));
 };
 
+/* Per-guild channel overrides for where a passive behavior posts its
+ * scheduled output (see src/resolveChannel.js) — one map per guild, keyed by
+ * scope ('trivia', 'shop', 'all', ...). Own partition, same shape as poses.
+ */
+const CHANNEL_OVERRIDE_PREFIX = 'CHANNEL#';
+const CHANNEL_OVERRIDE_SORT_KEY = 'OVERRIDES';
+
+// { [scope]: channelId }, or {} if the guild has never set one.
+const getChannelOverrides = async function (guildId) {
+    if (!isConfigured()) return {};
+
+    const result = await getClient().send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: CHANNEL_OVERRIDE_PREFIX + guildId, userId: CHANNEL_OVERRIDE_SORT_KEY },
+    }));
+    return (result.Item && result.Item.overrides) || {};
+};
+
+// Points `scope` at `channelId` for this guild, replacing whatever it was.
+// Read-merge-write rather than a nested SET, since the very first override
+// for a guild has no `overrides` map yet for a nested path to land in.
+const setChannelOverride = async function (guildId, scope, channelId) {
+    if (!isConfigured()) return;
+
+    const overrides = { ...(await getChannelOverrides(guildId)), [scope]: channelId };
+    await getClient().send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: CHANNEL_OVERRIDE_PREFIX + guildId, userId: CHANNEL_OVERRIDE_SORT_KEY, overrides },
+    }));
+};
+
+// Removes `scope`'s override, reverting it to its built-in default channel.
+const clearChannelOverride = async function (guildId, scope) {
+    if (!isConfigured()) return;
+
+    const overrides = { ...(await getChannelOverrides(guildId)) };
+    delete overrides[scope];
+    await getClient().send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: CHANNEL_OVERRIDE_PREFIX + guildId, userId: CHANNEL_OVERRIDE_SORT_KEY, overrides },
+    }));
+};
+
 /* Swap the equipped gear and bag in one write. `expectedBag` must match what's
  * stored now, so a stale read can't duplicate or lose an item. Returns false if
  * the bag changed under us.
@@ -1080,6 +1123,9 @@ module.exports = {
     setEquipment,
     getPose,
     setPose,
+    getChannelOverrides,
+    setChannelOverride,
+    clearChannelOverride,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,

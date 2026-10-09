@@ -1,8 +1,9 @@
 /* Passive behavior: the Herald's daily trivia.
  *
- * Once a day, at a random moment inside a 15-hour window (9:00 AM Eastern to
- * midnight Eastern — i.e. 6:00 AM to 9:00 PM Pacific), the Herald posts a
- * nerd pop-culture trivia question with four answer buttons (A/B/C/D).
+ * Once a day, at a random moment inside the shared 9 AM-9 PM Eastern window
+ * (see src/dailyLineup.js, which also schedules the daily puzzle and shop so
+ * none of the three overlap), the Herald posts a nerd pop-culture trivia
+ * question with four answer buttons (A/B/C/D).
  * Answering is done by clicking a button rather than reacting: Discord
  * reactions are public (anyone can see who reacted with what), which let
  * later answerers just copy whoever went first. A button click instead gets
@@ -17,9 +18,6 @@
  * by name in the results post (see flavor_text/triviaFlavor.js) - safe to do
  * once the round's over and answers are being revealed anyway, unlike
  * mid-round where they're kept secret.
- *
- * The random start time only lands on a 15-minute boundary within the window
- * (9:00, 9:15, 9:30, ...), chosen fresh once a day.
  *
  * Seasonal reskin: during Halloween season, a round may draw from a separate
  * spooky question bank (flavor_text/halloweenTriviaQuestions.js) instead of
@@ -39,43 +37,29 @@
  * always the Halloween bank and never subjective — see rollToday.
  *
  * Exposes:
- *   scheduleTrivia(client) - registers the daily randomized timer (call once, on ready)
- *   runTrivia(client, opts) - runs one round; reused by the /trivia preview command
- *   getScheduledFireTime() - the Date today's round is armed to fire, or null
- *                            if the window hasn't opened yet or already fired;
- *                            backs the /harold_time preview command
+ *   runTrivia(client, opts) - runs one round; called by src/dailyLineup.js
+ *                            and reused by the /trivia preview command
+ *   rollToday(date) - today's { seasonal, subjective } roll; src/dailyLineup.js
+ *                            rolls once and passes the result to runTrivia,
+ *                            rather than letting runTrivia roll again
  */
 
-const cron = require('node-cron');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { resolveChannel } = require('../../src/resolveChannel');
 const { findTriviaRole } = require('../../src/triviaRole');
 const flavor = require('../../flavor_text');
 const { runWouldYouRather } = require('./wouldYouRather');
 const { runRankingRound } = require('./rankingRound');
 
-// Window start (Eastern local time) and length. The window runs 9:00 AM to
-// midnight Eastern, which is 6:00 AM to 9:00 PM Pacific — a 15-hour span
-// either way you name it.
-const WINDOW_CRON = '0 9 * * *';
-const WINDOW_HOURS = 15;
 const TIMEZONE = 'America/New_York';
-
-const SLOT_MINUTES = 15;
-const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES; // 60 possible start times
 
 const ANSWER_WINDOW_MS = 30 * 60 * 1000; // how long the question stays open — half the daily Connections puzzle's window (see commands/puzzles/connections.js)
 const TRIVIA_POINTS = 2;
 
 const LETTERS = ['A', 'B', 'C', 'D'];
 const BUTTON_PREFIX = 'trivia_answer_';
-
-// The Date today's round is armed to fire, set when the window opens and
-// cleared once it actually runs. In memory only — not persisted, so a
-// restart loses it until the next window open (see scheduleTrivia).
-let scheduledFireAt = null;
-const getScheduledFireTime = () => scheduledFireAt;
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 const HALLOWEEN_EMBED_COLOR = 0xff7518; // jack-o'-lantern orange
@@ -342,7 +326,7 @@ const runTrivia = async function (client, options = {}) {
 
     for (const g of guilds) {
         try {
-            const channel = targetChannel || findAnnounceChannel(g);
+            const channel = targetChannel || await resolveChannel(g, 'trivia', findAnnounceChannel);
             if (!channel) {
                 console.log(`Trivia: no channel the herald can post in found in "${g.name}"; skipping.`);
                 continue;
@@ -381,41 +365,4 @@ const runTrivia = async function (client, options = {}) {
     }
 };
 
-/* Register the daily trivia timer. Call once after the client is ready.
- * Fires a cron job at the window's opening moment (9:00 AM Eastern), which
- * picks a random 15-minute-aligned slot within the window and sets a single
- * timeout to actually run trivia at that moment. If the bot restarts between
- * the window opening and the chosen slot, that day's round is skipped — no
- * state is persisted across restarts, matching the weekly recap's cron.
- */
-const scheduleTrivia = function (client) {
-    if (!cron.validate(WINDOW_CRON)) {
-        console.error(`Trivia: invalid cron expression "${WINDOW_CRON}"; not scheduled.`);
-        return;
-    }
-
-    cron.schedule(
-        WINDOW_CRON,
-        () => {
-            const slot = Math.floor(Math.random() * SLOT_COUNT);
-            const delayMs = slot * SLOT_MINUTES * 60 * 1000;
-            const fireAt = new Date(Date.now() + delayMs);
-            scheduledFireAt = fireAt;
-
-            console.log(`Trivia: today's round will fire at ~${fireAt.toISOString()} (slot ${slot + 1}/${SLOT_COUNT}).`);
-
-            setTimeout(() => {
-                console.log('Running scheduled trivia round...');
-                scheduledFireAt = null;
-                runTrivia(client, { persist: true }).catch((error) =>
-                    console.error('Scheduled trivia round failed:', error)
-                );
-            }, delayMs);
-        },
-        { timezone: TIMEZONE }
-    );
-
-    console.log(`Trivia scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), random ${SLOT_MINUTES}-minute slot across ${WINDOW_HOURS}h.`);
-};
-
-module.exports = { scheduleTrivia, runTrivia, getScheduledFireTime, rollToday };
+module.exports = { runTrivia, rollToday };

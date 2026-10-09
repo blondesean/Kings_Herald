@@ -35,6 +35,7 @@ const path = require('path');
 const cron = require('node-cron');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { resolveChannel } = require('../../src/resolveChannel');
 const { atEastern } = require('../../src/easternTime');
 const flavor = require('../../flavor_text');
 
@@ -146,7 +147,7 @@ const runBirthdays = async function (client, options = {}) {
 
     for (const g of guilds) {
         try {
-            const channel = targetChannel || findAnnounceChannel(g);
+            const channel = targetChannel || await resolveChannel(g, 'birthdays', findAnnounceChannel);
             if (!channel) {
                 console.log(`Birthdays: no channel the herald can post in found in "${g.name}"; skipping.`);
                 continue;

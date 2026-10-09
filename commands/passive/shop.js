@@ -1,7 +1,8 @@
 /* Passive behavior: the Herald's daily shop.
  *
- * Once a day, at a random 15-minute slot between 9 AM and 9 PM Eastern
- * (the same window and slot scheme as the daily trivia), the Herald opens the
+ * Once a day, at a random 15-minute slot between 9 AM and 9 PM Eastern,
+ * placed by src/dailyLineup.js so it doesn't overlap the daily trivia or
+ * puzzle slot (both posted to the same channel), the Herald opens the
  * shop and posts its stock:
  *   - 5 gear pieces, drawn at random from the catalog
  *   - 1 title, 1 class and 1 race
@@ -20,27 +21,21 @@
  * opens the shop does not survive a restart, the same as the other daily games.
  *
  * Exposes:
- *   scheduleShop(client) - registers the daily cron job (call once, on ready)
- *   openShopNow(client, opts) - opens the shop immediately; the scheduler uses it
+ *   openShopNow(client, opts) - opens the shop immediately; called by
+ *                            src/dailyLineup.js and the /shop_test preview command
  *   pickDailyStock(random) - the day's item ids, exported for the tests
  *   easternDay(date) - YYYY-MM-DD in Eastern time, exported for the tests
  */
 
-const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { resolveChannel } = require('../../src/resolveChannel');
 const { findShopRole } = require('../../src/shopRole');
 const catalog = require('./shopCatalog');
 const flavor = require('../../flavor_text');
 
-const CRON_EXPRESSION = '0 9 * * *';
 const TIMEZONE = 'America/New_York';
-// The shop opens between 9 AM and 9 PM, so the three-hour window always ends
-// before midnight, when the stock resets.
-const WINDOW_HOURS = 12;
-const SLOT_MINUTES = 15;
-const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES;
 const OPEN_MS = 3 * 60 * 60 * 1000;
 const COPIES_PER_ITEM = 2;
 // Titles are unique: one copy, so only one noble can bear each at a time.
@@ -145,7 +140,7 @@ const openShopNow = async function (client, options = {}) {
 
     for (const g of guilds) {
         try {
-            const channel = targetChannel || findAnnounceChannel(g);
+            const channel = targetChannel || await resolveChannel(g, 'shop', findAnnounceChannel);
             if (!channel) {
                 console.log(`Shop: no channel the herald can post in found in "${g.name}"; skipping.`);
                 continue;
@@ -167,40 +162,6 @@ const openShopNow = async function (client, options = {}) {
     }
 };
 
-/* Register the daily shop opening. Call once after the client is ready.
- * Fires at 9 AM Eastern, then waits a random 15-minute slot before opening,
- * like the daily trivia.
- */
-// The Date today's shop is armed to open, set when the daily cron fires and
-// cleared once it opens. In memory only, like the trivia's.
-let scheduledFireAt = null;
-const getShopScheduledFireTime = () => scheduledFireAt;
-
-const scheduleShop = function (client) {
-    if (!cron.validate(CRON_EXPRESSION)) {
-        console.error(`Shop: invalid cron expression "${CRON_EXPRESSION}"; not scheduled.`);
-        return;
-    }
-
-    cron.schedule(
-        CRON_EXPRESSION,
-        () => {
-            const delayMs = Math.floor(Math.random() * SLOT_COUNT) * SLOT_MINUTES * 60 * 1000;
-            scheduledFireAt = new Date(Date.now() + delayMs);
-            console.log(`Shop: today's shop will open in ${Math.round(delayMs / 60000)} minutes.`);
-            setTimeout(() => {
-                scheduledFireAt = null;
-                openShopNow(client, { persist: true }).catch((error) =>
-                    console.error('Scheduled shop opening failed:', error)
-                );
-            }, delayMs);
-        },
-        { timezone: TIMEZONE }
-    );
-
-    console.log(`Shop scheduled: "${CRON_EXPRESSION}" (${TIMEZONE}), opens in a random ${SLOT_MINUTES}-minute slot each day, open ${OPEN_MS / 60000} minutes.`);
-};
-
 // Today's open shop for a guild, or null if it hasn't opened yet, has closed,
 // or was opened on an earlier day.
 const currentOpenShop = async function (guildId, now = Date.now()) {
@@ -209,4 +170,4 @@ const currentOpenShop = async function (guildId, now = Date.now()) {
     return record;
 };
 
-module.exports = { scheduleShop, openShopNow, pickDailyStock, easternDay, stockRecord, shopEmbed, kindOf, currentOpenShop, getShopScheduledFireTime };
+module.exports = { openShopNow, pickDailyStock, easternDay, stockRecord, shopEmbed, kindOf, currentOpenShop };

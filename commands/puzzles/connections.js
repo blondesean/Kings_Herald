@@ -52,47 +52,24 @@
  * hour-long window escaping a reclaim is likely well above 99% in practice
  * — an inference from how Spot generally behaves, not a guarantee.
  *
- * Scheduling mirrors the daily trivia exactly (see scheduleTrivia in
- * commands/passive/trivia.js): a cron job opens a daily window, then a
- * single random 15-minute-aligned slot within it is chosen fresh each day
- * and a timeout fires the actual puzzle at that moment — rather than
- * posting at the same clock time every day.
- *
- * The daily puzzle slot is shared: on half of all days (LADDER_CHANCE)
- * the timer below runs the Word Ladder (commands/puzzles/wordLadder.js)
- * instead of Connections. The roll happens when the slot fires, so
- * getScheduledFireTime() and the timing are the same either way.
+ * Scheduling is coordinated with the daily trivia and shop in
+ * src/dailyLineup.js, which places all three in the shared 9 AM-9 PM Eastern
+ * window without overlap, rather than each rolling its own slot in isolation.
+ * That module also rolls Connections vs. Word Ladder for the puzzle slot
+ * before placement, since the two games have different window lengths.
  *
  * Exposes:
- *   scheduleConnectionsPuzzle(client) - registers the daily randomized timer for the
- *                            daily puzzle slot, Connections or Word Ladder (call once, on ready)
- *   runConnectionsPuzzle(client, opts) - runs one puzzle; reused by the preview command
- *   getScheduledFireTime() - the Date today's puzzle is armed to fire, or null
- *                            if the window hasn't opened yet or already fired;
- *                            backs the /connections_time preview command
+ *   runConnectionsPuzzle(client, opts) - runs one puzzle; called by
+ *                            src/dailyLineup.js and reused by the preview command
  */
 
-const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
+const { resolveChannel } = require('../../src/resolveChannel');
 const { findPuzzleRole } = require('../../src/puzzleRole');
 const connectionsPuzzles = require('./connectionsPuzzles');
-const { runWordLadder } = require('./wordLadder');
 const flavor = require('../../flavor_text');
-
-// Window start (Eastern local time) and length — identical window to the
-// daily trivia's (commands/passive/trivia.js), so both games roll their
-// random daily slot across the same 9 AM-to-midnight span.
-const WINDOW_CRON = '0 9 * * *';
-const WINDOW_HOURS = 15;
-const TIMEZONE = 'America/New_York';
-
-const SLOT_MINUTES = 15;
-const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES; // 60 possible start times
-
-// Chance that the day's puzzle is the Word Ladder rather than Connections.
-const LADDER_CHANCE = 0.5;
 
 // Kept at 3 even though the board grew from 4 groups to 6 — deliberately
 // tighter than a proportional scale-up would suggest.
@@ -103,12 +80,6 @@ const POINTS_PER_SOLVE = 1;
 // nor out of chances first — see the module comment above for why this is
 // deliberately short rather than "open most of the day."
 const GUESS_WINDOW_MS = 60 * 60 * 1000;
-
-// The Date today's puzzle is armed to fire, set when the window opens and
-// cleared once it actually runs. In memory only — not persisted, so a
-// restart loses it until the next window open (see scheduleConnectionsPuzzle).
-let scheduledFireAt = null;
-const getScheduledFireTime = () => scheduledFireAt;
 
 const DIFFICULTY_EMOJI = { yellow: '🟨', green: '🟩', blue: '🟦', purple: '🟪' };
 // 3 wide (not 4) so the board's monospace grid stays readable on a phone
@@ -424,7 +395,7 @@ const runConnectionsPuzzle = async function (client, options = {}) {
 
     await Promise.all(guilds.map(async (g) => {
         try {
-            const channel = targetChannel || findAnnounceChannel(g);
+            const channel = targetChannel || await resolveChannel(g, 'puzzle', findAnnounceChannel);
             if (!channel) {
                 console.log(`Connections: no channel the herald can post in found in "${g.name}"; skipping.`);
                 return;
@@ -436,45 +407,4 @@ const runConnectionsPuzzle = async function (client, options = {}) {
     }));
 };
 
-/* Register the daily Connections puzzle timer. Call once after the client is
- * ready. Fires a cron job at the window's opening moment (9:00 AM Eastern),
- * which picks a random 15-minute-aligned slot within the window and sets a
- * single timeout to actually run the puzzle at that moment — identical
- * shape to commands/passive/trivia.js's scheduleTrivia. If the bot restarts
- * between the window opening and the chosen slot, that day's puzzle is
- * skipped — no state is persisted across restarts, matching trivia and the
- * weekly recap's cron.
- */
-const scheduleConnectionsPuzzle = function (client) {
-    if (!cron.validate(WINDOW_CRON)) {
-        console.error(`Connections: invalid cron expression "${WINDOW_CRON}"; not scheduled.`);
-        return;
-    }
-
-    cron.schedule(
-        WINDOW_CRON,
-        () => {
-            const slot = Math.floor(Math.random() * SLOT_COUNT);
-            const delayMs = slot * SLOT_MINUTES * 60 * 1000;
-            const fireAt = new Date(Date.now() + delayMs);
-            scheduledFireAt = fireAt;
-
-            console.log(`Connections: today's puzzle will fire at ~${fireAt.toISOString()} (slot ${slot + 1}/${SLOT_COUNT}).`);
-
-            setTimeout(() => {
-                scheduledFireAt = null;
-                const ladder = Math.random() < LADDER_CHANCE;
-                console.log(`Running scheduled ${ladder ? 'Word Ladder' : 'Connections'} puzzle...`);
-                const run = ladder ? runWordLadder : runConnectionsPuzzle;
-                run(client, { persist: true }).catch((error) =>
-                    console.error(`Scheduled ${ladder ? 'Word Ladder' : 'Connections'} puzzle failed:`, error)
-                );
-            }, delayMs);
-        },
-        { timezone: TIMEZONE }
-    );
-
-    console.log(`Daily puzzle (Connections, or Word Ladder ${LADDER_CHANCE * 100}% of days) scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), random ${SLOT_MINUTES}-minute slot across ${WINDOW_HOURS}h, ${STARTING_TRIES} shared chances, open up to ${GUESS_WINDOW_MS / 60000}m.`);
-};
-
-module.exports = { scheduleConnectionsPuzzle, runConnectionsPuzzle, getScheduledFireTime };
+module.exports = { runConnectionsPuzzle };
