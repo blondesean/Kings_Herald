@@ -19,6 +19,7 @@ const shopTest = async function (interaction) {
             guild: interaction.guild,
             targetChannel: interaction.channel,
             persist: true,
+            ping: false,
         });
     } catch (error) {
         console.error('Error running shop test:', error);

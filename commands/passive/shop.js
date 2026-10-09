@@ -137,9 +137,10 @@ const shopEmbed = (record) => {
  *   targetChannel - where to post (default: each guild's announce channel)
  *   persist       - whether to save the shop; a rehearsal still posts but
  *                   doesn't open anything for buying (default: false)
+ *   ping          - whether to ping the shopaholics role (default: persist)
  */
 const openShopNow = async function (client, options = {}) {
-    const { guild, targetChannel, persist = false } = options;
+    const { guild, targetChannel, persist = false, ping = persist } = options;
     const guilds = guild ? [guild] : Array.from(client.guilds.cache.values());
 
     for (const g of guilds) {
@@ -153,7 +154,7 @@ const openShopNow = async function (client, options = {}) {
             const record = stockRecord();
             if (persist) await pointsStore.openShop(g.id, record);
             // Only the real opening pings the shopaholics; a test shop doesn't.
-            const role = persist ? findShopRole(g) : null;
+            const role = ping ? findShopRole(g) : null;
             await channel.send({
                 content: role ? `<@&${role.id}> The merchant has thrown open his stalls!` : undefined,
                 embeds: [shopEmbed(record)],
