@@ -65,6 +65,9 @@ const JOIN_WINDOW_MS = 60 * 60 * 1000;
 const LOOT_WINDOW_MS = 60 * 60 * 1000;
 const DEFAULT_MAX_PARTY = 5;
 const DROPS_PER_WIN = 2;
+// The pause between each loot roll post, for a little suspense.
+const ROLL_DELAY_MS = 2000;
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const STANCES = {
     aggressive: { label: 'Aggressive', multiplier: 1.15, restDays: 2, style: ButtonStyle.Danger },
@@ -160,12 +163,21 @@ const weekdayOf = (day) => {
 
 const itemLabel = (item) => `[${catalog.rarityFor(item.price)}] ${item.name}`;
 const percent = (chance) => `${Math.round(chance * 100)}%`;
+
+// How each difficulty is described in the reveal: "a relatively ___ threat".
+const THREAT_PHRASES = [
+    'a relatively easy threat',
+    'a moderate threat',
+    'a formidable threat',
+    'an extreme threat',
+    'a threat of the very gravest kind',
+];
 const minutesLabel = (ms) => (ms % 3600000 === 0 ? `${ms / 3600000} hour${ms === 3600000 ? '' : 's'}` : `${Math.round(ms / 60000)} minutes`);
 
 // ---- rendering ----------------------------------------------------------------
 
 const buildTeaserEmbed = (party, maxParty, joinWindowMs, closed = false) => {
-    const names = [...party.values()].map((m) => `${m.displayName}${m.vote !== null && m.stance ? ' (ready)' : ''}`);
+    const names = [...party.values()].map((m) => `${m.displayName}${m.vote !== null && m.stance ? ' - ready' : ''}`);
     return new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle(closed ? 'The Encounter: the party has marched' : 'The Encounter: a threat stirs')
@@ -178,6 +190,12 @@ const joinRow = (prefix, disabled) => new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`${prefix}join`).setLabel('Join the party').setStyle(ButtonStyle.Success).setDisabled(disabled)
 );
 
+// A row holding one disabled, grey button used purely as a heading, so the
+// two groups of choices read as two separate questions.
+const labelRow = (prefix, id, label) => new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`${prefix}label_${id}`).setLabel(label).setStyle(ButtonStyle.Secondary).setDisabled(true)
+);
+
 const buildPrompt = (prefix, member) => {
     const voteRow = new ActionRowBuilder().addComponents(
         DIFFICULTIES.map((label, i) =>
@@ -186,15 +204,15 @@ const buildPrompt = (prefix, member) => {
     );
     const stanceRow = new ActionRowBuilder().addComponents(
         Object.entries(STANCES).map(([key, s]) =>
-            new ButtonBuilder().setCustomId(`${prefix}stance_${key}`).setLabel(`${s.label}${member.stance === key ? ' (chosen)' : ''}`).setStyle(s.style)
+            new ButtonBuilder().setCustomId(`${prefix}stance_${key}`).setLabel(`${s.label}${member.stance === key ? ' - chosen' : ''}`).setStyle(s.style)
         )
     );
-    const vote = member.vote === null ? 'not chosen' : DIFFICULTIES[member.vote];
-    const stance = member.stance ? STANCES[member.stance].label : 'not chosen';
+    const vote = member.vote === null ? 'not chosen, so Easy' : DIFFICULTIES[member.vote];
+    const stance = member.stance ? STANCES[member.stance].label : 'not chosen, so Balanced';
     const status = member.vote !== null && member.stance ? '\n\n**Thou art ready.** Change either until the battle begins.' : '';
     return {
-        content: `${flavor.encounterPromptLine()}\n\n**Thy chosen challenge:** ${vote}\n**Stance:** ${stance}\nAggressive fights at +15% fit but risks two days' rest on a loss; Defensive at -15% but escapes unhurt; Balanced at thy true fit, one day's rest.${status}`,
-        components: [voteRow, stanceRow],
+        content: `${flavor.encounterPromptLine()}\n\n**Thy desired challenge:** ${vote}\n**Thy stance:** ${stance}\nAggressive fights at +15% fit but risks two days' rest on a loss; Defensive at -15% but escapes unhurt; Balanced at thy true fit, one day's rest. Whatever thou leavest unchosen, thou wilt face an Easy challenge with a Balanced stance.${status}`,
+        components: [labelRow(prefix, 'challenge', 'Thy desired challenge'), voteRow, labelRow(prefix, 'stance', 'Thy stance'), stanceRow],
     };
 };
 
@@ -271,7 +289,11 @@ const gatherParty = (g, channel, message, prefix, opts) =>
     });
 
 // Need/greed/pass on the dropped item. Resolves with the choices.
-const collectLoot = (message, members, lootWindowMs, prefix) =>
+// Need is only allowed for an upgrade: if the member already wears something
+// in the item's slot worth as much fit or more, a Need click is entered as
+// Greed instead, and they're told why. Gear is read at click time, so it
+// reflects anything they equipped during the loot window.
+const collectLoot = (message, members, lootWindowMs, prefix, item, guildId) =>
     new Promise((resolve) => {
         const choices = new Map();
         const memberIds = new Set(members.map((m) => m.userId));
@@ -279,12 +301,22 @@ const collectLoot = (message, members, lootWindowMs, prefix) =>
 
         collector.on('collect', async (interaction) => {
             if (!memberIds.has(interaction.user.id)) {
-                await interaction.reply({ content: 'These spoils belong to the party that won them.', flags: MessageFlags.Ephemeral }).catch(() => {});
+                await interaction.reply({ content: 'This loot belongs to the party that won it.', flags: MessageFlags.Ephemeral }).catch(() => {});
                 return;
             }
-            const choice = interaction.customId.slice(prefix.length);
+            let choice = interaction.customId.slice(prefix.length);
+            let note = '';
+            if (choice === 'need') {
+                const character = await pointsStore.getCharacter(guildId, interaction.user.id).catch(() => ({ gear: {} }));
+                const worn = catalog.findEntry((character.gear || {})[item.slot]);
+                if (worn && worn.price >= item.price) {
+                    choice = 'greed';
+                    note = `Thy **${itemLabel(worn)}** is already as fine as this ${item.slot} or finer, so thou canst not need it. Thou art entered for the **greed** roll instead.`;
+                }
+            }
             choices.set(interaction.user.id, choice);
-            await interaction.reply({ content: `Thou hast chosen **${choice}**. Thou mayest change it until the rolls.`, flags: MessageFlags.Ephemeral }).catch(() => {});
+            const content = note || `Thou hast chosen **${choice}**. Thou mayest change it until the rolls.`;
+            await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
             if (choices.size === memberIds.size) collector.stop('all');
         });
 
@@ -294,7 +326,7 @@ const collectLoot = (message, members, lootWindowMs, prefix) =>
 // ---- one encounter ------------------------------------------------------------
 
 const runEncounterIn = async (g, channel, opts) => {
-    const { maxParty, joinWindowMs, lootWindowMs, persist, runLabel } = opts;
+    const { maxParty, joinWindowMs, lootWindowMs, rollDelayMs, persist, runLabel } = opts;
     const tag = `Encounter (${runLabel}) (guild ${g.id})`;
     const roundId = crypto.randomBytes(4).toString('hex');
     const prefix = `enc_${roundId}_`;
@@ -312,9 +344,15 @@ const runEncounterIn = async (g, channel, opts) => {
     const party = await gatherParty(g, channel, message, prefix, opts);
     await message.edit({ embeds: [buildTeaserEmbed(party, maxParty, joinWindowMs, true)], components: [joinRow(prefix, true)] }).catch(() => {});
 
-    const ready = [...party.values()].filter((m) => m.vote !== null && m.stance);
+    // Everyone who joined fights. Anything a member left unchosen defaults to
+    // an Easy vote and a Balanced stance.
+    const ready = [...party.values()];
+    for (const m of ready) {
+        if (m.vote === null) m.vote = 0;
+        if (!m.stance) m.stance = 'balanced';
+    }
     if (!ready.length) {
-        console.log(`${tag}: no one ready; the threat passes.`);
+        console.log(`${tag}: no one joined; the threat passes.`);
         await channel.send(pick(flavor.encounterNoPartyLines()));
         return;
     }
@@ -334,31 +372,32 @@ const runEncounterIn = async (g, channel, opts) => {
     const won = Math.random() < chance;
     console.log(`${tag}: ${ready.length} fought ${boss.name} (${DIFFICULTIES[tier]}), party ${Math.round(partyFit)} vs boss ${bossFit}, ${percent(chance)} odds, ${won ? 'won' : 'lost'}.`);
 
-    const left = party.size - ready.length;
-    // Stances are only revealed on a loss, where they explain the injuries. On
-    // a win they stay secret — but still count, since the killing blow is
-    // weighted by stance-adjusted fit — so neither the stance nor the adjusted
-    // fit (which would give it away) is shown.
-    const lines = ready.map((m) => {
-        if (won) return `${pick(flavor.encounterWinMemberLines(m.displayName))} *(fit ${m.fit}, voted ${DIFFICULTIES[m.vote]})*`;
-        const stance = STANCES[m.stance];
-        return `${pick(flavor.encounterStanceLines[m.stance](m.displayName))} *(${stance.label}, fit ${m.fit} → ${Math.round(m.effectiveFit)}, voted ${DIFFICULTIES[m.vote]})*`;
-    });
+    // The result is two embeds in one message: the battle (who fought, and
+    // how well equipped they were) and the outcome. No fit numbers or votes
+    // are shown. Stances are only revealed on a loss, where they explain the
+    // injuries; on a win they stay secret, though they still count, since the
+    // killing blow is weighted by stance-adjusted fit.
+    const lines = ready.map((m) => (won
+        ? pick(flavor.encounterWinMemberLines(m.displayName))
+        : pick(flavor.encounterStanceLines[m.stance](m.displayName))));
 
-    const embed = new EmbedBuilder()
+    // How the party's plain gear (not stance-adjusted, so stances stay secret)
+    // measured up against the boss.
+    const gearRatio = bossFit ? ready.reduce((sum, m) => sum + m.fit, 0) / bossFit : 1;
+    const matchup = gearRatio > 1.1 ? 'exceptional' : gearRatio >= 0.9 ? 'appropriate' : 'outmatched';
+
+    const battleEmbed = new EmbedBuilder()
         .setColor(won ? EMBED_COLOR : DEFEAT_COLOR)
-        .setTitle(`The Encounter: ${boss.name} — ${won ? 'Victory!' : 'Defeat'}`)
-        .setDescription(pick(flavor.encounterRevealLines(boss, DIFFICULTIES[tier])))
+        .setTitle(`The Encounter: ${boss.name}`)
+        .setDescription(pick(flavor.encounterRevealLines(boss, THREAT_PHRASES[tier])))
         .addFields(
             { name: 'The Party', value: lines.join('\n') },
-            // On a win the stance-adjusted total and the exact odds would give
-            // stances away, so only the plain gear total is shown.
-            won
-                ? { name: 'The Odds', value: `The party's gear (fit ${ready.reduce((sum, m) => sum + m.fit, 0)}) against ${boss.name}'s ${bossFit}.` }
-                : { name: 'The Odds', value: `Party fit ${Math.round(partyFit)} against ${boss.name}'s ${bossFit}: a ${percent(chance)} chance.` }
-        )
+            { name: 'The Odds', value: pick(flavor.encounterMatchupLines[matchup](boss)) }
+        );
+
+    const outcomeEmbed = new EmbedBuilder()
+        .setColor(won ? EMBED_COLOR : DEFEAT_COLOR)
         .setTimestamp();
-    if (left) embed.setFooter({ text: `${left} who joined did not finish their choices in time and stayed behind.` });
 
     if (!won) {
         const injuries = [];
@@ -371,14 +410,18 @@ const runEncounterIn = async (g, channel, opts) => {
                 );
             }
         }
-        embed.addFields({ name: 'The Aftermath', value: `${pick(flavor.encounterDefeatLines(boss))}\n${injuries.join('\n')}${persist ? '' : '\n*(A rehearsal: no injuries were truly suffered.)*'}` });
-        await channel.send({ embeds: [embed] });
+        outcomeEmbed
+            .setTitle('Defeat')
+            .setDescription(`${pick(flavor.encounterDefeatLines(boss))}\n\n${injuries.join('\n')}${persist ? '' : '\n\n*A rehearsal: no injuries were truly suffered.*'}`);
+        await channel.send({ embeds: [battleEmbed, outcomeEmbed] });
         return;
     }
 
     const killer = pickKiller(ready);
-    embed.addFields({ name: 'The Killing Blow', value: `${pick(flavor.encounterVictoryLines())} ${pick(flavor.encounterKillingBlowLines(killer.displayName, boss))}` });
-    await channel.send({ embeds: [embed] });
+    outcomeEmbed
+        .setTitle('Victory!')
+        .setDescription(`${pick(flavor.encounterVictoryLines())} ${pick(flavor.encounterKillingBlowLines(killer.displayName, boss))}`);
+    await channel.send({ embeds: [battleEmbed, outcomeEmbed] });
 
     // Loot: DROPS_PER_WIN distinct random pieces of the tier's rarity, each
     // rolled for separately but all open at once in the same loot window.
@@ -394,32 +437,52 @@ const runEncounterIn = async (g, channel, opts) => {
         const lootPrefix = `encloot_${roundId}_${k}_`;
         const lootEmbed = new EmbedBuilder()
             .setColor(EMBED_COLOR)
-            .setTitle(`The Spoils of ${boss.name} (${k + 1} of ${items.length})`)
-            .setDescription(`${pick(flavor.encounterLootLines(itemLabel(item)))}\n\nSlot: ${item.slot}. Party members have ${minutesLabel(lootWindowMs)}: if anyone needs, only needers roll; otherwise greeders roll. Passes never roll.`)
+            .setTitle(`Loot dropped from ${boss.name}, ${k + 1} of ${items.length}`)
+            .setDescription(`${pick(flavor.encounterLootLines(itemLabel(item)))}\n\nSlot: ${item.slot}. Party members have ${minutesLabel(lootWindowMs)}: if anyone needs, only needers roll; otherwise greeders roll. Passes never roll. Need is only for an upgrade: if thou already wearest something as fine in this slot, thy Need becomes a Greed.`)
             .setTimestamp();
         const lootMessage = await channel.send({ embeds: [lootEmbed], components: [lootRow(lootPrefix, false)] });
-        const choices = await collectLoot(lootMessage, ready, lootWindowMs, lootPrefix);
+        const choices = await collectLoot(lootMessage, ready, lootWindowMs, lootPrefix, item, g.id);
         await lootMessage.edit({ components: [lootRow(lootPrefix, true)] }).catch(() => {});
         return { item, choices };
     }));
 
     // Resolved and granted one at a time, so a member who wins both pieces
     // gets the second checked against their gear after the first is in.
+    // Each roll gets its own post, a beat apart, for a little suspense; then
+    // the result lands in an embed styled like the loot post.
     for (const { item, choices } of drops) {
         const { rounds, winner } = rollLoot(choices);
-        const rollLines = rounds.map((round, i) =>
-            `${i ? '**Re-roll:** ' : ''}${round.map((r) => `${r.displayName} rolls **${r.roll}** (${r.choice === 'need' ? 'Need' : 'Greed'})`).join(', ')}`
-        );
+
+        if (rounds.length) {
+            await channel.send(`The dice are cast for **${itemLabel(item)}**...`);
+            for (let i = 0; i < rounds.length; i++) {
+                if (i) {
+                    await delay(rollDelayMs);
+                    await channel.send(`A tie at the top! **Re-roll** between ${rounds[i].map((r) => r.displayName).join(' and ')}...`);
+                }
+                for (const r of rounds[i]) {
+                    await delay(rollDelayMs);
+                    await channel.send(`${r.displayName} rolls **${r.roll}** for ${r.choice === 'need' ? 'Need' : 'Greed'}.`);
+                }
+            }
+            await delay(rollDelayMs);
+        }
+
         const anyNeed = choices.some((c) => c.choice === 'need');
         const outranked = anyNeed ? choices.filter((c) => c.choice === 'greed').map((c) => c.displayName) : [];
-        if (outranked.length) rollLines.push(`Greeded, but a Need comes first: ${outranked.join(', ')}`);
         const passers = choices.filter((c) => c.choice === 'pass').map((c) => c.displayName);
-        if (passers.length) rollLines.push(`Passed: ${passers.join(', ')}`);
-        const header = `**${itemLabel(item)}**`;
+        const footnotes = [];
+        if (outranked.length) footnotes.push(`Greeded, but a Need comes first: ${outranked.join(', ')}`);
+        if (passers.length) footnotes.push(`Passed: ${passers.join(', ')}`);
+
+        const resultEmbed = new EmbedBuilder().setColor(EMBED_COLOR).setTimestamp();
 
         if (!winner) {
             console.log(`${tag}: everyone passed on ${item.name}.`);
-            await channel.send(`${header}\n${rollLines.join('\n')}\n${pick(flavor.encounterLootAllPassedLines(itemLabel(item)))}`);
+            resultEmbed
+                .setTitle(`Loot left behind: ${itemLabel(item)}`)
+                .setDescription([pick(flavor.encounterLootAllPassedLines(itemLabel(item))), ...footnotes].join('\n'));
+            await channel.send({ embeds: [resultEmbed] });
             continue;
         }
 
@@ -431,8 +494,11 @@ const runEncounterIn = async (g, channel, opts) => {
             });
         }
         console.log(`${tag}: ${winner.displayName} (${winner.userId}) won ${item.name} (${result}).`);
-        const note = !persist ? '\n*(A rehearsal: the spoils were not truly granted.)*' : result === 'equipped' ? ' It is equipped at once.' : ' It goes to their bag.';
-        await channel.send(`${header}\n${rollLines.join('\n')}\n${pick(flavor.encounterLootWonLines(winner.displayName, itemLabel(item)))}${note}`);
+        const note = !persist ? '*A rehearsal: the loot was not truly granted.*' : result === 'equipped' ? 'It is equipped at once.' : 'It goes to their bag.';
+        resultEmbed
+            .setTitle(`Loot awarded: ${itemLabel(item)}`)
+            .setDescription([`${pick(flavor.encounterLootWonLines(winner.displayName, itemLabel(item)))} ${note}`, ...footnotes].join('\n'));
+        await channel.send({ embeds: [resultEmbed] });
     }
 };
 
@@ -443,6 +509,7 @@ const runEncounterIn = async (g, channel, opts) => {
  *   maxParty     - most members who can join (default 5)
  *   joinWindowMs - how long the party can form (default 1 hour)
  *   lootWindowMs - how long need/greed/pass stays open (default 1 hour)
+ *   rollDelayMs  - pause between loot roll posts (default 2 seconds)
  *   runLabel     - tags log lines (default: "scheduled" if persist, else "preview")
  */
 const runEncounter = async function (client, options = {}) {
@@ -453,6 +520,7 @@ const runEncounter = async function (client, options = {}) {
         maxParty = DEFAULT_MAX_PARTY,
         joinWindowMs = JOIN_WINDOW_MS,
         lootWindowMs = LOOT_WINDOW_MS,
+        rollDelayMs = ROLL_DELAY_MS,
         runLabel = persist ? 'scheduled' : 'preview',
     } = options;
     const guilds = guild ? [guild] : Array.from(client.guilds.cache.values());
@@ -464,7 +532,7 @@ const runEncounter = async function (client, options = {}) {
                 console.log(`Encounter: no channel the herald can post in found in "${g.name}"; skipping.`);
                 return;
             }
-            await runEncounterIn(g, channel, { maxParty, joinWindowMs, lootWindowMs, persist, runLabel });
+            await runEncounterIn(g, channel, { maxParty, joinWindowMs, lootWindowMs, rollDelayMs, persist, runLabel });
         } catch (error) {
             console.error(`Encounter failed for guild "${g.name}":`, error);
         }

@@ -37,15 +37,37 @@ const encounterNoPartyLines = () => [
     'Not a blade was drawn this day. The beast grows bolder for it, and the Herald fears its return.',
 ];
 
-// The reveal at the start of the result post. `boss` is { name, epithet }.
-const encounterRevealLines = (boss, difficulty) => [
-    `The party rides out, and the foe reveals itself: **${boss.name}**, ${boss.epithet}! (${difficulty})`,
-    `From the gloom emerges **${boss.name}**, ${boss.epithet}. A ${difficulty.toLowerCase()} trial indeed!`,
-    `The ground shakes as **${boss.name}**, ${boss.epithet}, rises to meet the party. (${difficulty})`,
-    `At the end of the long road waits **${boss.name}**, ${boss.epithet}. (${difficulty})`,
-    `A terrible roar splits the air: it is **${boss.name}**, ${boss.epithet}! The party stands its ground. (${difficulty})`,
-    `The mists part to reveal **${boss.name}**, ${boss.epithet}. There is no turning back now. (${difficulty})`,
+// The reveal at the start of the result post. `boss` is { name, epithet };
+// `threat` describes the difficulty, e.g. "a relatively easy threat".
+const encounterRevealLines = (boss, threat) => [
+    `The party rides out, and ${threat} in the realm emerges: **${boss.name}**, ${boss.epithet}!`,
+    `From the gloom rises ${threat}: **${boss.name}**, ${boss.epithet}.`,
+    `The ground shakes as ${threat} in the realm makes itself known. It is **${boss.name}**, ${boss.epithet}!`,
+    `At the end of the long road waits ${threat}: **${boss.name}**, ${boss.epithet}.`,
+    `A terrible roar splits the air. ${threat.charAt(0).toUpperCase()}${threat.slice(1)} has emerged: **${boss.name}**, ${boss.epithet}!`,
+    `The mists part to reveal ${threat} in the realm: **${boss.name}**, ${boss.epithet}. There is no turning back now.`,
 ];
+
+// How the party's gear measured up against the boss: within 10% of the boss
+// is appropriate, more than 10% over is exceptional, more than 10% under is
+// outmatched.
+const encounterMatchupLines = {
+    exceptional: (boss) => [
+        `The party marched out exceptionally geared, their kit far outshining what ${boss.name} could muster.`,
+        `Few foes have faced a party so finely equipped. ${boss.name} was outclassed before the first blow.`,
+        `Gleaming in their finest kit, the party came exceptionally well prepared for ${boss.name}.`,
+    ],
+    appropriate: (boss) => [
+        `The party came appropriately equipped, a fair match for ${boss.name}.`,
+        `Steel met steel on even terms: the party was well suited to the challenge of ${boss.name}.`,
+        `The party's kit was a worthy match for ${boss.name}. It would come down to skill and fortune.`,
+    ],
+    outmatched: (boss) => [
+        `The party was perhaps outmatched with their loadout against ${boss.name}.`,
+        `${boss.name} towered over a party whose kit was not quite equal to the task.`,
+        `The party's gear looked thin beside the might of ${boss.name}. A daring, perhaps foolhardy, venture.`,
+    ],
+};
 
 // A member's line in a victory (stances stay secret on a win).
 const encounterWinMemberLines = (name) => [
@@ -132,7 +154,7 @@ const encounterInjuryLines = {
 // The loot post. `item` is the label "[Rarity] Name".
 const encounterLootLines = (item) => [
     `From the fallen foe, the party recovers **${item}**! Need, greed or pass.`,
-    `Among the spoils lies **${item}**. Who claims it? Need, greed or pass.`,
+    `Among the loot lies **${item}**. Who claims it? Need, greed or pass.`,
     `Something glints in the wreckage: **${item}**! Need, greed or pass.`,
     `The victors search the lair and find **${item}**. Need, greed or pass.`,
     `A prize worthy of the fight: **${item}**! Need, greed or pass.`,
@@ -159,6 +181,7 @@ module.exports = {
     encounterInjuredLines,
     encounterNoPartyLines,
     encounterRevealLines,
+    encounterMatchupLines,
     encounterWinMemberLines,
     encounterKillingBlowLines,
     encounterVictoryLines,

@@ -16,7 +16,7 @@ const encounterTest = async function (interaction) {
     const minutes = interaction.options.getInteger('minutes') ?? 2;
     const maxParty = interaction.options.getInteger('party') ?? DEFAULT_MAX_PARTY;
 
-    await interaction.editReply(`Hark! A rehearsal encounter: ${minutes} minute(s) to form a party of up to ${maxParty}, and ${minutes} for the spoils.`);
+    await interaction.editReply(`Hark! A rehearsal encounter: ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} to form a party of up to ${maxParty}, and as long again for the loot.`);
 
     try {
         await runEncounter(interaction.client, {
