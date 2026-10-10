@@ -15,6 +15,7 @@ const SCOPES = {
     trivia: 'Daily trivia (and would-you-rather / ranking)',
     puzzle: 'Daily puzzle (Connections / Word Ladder)',
     shop: 'Daily shop',
+    encounter: 'Daily boss encounter',
     recap: 'Weekly recap',
     wow_trivia: 'WoW Trivia Wednesdays',
     birthdays: 'Birthday blessing',

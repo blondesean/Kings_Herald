@@ -1,7 +1,7 @@
 /* /harold_time <game> - report when a daily game is set to fire today.
  *
  * One admin command for all the daily timers: trivia, the puzzle slot
- * (Connections or Word Ladder, whichever is armed) and the shop are placed
+ * (Connections or Word Ladder, whichever is armed), the shop and the encounter are placed
  * without overlap by src/dailyLineup.js; birthdays and the Halloween treat
  * fire at their own fixed clock times and aren't part of that coordination.
  * adminOnly + hidden, and ephemeral, so only the admin who ran it sees the
@@ -24,6 +24,7 @@ const GAMES = {
     trivia: { label: "today's trivia round", fireAt: () => getFireTime('trivia'), unarmed: "No trivia round is armed at present" },
     puzzle: { label: "today's puzzle", fireAt: () => getFireTime('puzzle'), unarmed: "No puzzle is armed at present" },
     shop: { label: "today's shop", fireAt: () => getFireTime('shop'), unarmed: "No shop is armed at present" },
+    encounter: { label: "today's encounter", fireAt: () => getFireTime('encounter'), unarmed: "No encounter is armed at present" },
     birthdays: { label: "today's birthday check", fireAt: getBirthdayFireTime, unarmed: "The birthday check has already run today" },
     treat: { label: "today's Halloween treat", fireAt: getTreatFireTime, unarmed: "No Halloween treat is armed at present (it runs at noon Eastern in October)" },
 };
@@ -66,6 +67,7 @@ module.exports = {
                 { name: 'Trivia', value: 'trivia' },
                 { name: 'Puzzle', value: 'puzzle' },
                 { name: 'Shop', value: 'shop' },
+                { name: 'Encounter', value: 'encounter' },
                 { name: 'Birthdays', value: 'birthdays' },
                 { name: 'Halloween treat', value: 'treat' },
             ],

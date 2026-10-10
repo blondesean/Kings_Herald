@@ -923,6 +923,75 @@ const setPose = async function (guildId, userId, pose) {
     }));
 };
 
+/* Encounter injuries (see commands/passive/encounter.js): the last Eastern
+ * day (YYYY-MM-DD) a member is still recovering, so they can't join an
+ * encounter until after it. Own partition, so recording an injury never
+ * creates a ledger entry for someone with no points.
+ */
+const INJURY_PREFIX = 'INJURY#';
+
+const getInjury = async function (guildId, userId) {
+    if (!isConfigured()) return null;
+
+    const result = await getClient().send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: INJURY_PREFIX + guildId, userId },
+    }));
+    return (result.Item && result.Item.injuredUntil) || null;
+};
+
+const setInjury = async function (guildId, userId, injuredUntil) {
+    if (!isConfigured()) return;
+
+    await getClient().send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: INJURY_PREFIX + guildId, userId, injuredUntil },
+    }));
+};
+
+/* Give a member a piece of gear for free (encounter loot). Same rule as a
+ * /buy: it goes straight into its slot if that slot is empty, otherwise into
+ * the bag. The equip write is conditional on the gear being unchanged since
+ * the read, falling back to the bag if it changed in between.
+ */
+const grantGear = async function (guildId, userId, displayName, itemId, slot) {
+    if (!isConfigured()) return 'skipped';
+
+    const character = await getCharacter(guildId, userId);
+    const gear = character.gear || {};
+    if (!gear[slot]) {
+        const names = { '#dn': 'displayName', '#gear': 'gear' };
+        const values = { ':n': displayName || 'a noble', ':newGear': { ...gear, [slot]: itemId } };
+        let condition = 'attribute_not_exists(#gear)';
+        if (Object.keys(gear).length) {
+            values[':oldGear'] = gear;
+            condition = '#gear = :oldGear';
+        }
+        try {
+            await getClient().send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { guildId, userId },
+                UpdateExpression: 'SET #dn = :n, #gear = :newGear',
+                ConditionExpression: condition,
+                ExpressionAttributeNames: names,
+                ExpressionAttributeValues: values,
+            }));
+            return 'equipped';
+        } catch (error) {
+            if (error.name !== 'ConditionalCheckFailedException') throw error;
+        }
+    }
+
+    await getClient().send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+        UpdateExpression: 'SET #dn = :n, #bag = list_append(if_not_exists(#bag, :empty), :new)',
+        ExpressionAttributeNames: { '#dn': 'displayName', '#bag': 'bag' },
+        ExpressionAttributeValues: { ':n': displayName || 'a noble', ':empty': [], ':new': [itemId] },
+    }));
+    return 'bagged';
+};
+
 /* Per-guild channel overrides for where a passive behavior posts its
  * scheduled output (see src/resolveChannel.js) — one map per guild, keyed by
  * scope ('trivia', 'shop', 'all', ...). Own partition, same shape as poses.
@@ -1126,6 +1195,9 @@ module.exports = {
     getChannelOverrides,
     setChannelOverride,
     clearChannelOverride,
+    getInjury,
+    setInjury,
+    grantGear,
     recordDuelResult,
     getDuelStats,
     recordDuelHistory,

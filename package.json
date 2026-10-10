@@ -133,7 +133,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "updatelog": "node scripts/updatelog.js"
+    "updatelog": "node scripts/updatelog.js",
+    "encounter-odds": "node scripts/encounterOdds.js"
   },
   "keywords": [],
   "author": "",

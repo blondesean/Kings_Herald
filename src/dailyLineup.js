@@ -22,7 +22,11 @@
  *
  * Exposes:
  *   scheduleDailyLineup(client) - registers the daily cron (call once, on ready)
- *   getFireTime(game) - the Date 'trivia' | 'puzzle' | 'shop' is armed to
+ * The daily boss encounter (commands/passive/encounter.js) is placed the
+ * same way, reserving ENCOUNTER_WINDOW_MS: an hour to form the party plus an
+ * hour for need/greed/pass.
+ *
+ *   getFireTime(game) - the Date 'trivia' | 'puzzle' | 'shop' | 'encounter' is armed to
  *                        fire today, or null; backs /harold_time
  */
 
@@ -31,6 +35,7 @@ const { runTrivia, rollToday } = require('../commands/passive/trivia');
 const { runConnectionsPuzzle } = require('../commands/puzzles/connections');
 const { runWordLadder } = require('../commands/puzzles/wordLadder');
 const { openShopNow } = require('../commands/passive/shop');
+const { runEncounter, JOIN_WINDOW_MS, LOOT_WINDOW_MS } = require('../commands/passive/encounter');
 
 // The shared window: 9 AM to 9 PM Eastern. Shop needs to fit inside this
 // (its stock resets at midnight, and it's open for 3 hours), so the other two
@@ -58,11 +63,12 @@ const WYR_WINDOW_MS = 3 * 60 * 60 * 1000;
 const RANKING_WINDOW_MS = 30 * 60 * 1000;
 const PUZZLE_WINDOW_MS = 60 * 60 * 1000;
 const SHOP_WINDOW_MS = 3 * 60 * 60 * 1000;
+const ENCOUNTER_WINDOW_MS = JOIN_WINDOW_MS + LOOT_WINDOW_MS;
 
 // The Date each game is armed to fire today, or null once it has fired (or
 // before the window has opened). In memory only, like the old per-game
 // versions — a restart loses today's placement, same as before.
-const fireTimes = { trivia: null, puzzle: null, shop: null };
+const fireTimes = { trivia: null, puzzle: null, shop: null, encounter: null };
 const getFireTime = (game) => fireTimes[game] || null;
 
 /* Picks a non-overlapping start slot (in SLOT_MINUTES units, 0-based) for
@@ -99,16 +105,26 @@ const placeSlots = (durationsMs, random = Math.random) => {
         if (ok) return starts;
     }
 
-    console.error('Daily lineup: 500 random placements all collided; falling back to a back-to-back packing.');
+    // Fallback for a crowded day: lay the games out in a random order with the
+    // spare slots split randomly between the gaps, so it still always fits
+    // and still lands at different times each day.
+    console.log('Daily lineup: random placement kept colliding; spreading the games out instead.');
+    const used = lengths.reduce((a, b) => a + b, 0) + BUFFER_SLOTS * (lengths.length - 1);
+    const slack = Math.max(0, SLOT_COUNT - used);
+    if (used > SLOT_COUNT) {
+        console.error('Daily lineup: the day\'s games do not fit the window even back-to-back — some will run past 9 PM.');
+    }
+    // n + 1 random cut points over the slack: the gap before each game.
+    const cuts = Array.from({ length: lengths.length }, () => Math.floor(random() * (slack + 1))).sort((a, b) => a - b);
     let cursor = 0;
+    let previousCut = 0;
     const starts = new Array(durationsMs.length);
-    for (const i of order) {
+    order.forEach((i, k) => {
+        cursor += cuts[k] - previousCut;
+        previousCut = cuts[k];
         starts[i] = cursor;
         cursor += lengths[i] + BUFFER_SLOTS;
-    }
-    if (cursor - BUFFER_SLOTS > SLOT_COUNT) {
-        console.error('Daily lineup: even back-to-back, the day\'s games do not fit the window — some will run past 9 PM.');
-    }
+    });
     return starts;
 };
 
@@ -133,19 +149,20 @@ const scheduleDailyLineup = function (client) {
                 : subjectiveKind === 'ranking' ? RANKING_WINDOW_MS : WYR_WINDOW_MS;
             const ladder = Math.random() < LADDER_CHANCE;
 
-            const [triviaSlot, puzzleSlot, shopSlot] = placeSlots([triviaWindowMs, PUZZLE_WINDOW_MS, SHOP_WINDOW_MS]);
+            const [triviaSlot, puzzleSlot, shopSlot, encounterSlot] = placeSlots([triviaWindowMs, PUZZLE_WINDOW_MS, SHOP_WINDOW_MS, ENCOUNTER_WINDOW_MS]);
             const windowOpenedAt = Date.now();
             const slotTime = (slot) => windowOpenedAt + slot * SLOT_MS;
 
             fireTimes.trivia = new Date(slotTime(triviaSlot));
             fireTimes.puzzle = new Date(slotTime(puzzleSlot));
             fireTimes.shop = new Date(slotTime(shopSlot));
+            fireTimes.encounter = new Date(slotTime(encounterSlot));
 
             const triviaKindLabel = !roll.subjective ? `factual${roll.seasonal ? ', seasonal' : ''}` : subjectiveKind;
             console.log(
                 `Daily lineup: trivia (${triviaKindLabel}) at ~${fireTimes.trivia.toISOString()}, ` +
                 `puzzle (${ladder ? 'Word Ladder' : 'Connections'}) at ~${fireTimes.puzzle.toISOString()}, ` +
-                `shop at ~${fireTimes.shop.toISOString()}.`
+                `shop at ~${fireTimes.shop.toISOString()}, encounter at ~${fireTimes.encounter.toISOString()}.`
             );
 
             setTimeout(() => {
@@ -169,11 +186,18 @@ const scheduleDailyLineup = function (client) {
                     console.error('Scheduled shop opening failed:', error)
                 );
             }, slotTime(shopSlot) - Date.now());
+
+            setTimeout(() => {
+                fireTimes.encounter = null;
+                runEncounter(client, { persist: true }).catch((error) =>
+                    console.error('Scheduled encounter failed:', error)
+                );
+            }, slotTime(encounterSlot) - Date.now());
         },
         { timezone: TIMEZONE }
     );
 
-    console.log(`Daily lineup scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), trivia/puzzle/shop placed without overlap across ${WINDOW_HOURS}h.`);
+    console.log(`Daily lineup scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), trivia/puzzle/shop/encounter placed without overlap across ${WINDOW_HOURS}h.`);
 };
 
 module.exports = { scheduleDailyLineup, getFireTime, placeSlots, SLOT_COUNT, SLOT_MINUTES };
