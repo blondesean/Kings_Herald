@@ -107,6 +107,28 @@ const encounterDefeatLines = (boss) => [
     `Steel and courage were not enough. ${boss.name} sends the party reeling.`,
 ];
 
+// A loss despite being exceptionally geared: sheer bad luck. Replaces the
+// usual defeat line.
+const encounterUnluckyLossLines = (boss) => [
+    `By every measure the party should have won, but fortune turned its back. A shield strap snapped at the worst moment, and ${boss.name} seized it.`,
+    `The party's finest blade shattered on the first true blow, and ${boss.name} pressed the advantage. A cruel twist of fate.`,
+    `A misstep on loose stone sent the vanguard sprawling, and ${boss.name} broke through the gap. All that fine gear, undone by a pebble.`,
+    `Someone forgot to sharpen their sword. Someone else forgot to bring the potions. ${boss.name} did not forget to win.`,
+    `Overconfidence is a deadly foe. The party underestimated ${boss.name}, and paid for it dearly.`,
+    `A sudden storm blinded the party mid-charge, and ${boss.name} struck from the downpour. Not even the best kit can outfight the weather.`,
+];
+
+// A win despite being outmatched: a lucky break. Replaces the usual victory
+// line; the killing blow still follows.
+const encounterLuckyWinLines = (boss) => [
+    `By all rights the party should have fallen, but fortune smiled. ${boss.name} slipped on its own trail of ruin and never rose.`,
+    `Outmatched and outclassed, the party found the one crack in ${boss.name}'s armor that no one knew was there.`,
+    `A lucky arrow found ${boss.name}'s eye, and the battle turned in a heartbeat. The bards will call it skill.`,
+    `${boss.name} paused to gloat, and that pause was all the scrappy party needed.`,
+    `The odds said no. The gear said no. The party said yes, and somehow ${boss.name} believed them.`,
+    `A rumbling cave-in buried half of ${boss.name}'s strength, and the underequipped party made the most of the miracle.`,
+];
+
 // How each member fought, revealed only after a loss. `name` is a display name.
 const encounterStanceLines = {
     aggressive: (name) => [
@@ -186,6 +208,8 @@ module.exports = {
     encounterKillingBlowLines,
     encounterVictoryLines,
     encounterDefeatLines,
+    encounterUnluckyLossLines,
+    encounterLuckyWinLines,
     encounterStanceLines,
     encounterInjuryLines,
     encounterLootLines,

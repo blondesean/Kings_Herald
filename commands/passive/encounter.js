@@ -412,7 +412,8 @@ const runEncounterIn = async (g, channel, opts) => {
         }
         outcomeEmbed
             .setTitle('Defeat')
-            .setDescription(`${pick(flavor.encounterDefeatLines(boss))}\n\n${injuries.join('\n')}${persist ? '' : '\n\n*A rehearsal: no injuries were truly suffered.*'}`);
+            // An exceptionally geared party that still lost was simply unlucky.
+            .setDescription(`${pick(matchup === 'exceptional' ? flavor.encounterUnluckyLossLines(boss) : flavor.encounterDefeatLines(boss))}\n\n${injuries.join('\n')}${persist ? '' : '\n\n*A rehearsal: no injuries were truly suffered.*'}`);
         await channel.send({ embeds: [battleEmbed, outcomeEmbed] });
         return;
     }
@@ -420,7 +421,8 @@ const runEncounterIn = async (g, channel, opts) => {
     const killer = pickKiller(ready);
     outcomeEmbed
         .setTitle('Victory!')
-        .setDescription(`${pick(flavor.encounterVictoryLines())} ${pick(flavor.encounterKillingBlowLines(killer.displayName, boss))}`);
+        // An outmatched party that still won caught a lucky break.
+        .setDescription(`${pick(matchup === 'outmatched' ? flavor.encounterLuckyWinLines(boss) : flavor.encounterVictoryLines())} ${pick(flavor.encounterKillingBlowLines(killer.displayName, boss))}`);
     await channel.send({ embeds: [battleEmbed, outcomeEmbed] });
 
     // Loot: DROPS_PER_WIN distinct random pieces of the tier's rarity, each
