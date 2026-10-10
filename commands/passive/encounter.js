@@ -56,6 +56,7 @@ const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findAdventurerRole } = require('../../src/adventurerRole');
 const { fitScore } = require('../../src/character');
+const achievements = require('../../src/achievements');
 const catalog = require('./shopCatalog');
 const { easternDay } = require('./shop');
 const { DIFFICULTIES, BOSSES } = require('./encounterBosses');
@@ -372,6 +373,17 @@ const runEncounterIn = async (g, channel, opts) => {
     const won = Math.random() < chance;
     console.log(`${tag}: ${ready.length} fought ${boss.name} (${DIFFICULTIES[tier]}), party ${Math.round(partyFit)} vs boss ${bossFit}, ${percent(chance)} odds, ${won ? 'won' : 'lost'}.`);
 
+    // The mightiest party ever assembled, win or lose, is a myth (see /myths).
+    if (persist) {
+        await pointsStore.setMythIfHigher(g.id, 'party', Math.round(partyFit), {
+            members: ready.map((m) => m.displayName),
+            boss: boss.name,
+            difficulty: DIFFICULTIES[tier],
+            won,
+            day: easternDay(),
+        }).catch((error) => console.error(`${tag}: failed to record the party myth:`, error.message));
+    }
+
     // The result is two embeds in one message: the battle (who fought, and
     // how well equipped they were) and the outcome. No fit numbers or votes
     // are shown. Stances are only revealed on a loss, where they explain the
@@ -424,6 +436,22 @@ const runEncounterIn = async (g, channel, opts) => {
         // An outmatched party that still won caught a lucky break.
         .setDescription(`${pick(matchup === 'outmatched' ? flavor.encounterLuckyWinLines(boss) : flavor.encounterVictoryLines())} ${pick(flavor.encounterKillingBlowLines(killer.displayName, boss))}`);
     await channel.send({ embeds: [battleEmbed, outcomeEmbed] });
+
+    // Achievements: everyone in the party won at this tier, maybe as the
+    // underdogs or as a full party; the killer was the hero.
+    if (persist) {
+        const shared = {
+            encounter_wins: 1,
+            [achievements.tierCounter(DIFFICULTIES[tier])]: 1,
+            ...(matchup === 'outmatched' ? { lucky_wins: 1 } : {}),
+            ...(ready.length >= DEFAULT_MAX_PARTY ? { full_party_wins: 1 } : {}),
+        };
+        await achievements.record(g.id, ready.map((m) => ({
+            userId: m.userId,
+            displayName: m.displayName,
+            counts: { ...shared, ...(m === killer ? { heroics: 1 } : {}) },
+        })), channel);
+    }
 
     // Loot: DROPS_PER_WIN distinct random pieces of the tier's rarity, each
     // rolled for separately but all open at once in the same loot window.
@@ -496,11 +524,17 @@ const runEncounterIn = async (g, channel, opts) => {
             });
         }
         console.log(`${tag}: ${winner.displayName} (${winner.userId}) won ${item.name} (${result}).`);
+        const granted = result === 'equipped' || result === 'bagged';
         const note = !persist ? '*A rehearsal: the loot was not truly granted.*' : result === 'equipped' ? 'It is equipped at once.' : 'It goes to their bag.';
         resultEmbed
             .setTitle(`Loot awarded: ${itemLabel(item)}`)
             .setDescription([`${pick(flavor.encounterLootWonLines(winner.displayName, itemLabel(item)))} ${note}`, ...footnotes].join('\n'));
         await channel.send({ embeds: [resultEmbed] });
+        if (granted) {
+            const member = { userId: winner.userId, displayName: winner.displayName };
+            await achievements.record(g.id, [{ ...member, counts: { loot: 1 } }], channel);
+            await achievements.checkStats(g.id, [member], channel);
+        }
     }
 };
 

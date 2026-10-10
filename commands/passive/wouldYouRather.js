@@ -36,6 +36,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const achievements = require('../../src/achievements');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findTriviaRole } = require('../../src/triviaRole');
@@ -335,6 +336,11 @@ const runWouldYouRather = async function (client, options = {}) {
 
             const incompleteCount = votes.size - result.complete.length;
             await channel.send(buildResultsPost(question, result, incompleteCount, persist));
+            // Predicting a clear majority counts toward Mind Reader; a tie's
+            // consolation point doesn't.
+            if (persist && result.majority && result.winners.length) {
+                await achievements.record(g.id, result.winners.map((w) => ({ userId: w.userId, displayName: w.displayName, counts: { wyr_predictions: 1 } })), channel);
+            }
         } catch (guildError) {
             console.error(`Would you rather round failed for guild "${g.name}":`, guildError);
         }

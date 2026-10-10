@@ -41,6 +41,7 @@ const { scheduleWowTriviaWednesday } = require('./../commands/passive/wowTrivia'
 const { trackVoiceStateUpdate, startVoiceTracking } = require('./../commands/passive/voiceTime');
 const { scheduleBirthdays } = require('./../commands/passive/birthdays');
 const { scheduleHalloweenTreat } = require('./../commands/passive/halloweenTreat');
+const { scheduleAchievements } = require('./achievements');
 
 //Slash commands are auto-loaded by filename from commands/prompts (user-facing),
 //commands/passive/preview (manual triggers for scheduled passive behaviors),
@@ -131,6 +132,7 @@ client.on('ready', (c) => {
     scheduleHalloweenTreat(client);
     scheduleBirthdays(client);
     startVoiceTracking(client);
+    scheduleAchievements(client);
 });
 
 //Register commands when the bot is invited to a new server.

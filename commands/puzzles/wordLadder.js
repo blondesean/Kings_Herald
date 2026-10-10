@@ -49,6 +49,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const achievements = require('../../src/achievements');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findPuzzleRole } = require('../../src/puzzleRole');
@@ -250,6 +251,7 @@ const runWordLadderSession = (guild, channel, puzzle, persist, runLabel) => {
                         console.error('Word ladder: failed to persist puzzle points:', error.message);
                     }
                 }
+                await achievements.record(guild.id, [...session.contributors].map(([userId, { displayName }]) => ({ userId, displayName, counts: { ladders: 1 } })), channel);
             }
 
             console.log(`${tag}: ended (${result}) — ladder ${upper(session.chain).join(' > ')}, ${session.contributors.size} contributor(s)${solved ? `, awarded ${POINTS_PER_SOLVE} point each${persist ? '' : ' (preview: not persisted)'}` : ', no points awarded'}.`);

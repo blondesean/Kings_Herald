@@ -19,6 +19,7 @@
 const { ActionRowBuilder, ApplicationCommandOptionType, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { matchEntry } = require('../../src/character');
+const achievements = require('../../src/achievements');
 const catalog = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
 
@@ -197,6 +198,9 @@ const trade = async function (interaction) {
         ];
         if (want) lines.push(flavor.tradePlacedLine(giver.displayName, want.name, plan.fromEquipped));
         await answer.editReply(lines.join('\n'));
+        const traders = plan.sides.map((s) => ({ userId: s.userId, displayName: s.displayName }));
+        await achievements.record(guildId, traders.map((t) => ({ ...t, counts: { trades: 1 } })), interaction.channel);
+        await achievements.checkStats(guildId, traders, interaction.channel);
     } catch (error) {
         console.error('Error handling /trade:', error);
         await interaction.followUp('Alack! The ledger is sealed to mine eyes at present. Pray try again anon!').catch(() => {});

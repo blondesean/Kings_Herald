@@ -20,6 +20,7 @@ const SCOPES = {
     wow_trivia: 'WoW Trivia Wednesdays',
     birthdays: 'Birthday blessing',
     treat: 'Halloween treat',
+    achievements: 'Achievement summaries',
     all: 'Everything above with no more specific override',
 };
 

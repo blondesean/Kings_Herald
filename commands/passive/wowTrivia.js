@@ -36,6 +36,7 @@
 const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const achievements = require('../../src/achievements');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findWowTriviaRole } = require('../../src/wowTriviaRole');
@@ -203,6 +204,9 @@ const runWowTriviaSession = async (guild, channel, totalQuestions, persist, runL
 
     const namesText = joinMentions(champions.map(([userId]) => userId));
     await channel.send(`${pick(flavor.wowTriviaChampionLines(namesText, topCount, roundQuestions.length, pointsEach))}${previewNote}`);
+    if (persist) {
+        await achievements.record(guild.id, [...roundsWonBy].map(([userId, entry]) => ({ userId, displayName: entry.displayName, counts: { wow_trivia: entry.count } })), channel);
+    }
 };
 
 /* Run one session.

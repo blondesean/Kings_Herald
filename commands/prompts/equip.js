@@ -10,6 +10,7 @@
 const { ApplicationCommandOptionType } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { equipPlan, matchEntry } = require('../../src/character');
+const achievements = require('../../src/achievements');
 const { rarityFor } = require('../passive/shopCatalog');
 const catalog = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
@@ -45,6 +46,7 @@ const equip = async function (interaction) {
 
         console.log(`Equip (guild ${guildId}): ${interaction.member.displayName} (${userId}) equipped ${entry.name}${displacedName ? `, returned ${displacedName}` : ''}.`);
         await interaction.editReply(pick(flavor.equippedLines(`[${rarityFor(entry.price)}] ${entry.name}`, displacedName)));
+        await achievements.checkStats(guildId, [{ userId, displayName: interaction.member.displayName }], interaction.channel);
     } catch (error) {
         console.error('Error handling /equip:', error);
         await interaction.editReply('Alack! The ledger is sealed to mine eyes at present. Pray try again anon!');

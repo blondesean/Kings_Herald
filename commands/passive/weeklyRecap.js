@@ -40,6 +40,7 @@
 const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const achievements = require('../../src/achievements');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const flavor = require('../../flavor_text');
@@ -347,6 +348,9 @@ const displayNameOf = (message) => message.member?.displayName || message.author
  * A member can earn from all five (or hold two podium spots); everything sums.
  * Members whose combined award is 0 are dropped. Exported for the tests.
  */
+// The award sources that come from placing on a podium (see computeAwards).
+const PODIUM_SOURCES = ['podium', 'chatter', 'voice', 'puzzle'];
+
 const computeAwards = (topPosts, reactionsByAuthor, messagesByAuthor = new Map(), voiceStats = [], puzzleStats = []) => {
     const awards = new Map();
 
@@ -688,6 +692,17 @@ const runWeeklyRecap = async function (client, options = {}) {
             // placed on it this run — weeklyVoiceSeconds only ever accumulates
             // between recaps (see commands/passive/voiceTime.js), so it must be
             // zeroed for everyone who logged time, not just the top 3.
+            // The week's longest time in voice may be a new myth (see /myths).
+            // Read before the reset below wipes the week's tally.
+            if (persist && voiceStats.length) {
+                const top = voiceStats.reduce((best, entry) => (entry.weeklyVoiceSeconds > best.weeklyVoiceSeconds ? entry : best));
+                await pointsStore.setMythIfHigher(g.id, 'voice_week', top.weeklyVoiceSeconds, {
+                    holderId: top.userId,
+                    holderName: top.displayName,
+                    day: new Date().toISOString().slice(0, 10),
+                }).catch((error) => console.error('Weekly recap: failed to record the voice myth:', error.message));
+            }
+
             if (persist && voiceStats.length) {
                 try {
                     await pointsStore.resetWeeklyVoiceSeconds(g.id, voiceStats.map((entry) => entry.userId));
@@ -726,6 +741,13 @@ const runWeeklyRecap = async function (client, options = {}) {
             }
 
             await channel.send(buildRecapPost(topPosts, leaderboard, topChatters, topReacted, weeklyPoints, topVoice, topPairs, topPuzzle));
+
+            // Anyone who placed on a podium this week (posts, chatter, voice or
+            // puzzles; reaction points aren't a podium) is On the Podium.
+            if (persist) {
+                const placed = awards.filter((award) => award.breakdown.some((line) => PODIUM_SOURCES.includes(line.source)));
+                await achievements.record(g.id, placed.map((award) => ({ userId: award.userId, displayName: award.displayName, counts: { podiums: 1 } })), channel);
+            }
             console.log(`Weekly recap posted to #${channel.name} in "${g.name}" [${runLabel}] (${topPosts.length} honored, persist=${persist}).`);
 
             // Snapshot every point-holding member's final total (not just

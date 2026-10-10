@@ -23,6 +23,7 @@ const pointsStore = require('../../src/pointsStore');
 const { currentOpenShop, easternDay, kindOf, discountsFor, discountPrice } = require('../passive/shop');
 const { matchEntry } = require('../../src/character');
 const { askConfirm } = require('../../src/confirm');
+const achievements = require('../../src/achievements');
 const catalog = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
 
@@ -36,6 +37,10 @@ const gearGrant = (entry, character) => (!(character.gear || {})[entry.slot]
     ? { equip: { slot: entry.slot, itemId: entry.id, gear: character.gear || {} } }
     : { bag: entry.id });
 
+// Adds to the buyer's lifetime shop spending, the Biggest Spender myth (/myths).
+const recordSpending = (guildId, buyer, price) =>
+    achievements.record(guildId, [{ userId: buyer.id, displayName: buyer.displayName, counts: { shop_spent: price } }]);
+
 /* Buys the first of `listings` (all the same piece) still on sale, paying its
  * seller. Moves on to the next if one sells out from under the buyer.
  * Returns { ok, listing, equipped } or { ok: false, reason }.
@@ -44,7 +49,10 @@ const purchaseDiscount = async (guildId, day, buyer, entry, listings, character)
     const grant = gearGrant(entry, character);
     for (const listing of listings) {
         const result = await pointsStore.buyListing(guildId, listing, buyer, discountPrice(entry.price), grant, day, Date.now());
-        if (result.ok) return { ok: true, listing, equipped: grant.equip !== undefined };
+        if (result.ok) {
+            await recordSpending(guildId, buyer, discountPrice(entry.price));
+            return { ok: true, listing, equipped: grant.equip !== undefined };
+        }
         if (result.reason === 'cannotAfford') return result;
     }
     return { ok: false, reason: 'soldOut' };
@@ -64,6 +72,7 @@ const purchase = async (guildId, day, buyer, entry, kind, character) => {
         if (limited) await pointsStore.returnShopStock(guildId, entry.id);
         return { ok: false, reason: 'cannotAfford' };
     }
+    await recordSpending(guildId, buyer, entry.price);
     return { ok: true, equipped: grant.equip !== undefined };
 };
 
@@ -100,6 +109,8 @@ const buy = async function (interaction) {
                 }
                 console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) bought ${discounted.name} from ${result.listing.sellerName} (${result.listing.sellerId}) for ${price}${result.equipped ? ', equipped' : ''} (${easternDay()}).`);
                 await interaction.editReply(pick(flavor.purchasedDiscountLines(`<@${buyer.id}>`, discounted.name, result.listing.sellerName, result.equipped)));
+                await achievements.record(guildId, [{ userId: result.listing.sellerId, displayName: result.listing.sellerName, counts: { sales: 1 } }], interaction.channel);
+                await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
                 return;
             }
             if (!entry) {
@@ -139,6 +150,7 @@ const buy = async function (interaction) {
             await pointsStore.restockShopItem(guildId, record.day, held.id, Date.now());
             console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) swapped ${held.name} for ${entry.name} (${easternDay()}).`);
             await interaction.editReply(pick(flavor.titleSwappedLines(`<@${buyer.id}>`, held.name, entry.name)));
+            await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
             return;
         }
 
@@ -154,6 +166,7 @@ const buy = async function (interaction) {
             ? pick(flavor.purchasedEquippedLines(`<@${buyer.id}>`, entry.name))
             : pick(flavor.purchasedLines(`<@${buyer.id}>`, entry.name, kind));
         await interaction.editReply(line);
+        await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
     } catch (error) {
         console.error('Error handling /buy:', error);
         await interaction.editReply('Alack! The merchant\'s ledger is sealed to mine eyes at present. Pray try again anon!');

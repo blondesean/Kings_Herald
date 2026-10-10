@@ -46,6 +46,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const achievements = require('../../src/achievements');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findTriviaRole } = require('../../src/triviaRole');
@@ -359,6 +360,9 @@ const runTrivia = async function (client, options = {}) {
             }
 
             await channel.send(buildResultsPost(question, winners, participants, persist, seasonal));
+            if (persist && winners.length) {
+                await achievements.record(g.id, winners.map((w) => ({ userId: w.userId, displayName: w.displayName, counts: { trivia: 1 } })), channel);
+            }
         } catch (guildError) {
             console.error(`Trivia round failed for guild "${g.name}":`, guildError);
         }

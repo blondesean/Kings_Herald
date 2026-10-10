@@ -8,6 +8,7 @@
 const { ApplicationCommandOptionType } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { POSES, poseId } = require('../../src/poses');
+const achievements = require('../../src/achievements');
 
 const pose = async function (interaction) {
     const chosen = interaction.options.getString('pose');
@@ -17,6 +18,7 @@ const pose = async function (interaction) {
     try {
         await pointsStore.setPose(interaction.guild.id, interaction.member.id, poseId(entry));
         await interaction.editReply(`Thy figure now strikes the **${entry.name}** pose. Show it off with \`/flex\`.`);
+        await achievements.grant(interaction.guild.id, { userId: interaction.member.id, displayName: interaction.member.displayName }, 'poser', interaction.channel);
     } catch (error) {
         console.error('Error setting a pose:', error);
         await interaction.editReply('Alack! The ledger is sealed to mine eyes at present. Pray try again anon!');

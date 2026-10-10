@@ -105,6 +105,10 @@ const getClient = () => {
 
 const isConfigured = () => Boolean(TABLE_NAME);
 
+// Lifetime points earned on a member's ledger item: every positive award adds
+// to it, and spending or losing points never lowers it. See addPoints.
+const EARNED = 'totalEarned';
+
 /* Add points to one or more members. `awards` is an array of
  * { userId, displayName, points }. Each is an atomic increment so concurrent
  * runs (or retries) can't clobber each other.
@@ -124,14 +128,16 @@ const addPoints = async function (guildId, awards) {
 
         // A negative award (a duel loss, a /point_adjust take-away) also adds
         // to weeklyLost, so the recap can show losses separately from gains.
+        // A positive award also adds to totalEarned, the lifetime tally behind
+        // the "earn 100 points" achievement (spending never lowers it).
         const lost = award.points < 0 ? -award.points : 0;
         await client.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { guildId, userId: award.userId },
-            UpdateExpression: lost ? 'SET #dn = :n ADD #pts :p, #wl :lost' : 'SET #dn = :n ADD #pts :p',
+            UpdateExpression: lost ? 'SET #dn = :n ADD #pts :p, #wl :lost' : 'SET #dn = :n ADD #pts :p, #te :p',
             ExpressionAttributeNames: lost
                 ? { '#dn': 'displayName', '#pts': 'points', '#wl': 'weeklyLost' }
-                : { '#dn': 'displayName', '#pts': 'points' },
+                : { '#dn': 'displayName', '#pts': 'points', '#te': EARNED },
             ExpressionAttributeValues: lost
                 ? { ':n': award.displayName || 'a noble', ':p': award.points, ':lost': lost }
                 : { ':n': award.displayName || 'a noble', ':p': award.points },
@@ -257,13 +263,14 @@ const addVoiceSeconds = async function (guildId, userId, displayName, seconds, w
     await client.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { guildId, userId },
-        UpdateExpression: 'SET #dn = :n, #twvs = :newWeightedTotal ADD #tvs :s, #wvs :s, #pts :p',
+        UpdateExpression: 'SET #dn = :n, #twvs = :newWeightedTotal ADD #tvs :s, #wvs :s, #pts :p, #te :p',
         ExpressionAttributeNames: {
             '#dn': 'displayName',
             '#twvs': 'totalWeightedVoiceSeconds',
             '#tvs': 'totalVoiceSeconds',
             '#wvs': 'weeklyVoiceSeconds',
             '#pts': 'points',
+            '#te': EARNED,
         },
         ExpressionAttributeValues: {
             ':n': displayName || 'a noble',
@@ -441,11 +448,12 @@ const addPuzzlePoints = async function (guildId, userId, displayName, points) {
     await client.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { guildId, userId },
-        UpdateExpression: 'SET #dn = :n ADD #pts :p, #wpp :p',
+        UpdateExpression: 'SET #dn = :n ADD #pts :p, #wpp :p, #te :p',
         ExpressionAttributeNames: {
             '#dn': 'displayName',
             '#pts': 'points',
             '#wpp': 'weeklyPuzzlePoints',
+            '#te': EARNED,
         },
         ExpressionAttributeValues: {
             ':n': displayName || 'a noble',
@@ -873,6 +881,11 @@ const getCharacter = async function (guildId, userId) {
         title: item.title || null,
         class: item.class || null,
         race: item.race || null,
+        // Read by the achievement checks (src/achievements.js).
+        duelWins: item.duelWins || 0,
+        duelLosses: item.duelLosses || 0,
+        totalEarned: item.totalEarned || 0,
+        earnedBaseline: item.earnedBaseline,
     };
 };
 
@@ -997,6 +1010,233 @@ const grantGear = async function (guildId, userId, displayName, itemId, slot) {
     return 'bagged';
 };
 
+/* Achievements (see src/achievements.js). One item per member under
+ * ACH#<guildId>: each unlocked achievement is an attribute a_<id> holding the
+ * ISO time it was earned, and each progress counter is a number n_<key>.
+ * Flat attributes rather than maps, so the first write never needs a map
+ * to already exist.
+ */
+const ACH_PREFIX = 'ACH#';
+
+const achievementState = (item = {}) => {
+    const unlocked = {};
+    const counters = {};
+    for (const [key, value] of Object.entries(item)) {
+        if (key.startsWith('a_')) unlocked[key.slice(2)] = value;
+        else if (key.startsWith('n_')) counters[key.slice(2)] = value;
+    }
+    return { unlocked, counters };
+};
+
+// One member's { unlocked: { [id]: iso }, counters: { [key]: n } }.
+const getAchievements = async function (guildId, userId) {
+    if (!isConfigured()) return achievementState();
+
+    const result = await getClient().send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: ACH_PREFIX + guildId, userId },
+    }));
+    return achievementState(result.Item);
+};
+
+// Every member's achievement state in a guild, as a Map keyed by userId.
+const getAllAchievements = async function (guildId) {
+    const all = new Map();
+    if (!isConfigured()) return all;
+
+    let startKey;
+    do {
+        const result = await getClient().send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: '#g = :g',
+            ExpressionAttributeNames: { '#g': 'guildId' },
+            ExpressionAttributeValues: { ':g': ACH_PREFIX + guildId },
+            ExclusiveStartKey: startKey,
+        }));
+        for (const item of result.Items || []) all.set(item.userId, achievementState(item));
+        startKey = result.LastEvaluatedKey;
+    } while (startKey);
+    return all;
+};
+
+/* Add to a member's progress counters, e.g. { trivia: 1 }. Returns the
+ * member's whole state after the write. With `once` set (the log backfill),
+ * the write only lands the first time, so running it twice can't double count;
+ * returns null if it already ran for this member.
+ */
+const bumpCounters = async function (guildId, userId, counts, once = false) {
+    if (!isConfigured()) return achievementState();
+
+    const names = {};
+    const values = {};
+    const adds = Object.entries(counts).map(([key, by], i) => {
+        names[`#c${i}`] = `n_${key}`;
+        values[`:c${i}`] = by;
+        return `#c${i} :c${i}`;
+    });
+    if (!adds.length) return getAchievements(guildId, userId);
+
+    const params = {
+        TableName: TABLE_NAME,
+        Key: { guildId: ACH_PREFIX + guildId, userId },
+        UpdateExpression: `ADD ${adds.join(', ')}`,
+        ExpressionAttributeNames: names,
+        ExpressionAttributeValues: values,
+        ReturnValues: 'ALL_NEW',
+    };
+    if (once) {
+        names['#bf'] = 'backfilledAt';
+        values[':now'] = new Date().toISOString();
+        params.UpdateExpression = `SET #bf = :now ${params.UpdateExpression}`;
+        params.ConditionExpression = 'attribute_not_exists(#bf)';
+    }
+    try {
+        const result = await getClient().send(new UpdateCommand(params));
+        return achievementState(result.Attributes);
+    } catch (error) {
+        if (once && error.name === 'ConditionalCheckFailedException') return null;
+        throw error;
+    }
+};
+
+/* Unlock achievement `id` for a member and pay them `reward` points, in one
+ * transaction, so it can only ever be earned (and paid) once. Returns false
+ * if they already had it.
+ */
+const unlockAchievement = async function (guildId, userId, displayName, id, reward) {
+    if (!isConfigured()) return false;
+
+    try {
+        await getClient().send(new TransactWriteCommand({
+            TransactItems: [
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId: ACH_PREFIX + guildId, userId },
+                        UpdateExpression: 'SET #a = :now',
+                        ConditionExpression: 'attribute_not_exists(#a)',
+                        ExpressionAttributeNames: { '#a': `a_${id}` },
+                        ExpressionAttributeValues: { ':now': new Date().toISOString() },
+                    },
+                },
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId, userId },
+                        UpdateExpression: 'SET #dn = :n ADD #pts :r, #te :r',
+                        ExpressionAttributeNames: { '#dn': 'displayName', '#pts': 'points', '#te': EARNED },
+                        ExpressionAttributeValues: { ':n': displayName || 'a noble', ':r': reward },
+                    },
+                },
+            ],
+        }));
+        return true;
+    } catch (error) {
+        if (cancelledBy(error)) return false;
+        throw error;
+    }
+};
+
+/* Every real member's ledger item in a guild, unfiltered by points (the
+ * achievements sweep needs everyone, not just the top of the leaderboard).
+ */
+const getMembers = async function (guildId) {
+    if (!isConfigured()) return [];
+
+    const items = [];
+    let startKey;
+    do {
+        const result = await getClient().send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: '#g = :g',
+            ExpressionAttributeNames: { '#g': 'guildId' },
+            ExpressionAttributeValues: { ':g': guildId },
+            ExclusiveStartKey: startKey,
+        }));
+        items.push(...(result.Items || []));
+        startKey = result.LastEvaluatedKey;
+    } while (startKey);
+    // Real members have purely numeric Discord IDs; duel history and pairings don't.
+    return items.filter((item) => /^\d+$/.test(String(item.userId)));
+};
+
+// { [userId]: pose } for everyone in a guild who has chosen one.
+const getPoses = async function (guildId) {
+    if (!isConfigured()) return {};
+
+    const poses = {};
+    let startKey;
+    do {
+        const result = await getClient().send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: '#g = :g',
+            ExpressionAttributeNames: { '#g': 'guildId' },
+            ExpressionAttributeValues: { ':g': POSE_PREFIX + guildId },
+            ExclusiveStartKey: startKey,
+        }));
+        for (const item of result.Items || []) if (item.pose) poses[item.userId] = item.pose;
+        startKey = result.LastEvaluatedKey;
+    } while (startKey);
+    return poses;
+};
+
+/* totalEarned only counts from when it was added, so each member also gets a
+ * one-time estimate of what they earned before that (see src/achievements.js).
+ * Only the first write lands.
+ */
+const setEarnedBaseline = async function (guildId, userId, baseline) {
+    if (!isConfigured()) return;
+
+    await getClient().send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+        UpdateExpression: 'SET #b = if_not_exists(#b, :b)',
+        ExpressionAttributeNames: { '#b': 'earnedBaseline' },
+        ExpressionAttributeValues: { ':b': baseline },
+    }));
+};
+
+/* Myths: the guild's all-time records that can't be read from live data,
+ * such as the mightiest encounter party or the longest week in voice (see
+ * commands/prompts/myths.js). One item per record under MYTH#<guildId>,
+ * keyed by the record's name, holding { value, ...details }.
+ */
+const MYTH_PREFIX = 'MYTH#';
+
+// { [key]: { value, ...details } } for every record a guild has set.
+const getMyths = async function (guildId) {
+    if (!isConfigured()) return {};
+
+    const result = await getClient().send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: '#g = :g',
+        ExpressionAttributeNames: { '#g': 'guildId' },
+        ExpressionAttributeValues: { ':g': MYTH_PREFIX + guildId },
+    }));
+    return Object.fromEntries((result.Items || []).map(({ guildId: _g, userId: key, ...myth }) => [key, myth]));
+};
+
+/* Replace record `key` with { value, ...details }, but only if `value` beats
+ * the standing one. Returns true if it's a new record.
+ */
+const setMythIfHigher = async function (guildId, key, value, details = {}) {
+    if (!isConfigured()) return false;
+
+    try {
+        await getClient().send(new PutCommand({
+            TableName: TABLE_NAME,
+            Item: { ...details, guildId: MYTH_PREFIX + guildId, userId: key, value },
+            ConditionExpression: 'attribute_not_exists(#v) OR #v < :v',
+            ExpressionAttributeNames: { '#v': 'value' },
+            ExpressionAttributeValues: { ':v': value },
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
 /* A /trade between two members (see commands/prompts/trade.js), in one
  * transaction. Each side is
  *   { userId, displayName, before: { bag, gear }, bag, gear, points }
@@ -1021,6 +1261,10 @@ const tradeCharacters = async function (guildId, sides) {
             names['#pts'] = 'points';
             values[':pts'] = side.points;
             update += ' ADD #pts :pts';
+            if (side.points > 0) {
+                names['#te'] = EARNED;
+                update += ', #te :pts';
+            }
             if (side.points < 0) {
                 names['#wl'] = 'weeklyLost';
                 values[':cost'] = -side.points;
@@ -1168,8 +1412,8 @@ const buyListing = async function (guildId, listing, buyer, price, grant, day, n
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { guildId, userId: listing.sellerId },
-                        UpdateExpression: 'ADD #pts :price',
-                        ExpressionAttributeNames: { '#pts': 'points' },
+                        UpdateExpression: 'ADD #pts :price, #te :price',
+                        ExpressionAttributeNames: { '#pts': 'points', '#te': EARNED },
                         ExpressionAttributeValues: { ':price': price },
                     },
                 },
@@ -1206,8 +1450,8 @@ const expireListing = async function (guildId, listing, refund) {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { guildId, userId: listing.sellerId },
-                        UpdateExpression: 'ADD #pts :refund',
-                        ExpressionAttributeNames: { '#pts': 'points' },
+                        UpdateExpression: 'ADD #pts :refund, #te :refund',
+                        ExpressionAttributeNames: { '#pts': 'points', '#te': EARNED },
                         ExpressionAttributeValues: { ':refund': refund },
                     },
                 },
@@ -1431,6 +1675,15 @@ module.exports = {
     buyListing,
     expireListing,
     tradeCharacters,
+    getAchievements,
+    getAllAchievements,
+    bumpCounters,
+    unlockAchievement,
+    getMembers,
+    getPoses,
+    setEarnedBaseline,
+    getMyths,
+    setMythIfHigher,
     grantGear,
     recordDuelResult,
     getDuelStats,

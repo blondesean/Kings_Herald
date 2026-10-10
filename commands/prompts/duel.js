@@ -34,6 +34,7 @@ const {
     MessageFlags,
 } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const achievements = require('../../src/achievements');
 const { fitScore } = require('../../src/character');
 const flavor = require('../../flavor_text');
 
@@ -475,8 +476,16 @@ const duel = async function (interaction) {
 
     logDuel(guild.id, `Duel result: ${method} between ${displayNameOf(challengerMember)} (${challengerMember.id}) and ${displayNameOf(targetMember)} (${targetMember.id}) for ${wager} ${pointsWord(wager)} — winner: ${displayNameOf(winner)} (${winner.id}), loser: ${displayNameOf(loser)} (${loser.id}).`);
 
+    // Duel wins and losses, and a Death Roll win, can each unlock an achievement.
+    const duelAchievements = async () => {
+        const winnerEntry = { userId: winner.id, displayName: displayNameOf(winner) };
+        if (method === METHOD_DEATH_ROLL) await achievements.grant(guild.id, winnerEntry, 'death_roller', channel);
+        await achievements.checkStats(guild.id, [winnerEntry, { userId: loser.id, displayName: displayNameOf(loser) }], channel);
+    };
+
     if (method === METHOD_FIT) {
         await channel.send(`**${wager}** ${pointsWord(wager)} change hands.`);
+        await duelAchievements();
         return;
     }
 
@@ -485,6 +494,7 @@ const duel = async function (interaction) {
         ? flavor.duelVictoryLinesForChallenger(displayNameOf(winner), displayNameOf(loser))
         : flavor.duelVictoryLinesForTarget(displayNameOf(winner), displayNameOf(loser));
     await channel.send(`${pick(victoryLines)} **${wager}** ${pointsWord(wager)} change hands.`);
+    await duelAchievements();
 };
 
 module.exports = {

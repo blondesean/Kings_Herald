@@ -65,6 +65,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
+const achievements = require('../../src/achievements');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findPuzzleRole } = require('../../src/puzzleRole');
@@ -360,6 +361,13 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
                         console.error('Connections: failed to persist puzzle points:', error.message);
                     }
                 }
+                // Whoever solved the last group, which completed the puzzle, was clutch.
+                const last = session.pendingAwards[session.pendingAwards.length - 1];
+                await achievements.record(guild.id, uniqueParticipants.map((a) => ({
+                    userId: a.userId,
+                    displayName: a.displayName,
+                    counts: { connections: 1, ...(last && a.userId === last.userId ? { clutch: 1 } : {}) },
+                })), channel);
             }
 
             console.log(`Connections (${runLabel}) (guild ${guild.id}): session ended — ${session.solvedGroups.length}/${puzzle.groups.length} solved, ${session.triesLeft} chance(s) remained${fullySolved ? `, ${uniqueParticipants.length} participant(s) awarded ${POINTS_PER_SOLVE} point(s) each` : ', no points awarded'}.`);
