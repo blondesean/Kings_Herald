@@ -15,7 +15,7 @@ const wardrobe = async function (interaction) {
             pointsStore.getPose(interaction.guild.id, member.id),
         ]);
         const sheet = renderSheet({ displayName: member.displayName, character: { ...character, pose } });
-        await interaction.editReply(`\`\`\`\n${sheet}\n\`\`\``);
+        await interaction.editReply(`\`\`\`\n${sheet}\n\`\`\`\n*Use /pose to strike a new pose for thy figure.*`);
     } catch (error) {
         console.error('Error showing the sheet:', error);
         await interaction.editReply('Alack! The ledger is sealed to mine eyes at present. Pray try again anon!');

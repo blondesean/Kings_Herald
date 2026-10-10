@@ -55,7 +55,7 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | `/return_title` | Sends your title back to the shop after a confirmation, so someone else can buy it (only while the shop is open). Ephemeral. |
 | `/bank` | Lists the gear in your bag that isn't equipped, by slot (ephemeral). |
 | `/equip <item>` | Puts a piece of gear from your bag into its slot; the old item goes back to your bag. |
-| `/pose <pose>` | Chooses the stick figure pose beside your `/flex` sheet from a list with autosuggest (standing, waving, arms up, kneeling, sword raised). Anyone can change it, for free. Ephemeral. |
+| `/pose <pose>` | Chooses the stick figure pose beside your `/flex` sheet from a list with autosuggest (13 poses, from standing and waving to archer, casting, flexing and flag bearer). Anyone can change it, for free. Ephemeral. |
 | `/shop_signup` | Toggles the "shopaholics" role: run once to be pinged when the daily shop opens, run again to be removed (`src/shopRole.js`). |
 | `/adventurer_signup` | Toggles the "Adventurers" role: run once to be pinged when the daily boss encounter posts, run again to be removed (`src/adventurerRole.js`). |
 | `/flex` | Shows your character sheet in a monospace box: name and title, race and class, the seven gear slots, and your fit score. |

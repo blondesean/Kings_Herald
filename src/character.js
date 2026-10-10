@@ -114,7 +114,8 @@ const renderSheet = ({ displayName, character = {} }) => {
     lines.push(rule());
     // The figure goes beside the box, one figure line per sheet line.
     const figure = figureRows(character.pose, helmRow);
-    return lines.map((line, i) => `${(figure[i] || '').padEnd(FIGURE_WIDTH)}  ${line}`).join('\n');
+    // One space between the figure and the box keeps the sheet at 38 characters, phone-width.
+    return lines.map((line, i) => `${(figure[i] || '').padEnd(FIGURE_WIDTH)} ${line}`).join('\n');
 };
 
 /* Equipping moves the item out of the bag into its slot. Whatever was in the

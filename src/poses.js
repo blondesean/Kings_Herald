@@ -17,6 +17,14 @@ const POSES = [
     { name: 'arms up', lines: [' \\O/', '  |', ' / \\'] },
     { name: 'kneeling', lines: ['  O', ' /|', ' _/\\'] },
     { name: 'sword raised', lines: ['  O/', ' /|', ' / \\'] },
+    { name: 'shield up', lines: [' [O', ' [|\\', ' / \\'] },
+    { name: 'casting', lines: ['  O *', ' /|/', ' / \\'] },
+    { name: 'archer', lines: ['  O', ' /|)>', ' / \\'] },
+    { name: 'flexing', lines: [' _O_', '(/|\\)', ' / \\'] },
+    { name: 'dancing', lines: ['  O', ' <|>', ' / >'] },
+    { name: 'thinking', lines: ['  O?', ' /|\\', ' / \\'] },
+    { name: 'meditating', lines: ['  O', ' /|\\', '_/ \\_'] },
+    { name: 'flag bearer', lines: ['  O|>', ' /||', ' / |'] },
 ];
 
 const DEFAULT_POSE = 1;
