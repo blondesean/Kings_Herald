@@ -4,10 +4,10 @@
  */
 
 const connectionsIntroLines = () => [
-    'Hear ye! The Herald presents four-and-twenty words, bound in six secret kinships. The court has but five false steps to spare — choose wisely, and choose together!',
-    'A riddle of words for the whole court to puzzle over: twenty-four terms, six hidden groupings, and only five mistakes allowed before the chance is lost!',
-    'Gather round, good nobles — twenty-four words await sorting into six true families. The court shares but five wrong guesses, so counsel one another well!',
-    "The Herald lays twenty-four words upon the table, six groups hidden among them. Guess as one, err five times, and the day's puzzle is lost!",
+    'Hear ye! The Herald presents four-and-twenty words, bound in six secret kinships. The court has but three false steps to spare — choose wisely, and choose together!',
+    'A riddle of words for the whole court to puzzle over: twenty-four terms, six hidden groupings, and only three mistakes allowed before the chance is lost!',
+    'Gather round, good nobles — twenty-four words await sorting into six true families. The court shares but three wrong guesses, so counsel one another well!',
+    "The Herald lays twenty-four words upon the table, six groups hidden among them. Guess as one, err three times, and the day's puzzle is lost!",
 ];
 
 // A group was correctly identified. `category` is the revealed category
@@ -47,7 +47,7 @@ const connectionsCloseLines = (triesLeft) => {
 const connectionsWinLines = () => [
     'The court has triumphed! Every kinship laid bare before the chances ran out. Well played, all!',
     'By royal decree, the puzzle stands solved! A fine display of wit from the whole court.',
-    'The Herald applauds — all four kinships found! The day\'s puzzle yields to the court\'s cleverness.',
+    'The Herald applauds — all six kinships found! The day\'s puzzle yields to the court\'s cleverness.',
 ];
 
 // Out of chances before the puzzle was fully solved. `unsolved` is the

@@ -184,6 +184,27 @@ const buildBoardEmbed = (session) => {
         .setTimestamp();
 };
 
+// The closing embed, styled like buildBoardEmbed so a finished puzzle reads
+// as unmistakably the same game rather than a plain line of text — `fullySolved`
+// picks the headline and the title; every group is shown, solved or revealed
+// in defeat, since there's nothing left to hide once the session has ended.
+const buildFinalEmbed = (session, fullySolved) => {
+    const headline = fullySolved
+        ? pick(flavor.connectionsWinLines())
+        : pick(session.triesLeft <= 0 ? flavor.connectionsLossLines() : flavor.connectionsTimeoutLines());
+    const allGroups = [...session.solvedGroups, ...session.remainingGroups].map(solvedLine).join('\n');
+
+    return new EmbedBuilder()
+        .setColor(EMBED_COLOR)
+        .setTitle(`The Herald's Daily Puzzle: Connections — ${fullySolved ? 'Solved!' : 'Puzzle Over'}`)
+        .setDescription(headline)
+        .addFields(
+            { name: 'All Six Kinships', value: allGroups },
+            { name: 'Chances Left', value: String(session.triesLeft), inline: true }
+        )
+        .setTimestamp();
+};
+
 // ---- one session --------------------------------------------------------------
 
 // Runs one full puzzle session in one guild/channel until it's solved, out
@@ -317,13 +338,7 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
             const fullySolved = session.remainingGroups.length === 0;
 
             try {
-                if (fullySolved) {
-                    await channel.send(pick(flavor.connectionsWinLines()));
-                } else {
-                    const revealLines = session.remainingGroups.map(solvedLine).join('\n');
-                    const intro = session.triesLeft <= 0 ? pick(flavor.connectionsLossLines()) : pick(flavor.connectionsTimeoutLines());
-                    await channel.send(`${intro}\n${revealLines}`);
-                }
+                await channel.send({ embeds: [buildFinalEmbed(session, fullySolved)] });
             } catch (error) {
                 console.error(`Connections (${runLabel}) (guild ${guild.id}): failed to post final reveal:`, error.message);
             }
