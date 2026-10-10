@@ -22,6 +22,7 @@ new KingsHeraldStack(app, 'KingsHeraldStack', {
   desiredCount: 1,
   tableRemovalPolicy: cdk.RemovalPolicy.RETAIN,
   createDeployRole: true,
+  archiveHistory: true,
   githubRepo,
 });
 

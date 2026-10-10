@@ -92,7 +92,7 @@ const runHalloweenTreat = async function (client, options = {}) {
             // Only announce a gift that actually landed.
             if (persist) {
                 try {
-                    await pointsStore.addPoints(g.id, [{ userId: winner.id, displayName: winner.displayName, points: TREAT_POINTS }]);
+                    await pointsStore.addPoints(g.id, [{ userId: winner.id, displayName: winner.displayName, points: TREAT_POINTS }], 'halloween');
                 } catch (storeError) {
                     console.error('Halloween treat: failed to persist points:', storeError.message);
                     continue;

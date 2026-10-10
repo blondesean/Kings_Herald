@@ -490,6 +490,91 @@ The `githubRepo` value in `infra/cdk.json` is what pins the trust policy. If you
 aws logs tail /ecs/kings-herald --follow --region us-east-1
 ```
 
+#### Query the history log
+
+The logs are kept for a year (`infra/lib/kings-herald-stack.ts`), and the bot writes its long-term history into them as one JSON object per line (`src/historyLog.js`), so it can be charted or used to backfill a feature later:
+
+- **`points`**: every change to a member's points, written after the DynamoDB write lands, with `delta` and `reason` (`trivia`, `duel`, `recap`, `voice`, `connections`, `ladder`, `shop`, `shop_discount`, `sale`, `unsold_refund`, `trade`, `achievement`, `adjust`, and so on) plus details such as `item` or `achievement`.
+- **`snapshot`**: each member's standing at 11:55 PM Eastern every day (`src/snapshots.js`): points, points earned in all, fit, duel wins and losses, shop spending, lifetime voice hours achievements earned, and encounter wins (in all and per tier), killing blows and loot won.
+- **`encounter`** and **`loot`**: every boss fight, with the boss, odds, outcome and killer, and each member's vote, stance, fit, power, gear and injury; then every loot roll with each member's need, greed or pass, the rolls and the winner, linked by `encounterId`.
+
+In the CloudWatch console, Logs Insights on `/ecs/kings-herald` reads the fields directly. One member's fit and points by day:
+
+```
+filter history = 1 and type = "snapshot" and name = "Arctrooper66"
+| fields day, points, fit, duelWins, shopSpent
+| sort day asc
+```
+
+Where a guild's points came from:
+
+```
+filter history = 1 and type = "points"
+| stats sum(delta) as total by reason
+```
+
+Every slash command and button click is recorded too (`type = "command"` with its options, `type = "button"` with the button's id), so the court's interactions are preserved.
+
+#### Query the history archive (Athena)
+
+The logs expire after a year, so prod also keeps everything in S3 for good (`infra/lib/history-archive.ts`). It's a versioned bucket that is kept even if the stack is deleted, and it is described by the Glue database `kings_herald`:
+
+| Table | What |
+|---|---|
+| `history` | The history records above: points, snapshots, commands, clicks, encounters (with each member's vote, stance, fit, power, gear and injury) and loot rolls. Filter on `type`; partitioned by `dt` (the UTC date). |
+| `raw_logs` | Every log line the bot writes, in CloudWatch batches. `UNNEST(logevents)` gives one row per line. |
+| `game_state` | A nightly full export of the DynamoDB table. One row per item as DynamoDB JSON; `"$path"` tells the nights apart. |
+
+Two CloudWatch subscription filters feed two Firehose streams, which write gzip JSON files every 15 minutes or so. The table has point-in-time recovery on, which lets it be restored to any second in the last 35 days, and EventBridge Scheduler exports it nightly. Dates are worked out from the folder names, so nothing needs a crawler. Costs are pennies a month.
+
+In the Athena console, pick the `kings-herald` workgroup (results go to the bucket, and a query is capped at 1 GB scanned) and the `kings_herald` database:
+
+```sql
+-- One member's points and fit by day
+SELECT day, points, fit, duelwins, shopspent
+FROM history WHERE type = 'snapshot' AND name = 'Arctrooper66'
+ORDER BY day;
+
+-- Points by source this month
+SELECT reason, sum(delta) AS total
+FROM history WHERE type = 'points' AND dt >= '2026-10-01'
+GROUP BY reason ORDER BY total DESC;
+
+-- Encounter wins by player over time (from the nightly snapshot)
+SELECT day, name, encounterwins, killingblows, lootwon
+FROM history WHERE type = 'snapshot' ORDER BY day, name;
+
+-- Every fight, one row per member, with their stance, fit, power and gear
+SELECT at, boss, difficulty, won, power AS party_power,
+       m.name, m.stance, m.fit, m.power, m.gear
+FROM history CROSS JOIN UNNEST(members) AS t(m)
+WHERE type = 'encounter' AND NOT rehearsal
+ORDER BY at;
+
+-- Most used commands
+SELECT command, count(*) AS uses
+FROM history WHERE type = 'command'
+GROUP BY command ORDER BY uses DESC;
+
+-- Search every log line
+SELECT from_unixtime(e.timestamp / 1000) AS at, e.message
+FROM raw_logs CROSS JOIN UNNEST(logevents) AS t(e)
+WHERE dt = '2026-10-12' AND e.message LIKE '%Duel result%';
+
+-- Points per member in the latest nightly export
+SELECT json_extract_scalar(item, '$.displayName.S') AS name,
+       CAST(json_extract_scalar(item, '$.points.N') AS integer) AS points
+FROM game_state
+WHERE item IS NOT NULL AND "$path" LIKE '%/data/%'
+  AND "$path" LIKE (SELECT max(regexp_extract("$path", '^.*exports/[^/]+/')) FROM game_state) || '%';
+```
+
+The streams only catch logs written after they were deployed. To copy older logs (CloudWatch keeps them a year) into the archive, run a one-off export task. The times are epoch milliseconds, and `<bucket>` is the stack's `ArchiveBucketName` output:
+
+```powershell
+aws logs create-export-task --log-group-name /ecs/kings-herald --from 0 --to <ms-now> --destination <bucket> --destination-prefix logs-export
+```
+
 #### Force the running task to restart (picks up a new SSM value, etc.)
 
 ```powershell

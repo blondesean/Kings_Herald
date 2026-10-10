@@ -176,7 +176,7 @@ const runBirthdays = async function (client, options = {}) {
 
             if (persist) {
                 try {
-                    await pointsStore.addPoints(g.id, awards.map(({ userId, displayName, points }) => ({ userId, displayName, points })));
+                    await pointsStore.addPoints(g.id, awards.map(({ userId, displayName, points }) => ({ userId, displayName, points })), 'birthday');
                 } catch (storeError) {
                     console.error('Birthdays: failed to persist points:', storeError.message);
                     continue;

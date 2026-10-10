@@ -327,7 +327,7 @@ const runWouldYouRather = async function (client, options = {}) {
 
             if (persist && result.winners.length) {
                 try {
-                    await pointsStore.addPoints(g.id, result.winners.map((w) => ({ userId: w.userId, displayName: w.displayName, points: w.points })));
+                    await pointsStore.addPoints(g.id, result.winners.map((w) => ({ userId: w.userId, displayName: w.displayName, points: w.points })), 'would_you_rather');
                     console.log(`Would you rather: persisted awards for guild ${g.id}.`);
                 } catch (storeError) {
                     console.error('Would you rather: failed to persist points:', storeError.message);

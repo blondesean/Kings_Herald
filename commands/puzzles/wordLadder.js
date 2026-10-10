@@ -246,7 +246,7 @@ const runWordLadderSession = (guild, channel, puzzle, persist, runLabel) => {
             if (solved && persist) {
                 for (const [userId, { displayName }] of session.contributors) {
                     try {
-                        await pointsStore.addPuzzlePoints(guild.id, userId, displayName, POINTS_PER_SOLVE);
+                        await pointsStore.addPuzzlePoints(guild.id, userId, displayName, POINTS_PER_SOLVE, 'ladder');
                     } catch (error) {
                         console.error('Word ladder: failed to persist puzzle points:', error.message);
                     }

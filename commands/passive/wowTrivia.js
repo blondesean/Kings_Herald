@@ -193,7 +193,8 @@ const runWowTriviaSession = async (guild, channel, totalQuestions, persist, runL
         try {
             await pointsStore.addPoints(
                 guild.id,
-                champions.map(([userId, entry]) => ({ userId, displayName: entry.displayName, points: pointsEach }))
+                champions.map(([userId, entry]) => ({ userId, displayName: entry.displayName, points: pointsEach })),
+                'wow_trivia'
             );
         } catch (error) {
             console.error('WoW trivia: failed to persist champion points:', error.message);

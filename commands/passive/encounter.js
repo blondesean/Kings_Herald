@@ -57,6 +57,7 @@ const { resolveChannel } = require('../../src/resolveChannel');
 const { findAdventurerRole } = require('../../src/adventurerRole');
 const { fitScore } = require('../../src/character');
 const achievements = require('../../src/achievements');
+const { recordHistory } = require('../../src/historyLog');
 const catalog = require('./shopCatalog');
 const { easternDay } = require('./shop');
 const { DIFFICULTIES, BOSSES } = require('./encounterBosses');
@@ -361,7 +362,8 @@ const runEncounterIn = async (g, channel, opts) => {
     // Fit is read at battle time, so gear changed during the join window counts.
     for (const m of ready) {
         const character = await pointsStore.getCharacter(g.id, m.userId).catch(() => ({ gear: {} }));
-        m.fit = fitScore(character.gear);
+        m.gear = character.gear || {};
+        m.fit = fitScore(m.gear);
         m.effectiveFit = m.fit * STANCES[m.stance].multiplier;
     }
 
@@ -398,6 +400,35 @@ const runEncounterIn = async (g, channel, opts) => {
     const gearRatio = bossFit ? ready.reduce((sum, m) => sum + m.fit, 0) / bossFit : 1;
     const matchup = gearRatio > 1.1 ? 'exceptional' : gearRatio >= 0.9 ? 'appropriate' : 'outmatched';
 
+    // The whole fight goes into the history log (src/historyLog.js): the boss,
+    // the odds and the outcome, and each member's vote, stance, fit, power
+    // (fit after the stance multiplier) and the gear they wore. Loot rolls are
+    // recorded separately under the same encounterId.
+    const recordEncounter = (killer) => recordHistory('encounter', {
+        guildId: g.id,
+        encounterId: roundId,
+        rehearsal: !persist,
+        boss: boss.name,
+        difficulty: DIFFICULTIES[tier],
+        bossFit,
+        partyFit: ready.reduce((sum, m) => sum + m.fit, 0),
+        power: Math.round(partyFit),
+        chance: Math.round(chance * 1000) / 1000,
+        matchup,
+        won,
+        killerId: killer ? killer.userId : null,
+        members: ready.map((m) => ({
+            userId: m.userId,
+            name: m.displayName,
+            vote: DIFFICULTIES[m.vote],
+            stance: m.stance,
+            fit: m.fit,
+            power: Math.round(m.effectiveFit),
+            gear: m.gear,
+            injuryDays: won ? 0 : STANCES[m.stance].restDays,
+        })),
+    });
+
     const battleEmbed = new EmbedBuilder()
         .setColor(won ? EMBED_COLOR : DEFEAT_COLOR)
         .setTitle(`The Encounter: ${boss.name}`)
@@ -426,11 +457,13 @@ const runEncounterIn = async (g, channel, opts) => {
             .setTitle('Defeat')
             // An exceptionally geared party that still lost was simply unlucky.
             .setDescription(`${pick(matchup === 'exceptional' ? flavor.encounterUnluckyLossLines(boss) : flavor.encounterDefeatLines(boss))}\n\n${injuries.join('\n')}${persist ? '' : '\n\n*A rehearsal: no injuries were truly suffered.*'}`);
+        recordEncounter(null);
         await channel.send({ embeds: [battleEmbed, outcomeEmbed] });
         return;
     }
 
     const killer = pickKiller(ready);
+    recordEncounter(killer);
     outcomeEmbed
         .setTitle('Victory!')
         // An outmatched party that still won caught a lucky break.
@@ -482,6 +515,18 @@ const runEncounterIn = async (g, channel, opts) => {
     // the result lands in an embed styled like the loot post.
     for (const { item, choices } of drops) {
         const { rounds, winner } = rollLoot(choices);
+        const recordLoot = (result) => recordHistory('loot', {
+            guildId: g.id,
+            encounterId: roundId,
+            rehearsal: !persist,
+            item: item.id,
+            slot: item.slot,
+            price: item.price,
+            choices: choices.map((c) => ({ userId: c.userId, name: c.displayName, choice: c.choice })),
+            rolls: JSON.stringify(rounds),
+            winnerId: winner ? winner.userId : null,
+            result,
+        });
 
         if (rounds.length) {
             await channel.send(`The dice are cast for **${itemLabel(item)}**...`);
@@ -509,6 +554,7 @@ const runEncounterIn = async (g, channel, opts) => {
 
         if (!winner) {
             console.log(`${tag}: everyone passed on ${item.name}.`);
+            recordLoot('passed');
             resultEmbed
                 .setTitle(`Loot left behind: ${itemLabel(item)}`)
                 .setDescription([pick(flavor.encounterLootAllPassedLines(itemLabel(item))), ...footnotes].join('\n'));
@@ -525,6 +571,7 @@ const runEncounterIn = async (g, channel, opts) => {
         }
         console.log(`${tag}: ${winner.displayName} (${winner.userId}) won ${item.name} (${result}).`);
         const granted = result === 'equipped' || result === 'bagged';
+        recordLoot(result);
         const note = !persist ? '*A rehearsal: the loot was not truly granted.*' : result === 'equipped' ? 'It is equipped at once.' : 'It goes to their bag.';
         resultEmbed
             .setTitle(`Loot awarded: ${itemLabel(item)}`)

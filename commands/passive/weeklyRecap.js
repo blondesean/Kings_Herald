@@ -681,7 +681,7 @@ const runWeeklyRecap = async function (client, options = {}) {
 
             if (persist && awards.length) {
                 try {
-                    await pointsStore.addPoints(g.id, awards);
+                    await pointsStore.addPoints(g.id, awards, 'recap');
                     console.log(`Weekly recap: persisted awards for guild ${g.id}.`);
                 } catch (storeError) {
                     console.error('Weekly recap: failed to persist points:', storeError.message);

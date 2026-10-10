@@ -352,7 +352,7 @@ const runTrivia = async function (client, options = {}) {
 
             if (persist && winners.length) {
                 try {
-                    await pointsStore.addPoints(g.id, winners);
+                    await pointsStore.addPoints(g.id, winners, 'trivia');
                     console.log(`Trivia: persisted awards for guild ${g.id}.`);
                 } catch (storeError) {
                     console.error('Trivia: failed to persist points:', storeError.message);

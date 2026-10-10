@@ -8,6 +8,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import { HistoryArchive } from './history-archive';
 
 export interface KingsHeraldStackProps extends cdk.StackProps {
   /**
@@ -35,6 +36,12 @@ export interface KingsHeraldStackProps extends cdk.StackProps {
    * reuses the same role, so it passes false.
    */
   readonly createDeployRole: boolean;
+
+  /**
+   * Whether to archive the bot's history to S3 for Athena (see
+   * history-archive.ts). Prod only; beta's data is throwaway.
+   */
+  readonly archiveHistory?: boolean;
 
   /**
    * owner/repo the deploy role trusts, and the default target for `!complain`.
@@ -71,7 +78,8 @@ export class KingsHeraldStack extends cdk.Stack {
 
     const logGroup = new logs.LogGroup(this, 'LogGroup', {
       logGroupName: `/ecs/${resourceName}`,
-      retention: logs.RetentionDays.ONE_MONTH,
+      // A year, so achievement-style backfills can reach back that far.
+      retention: logs.RetentionDays.ONE_YEAR,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -96,7 +104,14 @@ export class KingsHeraldStack extends cdk.Stack {
       sortKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: tableRemovalPolicy,
+      // Restore to any second in the last 35 days; also what the nightly
+      // export to the history archive reads from.
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
     });
+
+    if (props.archiveHistory) {
+      new HistoryArchive(this, 'HistoryArchive', { resourceName, logGroup, table: pointsTable });
+    }
 
     // Builds the bot image from the repo's Dockerfile at deploy time and uploads
     // it to a CDK-managed ECR repository.

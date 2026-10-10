@@ -42,6 +42,8 @@ const { trackVoiceStateUpdate, startVoiceTracking } = require('./../commands/pas
 const { scheduleBirthdays } = require('./../commands/passive/birthdays');
 const { scheduleHalloweenTreat } = require('./../commands/passive/halloweenTreat');
 const { scheduleAchievements } = require('./achievements');
+const { scheduleSnapshots } = require('./snapshots'); // daily standings for the history log
+const { recordHistory } = require('./historyLog');
 
 //Slash commands are auto-loaded by filename from commands/prompts (user-facing),
 //commands/passive/preview (manual triggers for scheduled passive behaviors),
@@ -133,6 +135,7 @@ client.on('ready', (c) => {
     scheduleBirthdays(client);
     startVoiceTracking(client);
     scheduleAchievements(client);
+    scheduleSnapshots(client);
 });
 
 //Register commands when the bot is invited to a new server.
@@ -143,6 +146,27 @@ client.on('guildCreate', registerCommands);
 client.on('voiceStateUpdate', trackVoiceStateUpdate);
 
 //Client reacts whenever a slash command comes in
+//Every slash command and button click goes into the history log, so the
+//court's interactions are preserved long-term (see src/historyLog.js).
+client.on('interactionCreate', (interaction) => {
+    try {
+        const base = {
+            guildId: interaction.guildId,
+            channelId: interaction.channelId,
+            userId: interaction.user.id,
+            name: interaction.member?.displayName || interaction.user.username,
+        };
+        if (interaction.isChatInputCommand()) {
+            const options = Object.fromEntries(interaction.options.data.map((o) => [o.name, o.value ?? null]));
+            recordHistory('command', { ...base, command: interaction.commandName, options: JSON.stringify(options) });
+        } else if (interaction.isButton()) {
+            recordHistory('button', { ...base, customId: interaction.customId, messageId: interaction.message?.id });
+        }
+    } catch (error) {
+        console.error('History: failed to record an interaction:', error.message);
+    }
+});
+
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 

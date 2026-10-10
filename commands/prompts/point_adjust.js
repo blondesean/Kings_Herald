@@ -44,7 +44,7 @@ const pointAdjust = async function (interaction) {
     }
 
     try {
-        await pointsStore.addPoints(guild.id, [{ userId: target.id, displayName: target.displayName, points: amount }]);
+        await pointsStore.addPoints(guild.id, [{ userId: target.id, displayName: target.displayName, points: amount }], 'adjust');
     } catch (error) {
         console.error('point_adjust: failed to write adjustment:', error);
         await interaction.editReply('Alack! I could not inscribe that adjustment in the ledger, Milord. Pray try again anon!');

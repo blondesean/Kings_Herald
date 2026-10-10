@@ -356,7 +356,7 @@ const runConnectionsSession = (guild, channel, puzzle, persist, runLabel) => {
             if (fullySolved && persist) {
                 for (const award of uniqueParticipants) {
                     try {
-                        await pointsStore.addPuzzlePoints(guild.id, award.userId, award.displayName, POINTS_PER_SOLVE);
+                        await pointsStore.addPuzzlePoints(guild.id, award.userId, award.displayName, POINTS_PER_SOLVE, 'connections');
                     } catch (error) {
                         console.error('Connections: failed to persist puzzle points:', error.message);
                     }

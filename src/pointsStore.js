@@ -46,6 +46,7 @@
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, UpdateCommand, QueryCommand, GetCommand, PutCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
+const { recordPoints } = require('./historyLog');
 
 const TABLE_NAME = process.env.POINTS_TABLE_NAME;
 
@@ -111,9 +112,10 @@ const EARNED = 'totalEarned';
 
 /* Add points to one or more members. `awards` is an array of
  * { userId, displayName, points }. Each is an atomic increment so concurrent
- * runs (or retries) can't clobber each other.
+ * runs (or retries) can't clobber each other. `reason` names the source in
+ * the history log (src/historyLog.js), e.g. 'trivia' or 'duel'.
  */
-const addPoints = async function (guildId, awards) {
+const addPoints = async function (guildId, awards, reason = 'award') {
     if (!isConfigured()) {
         console.log('POINTS_TABLE_NAME not set; skipping points persistence.');
         return;
@@ -142,6 +144,7 @@ const addPoints = async function (guildId, awards) {
                 ? { ':n': award.displayName || 'a noble', ':p': award.points, ':lost': lost }
                 : { ':n': award.displayName || 'a noble', ':p': award.points },
         }));
+        recordPoints(guildId, award.userId, award.points, reason);
     }
 };
 
@@ -279,6 +282,7 @@ const addVoiceSeconds = async function (guildId, userId, displayName, seconds, w
             ':p': pointsEarned,
         },
     }));
+    recordPoints(guildId, userId, pointsEarned, 'voice');
 };
 
 /* Return every member of a guild with voice time logged since the last
@@ -436,7 +440,7 @@ const resetWeeklyPairSeconds = async function (guildId, pairKeys) {
  * (Connections today, others later), so the recap's podium isn't tied to
  * any one of them specifically.
  */
-const addPuzzlePoints = async function (guildId, userId, displayName, points) {
+const addPuzzlePoints = async function (guildId, userId, displayName, points, reason = 'puzzle') {
     if (!isConfigured()) {
         console.log('POINTS_TABLE_NAME not set; skipping puzzle point persistence.');
         return;
@@ -460,6 +464,7 @@ const addPuzzlePoints = async function (guildId, userId, displayName, points) {
             ':p': points,
         },
     }));
+    recordPoints(guildId, userId, points, reason);
 };
 
 /* Return every member with puzzle points logged since the last weekly
@@ -817,12 +822,16 @@ const buyWithPoints = async function (guildId, userId, displayName, price, grant
 
     try {
         await getClient().send(new UpdateCommand(chargeUpdate(guildId, userId, displayName, price, grant)));
+        recordPoints(guildId, userId, -price, 'shop', { item: grantedItem(grant) });
         return true;
     } catch (error) {
         if (error.name === 'ConditionalCheckFailedException') return false;
         throw error;
     }
 };
+
+// The item id a buyWithPoints grant hands over, for the history log.
+const grantedItem = (grant) => grant.bag || (grant.equip && grant.equip.itemId) || grant.value;
 
 // The update behind buyWithPoints, also used inside buyListing's transaction.
 const chargeUpdate = (guildId, userId, displayName, price, grant) => {
@@ -1130,6 +1139,7 @@ const unlockAchievement = async function (guildId, userId, displayName, id, rewa
                 },
             ],
         }));
+        recordPoints(guildId, userId, reward, 'achievement', { achievement: id });
         return true;
     } catch (error) {
         if (cancelledBy(error)) return false;
@@ -1284,6 +1294,7 @@ const tradeCharacters = async function (guildId, sides) {
 
     try {
         await getClient().send(new TransactWriteCommand({ TransactItems: sides.map((side) => ({ Update: updateFor(side) })) }));
+        for (const side of sides) recordPoints(guildId, side.userId, side.points, 'trade');
         return true;
     } catch (error) {
         if (cancelledBy(error)) return false;
@@ -1419,6 +1430,8 @@ const buyListing = async function (guildId, listing, buyer, price, grant, day, n
                 },
             ],
         }));
+        recordPoints(guildId, buyer.id, -price, 'shop_discount', { item: listing.itemId, listingId: listing.listingId });
+        recordPoints(guildId, listing.sellerId, price, 'sale', { item: listing.itemId, listingId: listing.listingId });
         return { ok: true };
     } catch (error) {
         if (!cancelledBy(error)) throw error;
@@ -1457,6 +1470,7 @@ const expireListing = async function (guildId, listing, refund) {
                 },
             ],
         }));
+        recordPoints(guildId, listing.sellerId, refund, 'unsold_refund', { item: listing.itemId, listingId: listing.listingId });
         return true;
     } catch (error) {
         if (cancelledBy(error)) return false;

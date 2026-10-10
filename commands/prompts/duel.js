@@ -442,7 +442,7 @@ const duel = async function (interaction) {
         await pointsStore.addPoints(guild.id, [
             { userId: winner.id, displayName: displayNameOf(winner), points: wager },
             { userId: loser.id, displayName: displayNameOf(loser), points: -wager },
-        ]);
+        ], 'duel');
     } catch (error) {
         console.error('duel: failed to transfer points:', error);
     }

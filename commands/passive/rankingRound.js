@@ -423,7 +423,7 @@ const runRankingRound = async function (client, options = {}) {
 
             if (persist && result.winners.length) {
                 try {
-                    await pointsStore.addPoints(g.id, result.winners.map((w) => ({ userId: w.userId, displayName: w.displayName, points: w.points })));
+                    await pointsStore.addPoints(g.id, result.winners.map((w) => ({ userId: w.userId, displayName: w.displayName, points: w.points })), 'ranking');
                     console.log(`Ranking: persisted awards for guild ${g.id}.`);
                 } catch (storeError) {
                     console.error('Ranking: failed to persist points:', storeError.message);
