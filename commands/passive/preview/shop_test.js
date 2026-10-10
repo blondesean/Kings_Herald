@@ -7,6 +7,8 @@
  * Unlike the other previews this one saves the shop, so /buy works in the
  * same channel. It replaces today's shop for the guild, including its stock,
  * so the real scheduled shop may still open later today with a new draw.
+ * It also puts /sell listings from earlier days on sale for real, and any
+ * still unsold when it closes pay out their refund.
  */
 
 const { openShopNow } = require('../shop');

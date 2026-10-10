@@ -9,13 +9,18 @@
  * old one. A title is unique: buying one while already bearing another asks
  * for confirmation first, then sends the old title back to the shelves.
  *
+ * A piece in the Discounts section (sold back by a member with /sell) is
+ * bought before a full-price copy of the same piece. Taking the listing,
+ * charging the buyer and paying the seller happen in one transaction.
+ * Nobody can buy their own listing.
+ *
  * Public, so the purchase is announced in the channel, in character. Any
  * confirmation is private.
  */
 
 const { ApplicationCommandOptionType } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
-const { currentOpenShop, easternDay, kindOf } = require('../passive/shop');
+const { currentOpenShop, easternDay, kindOf, discountsFor, discountPrice } = require('../passive/shop');
 const { matchEntry } = require('../../src/character');
 const { askConfirm } = require('../../src/confirm');
 const catalog = require('../passive/shopCatalog');
@@ -26,6 +31,25 @@ const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 // Which character field a non-gear entry sets. Gear goes to the bag instead.
 const FIELD_FOR_KIND = { title: 'title', class: 'class', race: 'race' };
 
+// An empty slot takes a gear piece straight away; otherwise it goes to the bag.
+const gearGrant = (entry, character) => (!(character.gear || {})[entry.slot]
+    ? { equip: { slot: entry.slot, itemId: entry.id, gear: character.gear || {} } }
+    : { bag: entry.id });
+
+/* Buys the first of `listings` (all the same piece) still on sale, paying its
+ * seller. Moves on to the next if one sells out from under the buyer.
+ * Returns { ok, listing, equipped } or { ok: false, reason }.
+ */
+const purchaseDiscount = async (guildId, day, buyer, entry, listings, character) => {
+    const grant = gearGrant(entry, character);
+    for (const listing of listings) {
+        const result = await pointsStore.buyListing(guildId, listing, buyer, discountPrice(entry.price), grant, day, Date.now());
+        if (result.ok) return { ok: true, listing, equipped: grant.equip !== undefined };
+        if (result.reason === 'cannotAfford') return result;
+    }
+    return { ok: false, reason: 'soldOut' };
+};
+
 // Takes the copy, charges the points and grants the item. Returns the kind on
 // success, or null (after giving the copy back) if the purchase didn't go through.
 const purchase = async (guildId, day, buyer, entry, kind, character) => {
@@ -34,16 +58,7 @@ const purchase = async (guildId, day, buyer, entry, kind, character) => {
     const taken = limited ? await pointsStore.takeShopStock(guildId, day, entry.id, Date.now()) : true;
     if (!taken) return { ok: false, reason: 'soldOut' };
 
-    let grant;
-    if (kind === 'gear') {
-        // An empty slot takes the piece straight away; otherwise it goes to the bag.
-        const slotEmpty = !(character.gear || {})[entry.slot];
-        grant = slotEmpty
-            ? { equip: { slot: entry.slot, itemId: entry.id, gear: character.gear || {} } }
-            : { bag: entry.id };
-    } else {
-        grant = { field: FIELD_FOR_KIND[kind], value: entry.id };
-    }
+    const grant = kind === 'gear' ? gearGrant(entry, character) : { field: FIELD_FOR_KIND[kind], value: entry.id };
     const paid = await pointsStore.buyWithPoints(guildId, buyer.id, buyer.displayName, entry.price, grant);
     if (!paid) {
         if (limited) await pointsStore.returnShopStock(guildId, entry.id);
@@ -66,6 +81,33 @@ const buy = async function (interaction) {
 
         const onShelf = record.items.map((id) => catalog.findEntry(id)).filter(Boolean);
         const entry = matchEntry(onShelf, typed);
+
+        // A discounted piece is sold before a full-price copy of the same one.
+        // Once every discounted copy is gone, /buy falls through to full price.
+        const discounts = await discountsFor(guildId, record.day);
+        const discounted = matchEntry(discounts.map((l) => catalog.findEntry(l.itemId)).filter(Boolean), typed);
+        if (discounted) {
+            const listings = discounts.filter((l) => l.itemId === discounted.id && l.status === 'onSale');
+            const forSale = listings.filter((l) => l.sellerId !== buyer.id);
+            if (forSale.length) {
+                const price = discountPrice(discounted.price);
+                const character = await pointsStore.getCharacter(guildId, buyer.id);
+                const result = await purchaseDiscount(guildId, record.day, buyer, discounted, forSale, character);
+                if (!result.ok) {
+                    const lines = result.reason === 'soldOut' ? flavor.soldOutLines(discounted.name, true) : flavor.cannotAffordLines(discounted.name, price);
+                    await interaction.editReply(pick(lines));
+                    return;
+                }
+                console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) bought ${discounted.name} from ${result.listing.sellerName} (${result.listing.sellerId}) for ${price}${result.equipped ? ', equipped' : ''} (${easternDay()}).`);
+                await interaction.editReply(pick(flavor.purchasedDiscountLines(`<@${buyer.id}>`, discounted.name, result.listing.sellerName, result.equipped)));
+                return;
+            }
+            if (!entry) {
+                await interaction.editReply(pick(listings.length ? flavor.ownListingLines(discounted.name) : flavor.soldOutLines(discounted.name, true)));
+                return;
+            }
+        }
+
         if (!entry) {
             await interaction.editReply(pick(flavor.notInShopLines(typed)));
             return;

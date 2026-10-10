@@ -105,6 +105,38 @@ const shopShutForReturnLines = () => [
     'The shop is shut, so the merchant cannot take a title back until the stalls reopen.',
 ];
 
+// A discounted piece was bought from another member's listing.
+const purchasedDiscountLines = (buyer, name, seller, equipped) => (equipped
+    ? [
+        `${buyer} snaps up **${name}** at a discount, once ${seller}'s, and buckles it on at once.`,
+        `**${name}** passes from ${seller} to ${buyer} at a bargain, and is worn already.`,
+    ]
+    : [
+        `${buyer} snaps up **${name}** at a discount, once ${seller}'s, and carries it to their bag.`,
+        `**${name}** passes from ${seller} to ${buyer} at a bargain. Equip it with \`/equip\`.`,
+    ]);
+
+const ownListingLines = (name) => [
+    `**${name}** is thine own ware, good noble. Thou canst not buy it back.`,
+];
+
+// Asks the seller to confirm listing a piece, with what each outcome pays.
+const sellPromptLines = (name, salePrice, refund) => [
+    `Sell **${name}** back to the merchant? It goes on sale in the next day's shop for ${salePrice} points. If another noble buys it, thou receivest ${salePrice}. If none does, the merchant pays thee ${refund} and keeps it.`,
+];
+
+const listedLines = (name) => [
+    `**${name}** leaves thy bag for the merchant's cart. Look for it among the discounts in the next day's shop.`,
+];
+
+const sellEquippedLines = (name) => [
+    `Thou art wearing **${name}**. Only gear in thy bag can be sold: equip another piece in its place first.`,
+];
+
+const notSellableLines = (name) => [
+    `**${name}** is not a piece of gear, so the merchant will not buy it back.`,
+];
+
 const confirmCancelledLines = () => [
     'Very well. Nothing has changed.',
 ];
@@ -114,6 +146,12 @@ const confirmExpiredLines = () => [
 ];
 
 module.exports = {
+    purchasedDiscountLines,
+    ownListingLines,
+    sellPromptLines,
+    listedLines,
+    sellEquippedLines,
+    notSellableLines,
     purchasedEquippedLines,
     titleReturnPromptLines,
     titleSwapPromptLines,

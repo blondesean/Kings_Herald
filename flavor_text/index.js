@@ -35,6 +35,7 @@ module.exports = {
     ...require('./wordLadderFlavor'),
     ...require('./birthdayFlavor'),
     ...require('./shopFlavor'),
+    ...require('./tradeFlavor'),
     ...require('./fitDuelFlavor'),
     ...require('./encounterFlavor'),
     ...require('./weeklyRecapFlavor'),

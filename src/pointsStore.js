@@ -45,7 +45,7 @@
  */
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, UpdateCommand, QueryCommand, GetCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, UpdateCommand, QueryCommand, GetCommand, PutCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
 
 const TABLE_NAME = process.env.POINTS_TABLE_NAME;
 
@@ -807,6 +807,17 @@ const returnShopStock = async function (guildId, itemId) {
 const buyWithPoints = async function (guildId, userId, displayName, price, grant) {
     if (!isConfigured()) return false;
 
+    try {
+        await getClient().send(new UpdateCommand(chargeUpdate(guildId, userId, displayName, price, grant)));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
+// The update behind buyWithPoints, also used inside buyListing's transaction.
+const chargeUpdate = (guildId, userId, displayName, price, grant) => {
     const names = { '#dn': 'displayName', '#pts': 'points', '#wl': 'weeklyLost' };
     const values = { ':n': displayName || 'a noble', ':neg': -price, ':price': price, ':lost': price };
     let update;
@@ -833,20 +844,14 @@ const buyWithPoints = async function (guildId, userId, displayName, price, grant
         update = 'SET #dn = :n, #field = :value ADD #pts :neg, #wl :lost';
     }
 
-    try {
-        await getClient().send(new UpdateCommand({
-            TableName: TABLE_NAME,
-            Key: { guildId, userId },
-            UpdateExpression: update,
-            ConditionExpression: condition,
-            ExpressionAttributeNames: names,
-            ExpressionAttributeValues: values,
-        }));
-        return true;
-    } catch (error) {
-        if (error.name === 'ConditionalCheckFailedException') return false;
-        throw error;
-    }
+    return {
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+        UpdateExpression: update,
+        ConditionExpression: condition,
+        ExpressionAttributeNames: names,
+        ExpressionAttributeValues: values,
+    };
 };
 
 // A member's character and points: { points, displayName, gear, bag, title, class, race }.
@@ -990,6 +995,229 @@ const grantGear = async function (guildId, userId, displayName, itemId, slot) {
         ExpressionAttributeValues: { ':n': displayName || 'a noble', ':empty': [], ':new': [itemId] },
     }));
     return 'bagged';
+};
+
+/* A /trade between two members (see commands/prompts/trade.js), in one
+ * transaction. Each side is
+ *   { userId, displayName, before: { bag, gear }, bag, gear, points }
+ * where `before` is what was read, `bag`/`gear` are what to write, and
+ * `points` is what that member gains (negative to pay). Each write only lands
+ * if that member's bag and gear are still what was read, and a payer still
+ * has the points. Returns false if anything changed in between.
+ */
+const tradeCharacters = async function (guildId, sides) {
+    if (!isConfigured()) return false;
+
+    const updateFor = (side) => {
+        const names = { '#dn': 'displayName', '#bag': 'bag', '#gear': 'gear' };
+        const values = { ':n': side.displayName || 'a noble', ':bag': side.bag, ':gear': side.gear, ':oldBag': side.before.bag, ':oldGear': side.before.gear };
+        // An empty bag or gear map may never have been written at all.
+        const conditions = [
+            side.before.bag.length ? '#bag = :oldBag' : '(attribute_not_exists(#bag) OR #bag = :oldBag)',
+            Object.keys(side.before.gear).length ? '#gear = :oldGear' : '(attribute_not_exists(#gear) OR #gear = :oldGear)',
+        ];
+        let update = 'SET #dn = :n, #bag = :bag, #gear = :gear';
+        if (side.points) {
+            names['#pts'] = 'points';
+            values[':pts'] = side.points;
+            update += ' ADD #pts :pts';
+            if (side.points < 0) {
+                names['#wl'] = 'weeklyLost';
+                values[':cost'] = -side.points;
+                conditions.push('#pts >= :cost');
+                update += ', #wl :cost';
+            }
+        }
+        return {
+            TableName: TABLE_NAME,
+            Key: { guildId, userId: side.userId },
+            UpdateExpression: update,
+            ConditionExpression: conditions.join(' AND '),
+            ExpressionAttributeNames: names,
+            ExpressionAttributeValues: values,
+        };
+    };
+
+    try {
+        await getClient().send(new TransactWriteCommand({ TransactItems: sides.map((side) => ({ Update: updateFor(side) })) }));
+        return true;
+    } catch (error) {
+        if (cancelledBy(error)) return false;
+        throw error;
+    }
+};
+
+/* Sellback listings (see commands/prompts/sell.js and commands/passive/shop.js).
+ * Each listing is its own item under SELL#<guildId>, keyed by listingId:
+ *   { itemId, price, sellerId, sellerName, listedDay, status, saleDay, closesAt, buyerId, paid }
+ * status moves listed -> onSale (when a shop opens on a later day) -> sold or
+ * expired. Every move that pays someone is a transaction with the status
+ * change, so a listing can never pay out twice.
+ */
+const LISTING_PREFIX = 'SELL#';
+
+// Every listing a guild has, oldest first, each with its listingId.
+const getListings = async function (guildId) {
+    if (!isConfigured()) return [];
+
+    const items = [];
+    let startKey;
+    do {
+        const result = await getClient().send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: '#g = :g',
+            ExpressionAttributeNames: { '#g': 'guildId' },
+            ExpressionAttributeValues: { ':g': LISTING_PREFIX + guildId },
+            ExclusiveStartKey: startKey,
+        }));
+        items.push(...(result.Items || []));
+        startKey = result.LastEvaluatedKey;
+    } while (startKey);
+    return items.map(({ guildId: _g, userId, ...listing }) => ({ listingId: userId, ...listing }));
+};
+
+// True if the transaction was refused by one of its conditions.
+const cancelledBy = (error) => error.name === 'TransactionCanceledException' || error.name === 'ConditionalCheckFailedException';
+
+// Which of a cancelled transaction's writes failed its condition, by index, or -1.
+const failedIndex = (error) =>
+    (error.CancellationReasons || []).findIndex((reason) => reason && reason.Code === 'ConditionalCheckFailed');
+
+/* Take one copy of `listing.itemId` out of the seller's bag and list it, in
+ * one transaction. `expectedBag` must match what's stored now, the same guard
+ * /equip uses. Returns the listingId, or null if the bag changed.
+ */
+const createListing = async function (guildId, seller, listing, expectedBag, newBag) {
+    if (!isConfigured()) return null;
+
+    const listingId = `${Date.now()}#${Math.random().toString(36).slice(2, 8)}`;
+    try {
+        await getClient().send(new TransactWriteCommand({
+            TransactItems: [
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId, userId: seller.id },
+                        UpdateExpression: 'SET #bag = :bag',
+                        ConditionExpression: '#bag = :expected',
+                        ExpressionAttributeNames: { '#bag': 'bag' },
+                        ExpressionAttributeValues: { ':bag': newBag, ':expected': expectedBag },
+                    },
+                },
+                {
+                    Put: {
+                        TableName: TABLE_NAME,
+                        Item: { guildId: LISTING_PREFIX + guildId, userId: listingId, status: 'listed', sellerId: seller.id, sellerName: seller.displayName || 'a noble', ...listing },
+                    },
+                },
+            ],
+        }));
+        return listingId;
+    } catch (error) {
+        if (cancelledBy(error)) return null;
+        throw error;
+    }
+};
+
+/* Put a listing on today's shelves, or refresh its closing time if it is
+ * already there (a second shop opened the same day). Returns false if it was
+ * sold or settled in the meantime.
+ */
+const putListingOnSale = async function (guildId, listingId, saleDay, closesAt) {
+    if (!isConfigured()) return false;
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId: LISTING_PREFIX + guildId, userId: listingId },
+            UpdateExpression: 'SET #status = :onSale, #saleDay = :day, #closes = :closes',
+            ConditionExpression: '#status = :listed OR (#status = :onSale AND #saleDay = :day)',
+            ExpressionAttributeNames: { '#status': 'status', '#saleDay': 'saleDay', '#closes': 'closesAt' },
+            ExpressionAttributeValues: { ':listed': 'listed', ':onSale': 'onSale', ':day': saleDay, ':closes': closesAt },
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
+/* Buy a listing, in one transaction: the listing must still be on sale today,
+ * the buyer is charged `price` and given the gear (`grant`, as in
+ * buyWithPoints), and the seller is paid the same `price`. Returns
+ * { ok: true } or { ok: false, reason: 'soldOut' | 'cannotAfford' }.
+ */
+const buyListing = async function (guildId, listing, buyer, price, grant, day, now) {
+    if (!isConfigured()) return { ok: false, reason: 'soldOut' };
+
+    try {
+        await getClient().send(new TransactWriteCommand({
+            TransactItems: [
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId: LISTING_PREFIX + guildId, userId: listing.listingId },
+                        UpdateExpression: 'SET #status = :sold, #buyer = :buyer, #paid = :price',
+                        ConditionExpression: '#status = :onSale AND #saleDay = :day AND #closes > :now',
+                        ExpressionAttributeNames: { '#status': 'status', '#buyer': 'buyerId', '#paid': 'paid', '#saleDay': 'saleDay', '#closes': 'closesAt' },
+                        ExpressionAttributeValues: { ':sold': 'sold', ':onSale': 'onSale', ':buyer': buyer.id, ':price': price, ':day': day, ':now': now },
+                    },
+                },
+                { Update: chargeUpdate(guildId, buyer.id, buyer.displayName, price, grant) },
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId, userId: listing.sellerId },
+                        UpdateExpression: 'ADD #pts :price',
+                        ExpressionAttributeNames: { '#pts': 'points' },
+                        ExpressionAttributeValues: { ':price': price },
+                    },
+                },
+            ],
+        }));
+        return { ok: true };
+    } catch (error) {
+        if (!cancelledBy(error)) throw error;
+        return { ok: false, reason: failedIndex(error) === 1 ? 'cannotAfford' : 'soldOut' };
+    }
+};
+
+/* Close out a listing that didn't sell: the seller is paid `refund` and the
+ * listing is marked expired, in one transaction. Returns false if it was
+ * already settled.
+ */
+const expireListing = async function (guildId, listing, refund) {
+    if (!isConfigured()) return false;
+
+    try {
+        await getClient().send(new TransactWriteCommand({
+            TransactItems: [
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId: LISTING_PREFIX + guildId, userId: listing.listingId },
+                        UpdateExpression: 'SET #status = :expired, #paid = :refund',
+                        ConditionExpression: '#status = :onSale',
+                        ExpressionAttributeNames: { '#status': 'status', '#paid': 'paid' },
+                        ExpressionAttributeValues: { ':expired': 'expired', ':onSale': 'onSale', ':refund': refund },
+                    },
+                },
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId, userId: listing.sellerId },
+                        UpdateExpression: 'ADD #pts :refund',
+                        ExpressionAttributeNames: { '#pts': 'points' },
+                        ExpressionAttributeValues: { ':refund': refund },
+                    },
+                },
+            ],
+        }));
+        return true;
+    } catch (error) {
+        if (cancelledBy(error)) return false;
+        throw error;
+    }
 };
 
 /* Per-guild channel overrides for where a passive behavior posts its
@@ -1197,6 +1425,12 @@ module.exports = {
     clearChannelOverride,
     getInjury,
     setInjury,
+    getListings,
+    createListing,
+    putListingOnSale,
+    buyListing,
+    expireListing,
+    tradeCharacters,
     grantGear,
     recordDuelResult,
     getDuelStats,

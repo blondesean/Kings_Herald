@@ -6,7 +6,7 @@
  */
 
 const pointsStore = require('../../src/pointsStore');
-const { currentOpenShop, shopEmbed } = require('../passive/shop');
+const { currentOpenShop, shopEmbed, discountsFor } = require('../passive/shop');
 const flavor = require('../../flavor_text');
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
@@ -18,7 +18,8 @@ const shop = async function (interaction) {
             await interaction.editReply(pick(flavor.shopClosedLines()));
             return;
         }
-        await interaction.editReply({ embeds: [shopEmbed(record)] });
+        const discounts = await discountsFor(interaction.guild.id, record.day);
+        await interaction.editReply({ embeds: [shopEmbed(record, discounts)] });
     } catch (error) {
         console.error('Error showing the shop:', error);
         await interaction.editReply('Alack! The merchant\'s ledger is sealed to mine eyes at present. Pray try again anon!');

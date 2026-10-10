@@ -11,6 +11,9 @@
  * never run out. The shop stays open for OPEN_MS (180
  * minutes) after it posts, and its stock resets at midnight Eastern.
  *
+ * Gear members sold back with /sell on an earlier day also goes on sale, in
+ * a Discounts section shown only when there is some (see DISCOUNT below).
+ *
  * Buying uses points from the ledger (see /buy in commands/prompts/buy.js).
  * Gear goes to the buyer's bag, and titles, classes and races take effect
  * right away, replacing the old one. Equipping gear and the fit score are
@@ -99,20 +102,73 @@ const kindOf = (entry) => {
     return 'gear';
 };
 
-const shopEmbed = (record) => {
+/* Sellback discounts (see /sell in commands/prompts/sell.js). Gear listed on
+ * one day goes on sale at the next shop to open on a later day, one copy,
+ * at DISCOUNT off. A sale pays the seller what the buyer paid; a listing
+ * still unsold when that shop closes pays the seller UNSOLD_REFUND of the
+ * full price instead, and the piece leaves the realm.
+ */
+const DISCOUNT = 0.25;
+const UNSOLD_REFUND = 0.5;
+const discountPrice = (price) => Math.round(price * (1 - DISCOUNT));
+const unsoldRefund = (price) => Math.round(price * UNSOLD_REFUND);
+
+// The listings on sale (or already sold) in today's shop, oldest first.
+const discountsFor = async function (guildId, day) {
+    const listings = await pointsStore.getListings(guildId);
+    return listings.filter((l) => l.saleDay === day && (l.status === 'onSale' || l.status === 'sold'));
+};
+
+// Pays out every listing whose shop has closed without it selling.
+const settleListings = async function (guildId, now = Date.now()) {
+    const listings = await pointsStore.getListings(guildId);
+    for (const listing of listings) {
+        if (listing.status !== 'onSale' || listing.closesAt > now) continue;
+        const refund = unsoldRefund(listing.price);
+        if (await pointsStore.expireListing(guildId, listing, refund)) {
+            console.log(`Shop (guild ${guildId}): ${listing.sellerName}'s ${listing.itemId} went unsold; refunded ${refund}.`);
+        }
+    }
+    return listings;
+};
+
+// Moves every listing from an earlier day onto this shop's shelves, and
+// returns today's discounts. A rehearsal only shows what would go on sale.
+const stockDiscounts = async function (guildId, record, persist) {
+    const listings = persist ? await settleListings(guildId, record.openedAt) : await pointsStore.getListings(guildId);
+    const ready = listings.filter((l) =>
+        (l.status === 'listed' && l.listedDay < record.day) ||
+        (l.status === 'onSale' && l.saleDay === record.day && l.closesAt > record.openedAt));
+    const onSale = [];
+    for (const listing of ready) {
+        if (!persist || await pointsStore.putListingOnSale(guildId, listing.listingId, record.day, record.closesAt)) {
+            onSale.push({ ...listing, status: 'onSale', saleDay: record.day, closesAt: record.closesAt });
+        }
+    }
+    return onSale;
+};
+
+const shopEmbed = (record, discounts = []) => {
+    // Gear reads [Slot] [Rarity] Name; the rarity comes from the price.
+    const tagFor = (entry) => (entry.slot
+        ? `[${entry.slot[0].toUpperCase()}${entry.slot.slice(1)}] [${catalog.rarityFor(entry.price)}] `
+        : '');
     const linesFor = (kind) => record.items
         .map((id) => catalog.findEntry(id))
         .filter((entry) => entry && kindOf(entry) === kind)
-        .map((entry) => {
-            // Gear reads [Slot] [Rarity] Name; the rarity comes from the price.
-            const tag = entry.slot
-                ? `[${entry.slot[0].toUpperCase()}${entry.slot.slice(1)}] [${catalog.rarityFor(entry.price)}] `
-                : '';
-            return `${tag}**${entry.name}** — ${entry.price} pts`;
+        .map((entry) => `${tagFor(entry)}**${entry.name}** — ${entry.price} pts`);
+
+    const discountLines = discounts
+        .map((listing) => ({ listing, entry: catalog.findEntry(listing.itemId) }))
+        .filter(({ entry }) => entry)
+        .map(({ listing, entry }) => {
+            const price = listing.status === 'sold' ? 'sold' : `~~${entry.price}~~ ${discountPrice(entry.price)} pts`;
+            return `${tagFor(entry)}**${entry.name}** — ${price}, from ${listing.sellerName}`;
         });
 
     const sections = [
         [`=== Armor and Arms (${COPIES_PER_ITEM} in stock) ===`, linesFor('gear')],
+        [`=== Discounts (${DISCOUNT * 100}% off, 1 each) ===`, discountLines],
         ['=== Titles (unique) ===', linesFor('title')],
         ['=== Classes (no limit) ===', linesFor('class')],
         ['=== Races (no limit) ===', linesFor('race')],
@@ -122,7 +178,18 @@ const shopEmbed = (record) => {
         .setTitle("The Herald's Shop")
         .setDescription(`${flavor.shopOpenLines()[0]}\n\nBuy with \`/buy <name>\` and bear thy spoils proudly on \`/flex\`. Each piece lends thee fit, reckoned by its fame and, mostly, its weight in coin. Seek the rarest pieces, for the court's duels favor the best-armoured, and a full kit makes thy fit the envy of the realm. The merchant packs up after three turns of the hour hand.\n\n*Wish to be summoned the moment the stalls open? Use /shop_signup!*`);
     for (const [name, values] of sections) {
-        if (values.length) embed.addFields({ name, value: values.join('\n') });
+        // A field holds 1024 characters, so a long section carries over into more.
+        let chunk = [];
+        let fieldName = name;
+        for (const line of values) {
+            if (chunk.length && [...chunk, line].join('\n').length > 1024) {
+                embed.addFields({ name: fieldName, value: chunk.join('\n') });
+                chunk = [];
+                fieldName = '​';
+            }
+            chunk.push(line);
+        }
+        if (chunk.length) embed.addFields({ name: fieldName, value: chunk.join('\n') });
     }
     return embed;
 };
@@ -148,14 +215,22 @@ const openShopNow = async function (client, options = {}) {
 
             const record = stockRecord();
             if (persist) await pointsStore.openShop(g.id, record);
+            const discounts = await stockDiscounts(g.id, record, persist);
+            if (persist && discounts.length) {
+                // Pays out whatever is left unsold at closing. A restart loses
+                // this timer, so the next opening settles them instead.
+                setTimeout(() => {
+                    settleListings(g.id).catch((error) => console.error(`Shop (guild ${g.id}): settling listings failed:`, error));
+                }, OPEN_MS + 1000);
+            }
             // Only the real opening pings the shopaholics; a test shop doesn't.
             const role = ping ? findShopRole(g) : null;
             await channel.send({
                 content: role ? `<@&${role.id}> The merchant has thrown open his stalls!` : undefined,
-                embeds: [shopEmbed(record)],
+                embeds: [shopEmbed(record, discounts)],
                 allowedMentions: { roles: role ? [role.id] : [] },
             });
-            console.log(`Shop (guild ${g.id}) opened${persist ? '' : ' (rehearsal, not saved)'}: ${record.items.join(', ')}.`);
+            console.log(`Shop (guild ${g.id}) opened${persist ? '' : ' (rehearsal, not saved)'}: ${record.items.join(', ')}${discounts.length ? `; discounts: ${discounts.map((l) => l.itemId).join(', ')}` : ''}.`);
         } catch (guildError) {
             console.error(`Shop failed to open for guild "${g.name}":`, guildError);
         }
@@ -170,4 +245,7 @@ const currentOpenShop = async function (guildId, now = Date.now()) {
     return record;
 };
 
-module.exports = { openShopNow, pickDailyStock, easternDay, stockRecord, shopEmbed, kindOf, currentOpenShop };
+module.exports = {
+    openShopNow, pickDailyStock, easternDay, stockRecord, shopEmbed, kindOf, currentOpenShop,
+    discountsFor, settleListings, discountPrice, unsoldRefund,
+};
