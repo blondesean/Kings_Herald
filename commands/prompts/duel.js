@@ -499,7 +499,7 @@ const duel = async function (interaction) {
 
 module.exports = {
     description: 'Challenge another court member to a wagered duel',
-    category: 'COURTLY GAMES',
+    category: 'DUELS',
     options: [
         {
             name: 'opponent',

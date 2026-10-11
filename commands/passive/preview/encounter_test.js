@@ -35,7 +35,7 @@ const encounterTest = async function (interaction) {
 
 module.exports = {
     description: 'Run a rehearsal boss encounter in this channel (no injuries or loot)',
-    category: 'ROYAL CHRONICLES',
+    category: 'UTILITY',
     hidden: true, // out of the generated /help
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     options: [

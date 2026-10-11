@@ -1,4 +1,4 @@
-/* Shared helper: the role members can join via /shop_signup to be pinged when
+/* Shared helper: the role members can join via /signup shop to be pinged when
  * the daily shop opens (commands/passive/shop.js). Looked up by name per guild
  * rather than stored anywhere; Discord persists the role itself, so nothing
  * needs to survive a bot restart. Mirrors src/puzzleRole.js.
@@ -21,7 +21,7 @@ const getOrCreateShopRole = async (guild) => {
         name: SHOP_ROLE_NAME,
         mentionable: true,
         color: SHOP_ROLE_COLOR,
-        reason: 'Auto-created for /shop_signup',
+        reason: 'Auto-created for /signup shop',
     });
 };
 

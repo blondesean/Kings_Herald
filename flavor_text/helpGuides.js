@@ -1,0 +1,131 @@
+/* The guides behind `/help topic:<name>` (commands/prompts/help.js), in the
+ * herald's voice. Each is { label, title, text }: label names it in the topic
+ * picker, and text becomes the embed description, so keep it well under
+ * Discord's 4096 characters.
+ *
+ * These are hand-written, so keep them in step with the rules they describe:
+ * the encounter (commands/passive/encounter.js), the shop and sellback
+ * (commands/passive/shop.js, /sell, /trade), achievements (src/achievements.js),
+ * myths (commands/prompts/myths.js), duels (commands/prompts/duel.js), and every
+ * way points are earned.
+ */
+
+const helpGuides = {
+    encounter: {
+        label: 'Boss encounters',
+        title: 'The Daily Encounter',
+        text: [
+            'Once a day a threat stirs, and the herald calls for a party of up to five.',
+            '',
+            '**Joining.** Click **Join the party**, and thou art asked, privately, two things: how grand a challenge to face, Easy through Max, and thy stance. The party\'s average vote picks the foe, revealed only in battle.',
+            '',
+            '**Stances.** Aggressive fights at +15% fit, but a loss lays thee up for two days. Balanced fights at thy true fit and rests one day. Defensive fights at -15% and walks away unhurt.',
+            '',
+            '**Fit and power.** Thy fit is the worth of the gear thou wearest. Power is fit after thy stance. The party\'s power against the boss\'s sets the odds: about 80% at an even match, better above it, falling fast below it, and never quite certain.',
+            '',
+            '**The march.** The party marches when it is full and every member has chosen, or after an hour. Whatever thou leavest unchosen is Easy and Balanced.',
+            '',
+            '**Victory.** One hero lands the killing blow, and two pieces of loot drop, Common for Easy up to Legendary for Max. Click **Roll for this loot** to choose Need, Greed or Pass in secret. Needers roll first, and Need is only for an upgrade over what thou wearest.',
+            '',
+            '**Defeat.** The wounded may not join again until they heal.',
+            '',
+            'Be summoned when a threat stirs with `/signup encounter`.',
+        ].join('\n'),
+    },
+    shop: {
+        label: 'Shop, selling and trading',
+        title: 'The Merchant\'s Stalls',
+        text: [
+            'Once a day the merchant opens for three hours with 5 pieces of gear, a title, a class and a race. See it with `/shop`.',
+            '',
+            '**Buying.** `/buy <name>`. Each piece of gear has two copies for the whole court, and a title only one. Gear goes to thy bag, seen with `/bank`, and `/equip` puts it on. A class, race or title takes hold at once.',
+            '',
+            '**Rarity.** Common 10 points, Uncommon 15 to 20, Rare 25 to 30, Epic 35 to 45, Legendary 50. What thy worn gear cost is thy fit, which sways fit duels and encounters.',
+            '',
+            '**Selling.** `/sell <item>` lists a piece from thy bag in the next day\'s **Discounts**, at 25% off. If it sells, thou receivest what the buyer paid. If not, half its price comes back to thee and the piece is gone.',
+            '',
+            '**Trading.** `/trade <item> <player> <offer>` offers gear from thy bag for gear from theirs, or for points. They have five minutes to accept.',
+            '',
+            '**Titles.** A new title sends thine old one back to the shelf, and `/return_title` gives it up while the shop is open.',
+            '',
+            'Be summoned when the stalls open with `/signup shop`.',
+        ].join('\n'),
+    },
+    character: {
+        label: 'Thy character',
+        title: 'Thy Character',
+        text: [
+            'Every noble of the court has a character sheet: a name and title, a race and class, and seven slots of gear: helm, chest, pants, weapon, gloves, cape and boots.',
+            '',
+            '`/flex` shows thy sheet to the court. `/wardrobe` shows it to thee alone, and `/inspect <member>` lets thee study another\'s in private.',
+            '',
+            '`/pose` chooses the figure that stands beside thy sheet. It costs nothing.',
+            '',
+            '`/bank` lists the gear in thy bag, and `/equip <item>` puts a piece on, sending what thou wore back to the bag.',
+            '',
+            'Thy **fit** is the worth of the gear thou wearest. It sways fit duels and the daily encounter, and the finest fit in the court is a myth.',
+        ].join('\n'),
+    },
+    achievements: {
+        label: 'Achievements',
+        title: 'Achievements',
+        text: [
+            'Deeds the herald records, each worth **5 points**, earned once.',
+            '',
+            '`/achievements` shows every one, earned or not, with thy progress, such as 7/10. Only thou seest it.',
+            '',
+            '**How they unlock.** Most are announced the moment they happen, in the game where thou earnest them. The herald also counts every hour and proclaims any deed it finds, such as points earned in voice.',
+            '',
+            '**What they measure.** Some count what thou hast done: encounter wins at each challenge, duels, puzzles solved, trivia answered, recap podiums, gear sold and trades made. Others, what thou art: thy fit, a full kit, a Legendary piece worn, a class, race, title or pose.',
+            '',
+            '**Points earned** counts every point thou hast ever won, spent or not. Deeds from before achievements existed were counted from the herald\'s records.',
+        ].join('\n'),
+    },
+    myths: {
+        label: 'Myths',
+        title: 'The Myths of the Court',
+        text: [
+            '`/myths` shows the court\'s all-time records. Surpass one, and thy name replaces it. Ties share the honour.',
+            '',
+            '**Mightiest Party.** The greatest power any encounter party has brought to battle, win or lose.',
+            '**Most Duels Won.** The most duels won, ever.',
+            '**Longest Week in Voice.** The most hours spent in voice in a single week, Sunday to Sunday.',
+            '**Biggest Spender.** The most points ever spent at the merchant\'s stalls.',
+            '**Finest Fit.** The highest fit worn right now.',
+            '**Greatest Duel.** The richest wager ever won, and who was beaten.',
+        ].join('\n'),
+    },
+    duels: {
+        label: 'Duels',
+        title: 'Duels',
+        text: [
+            '`/duel <opponent> <method> <wager>` challenges a member of the court. Both must hold the wager, and the challenged has five minutes to accept or decline. The winner takes the wager.',
+            '',
+            '**Coin Flip.** Even odds.',
+            '**Rock Paper Scissors.** Each chooses in secret, and a tie goes again.',
+            '**Death Roll.** The first roll is from 0 to 10,000, and each roll after goes from 0 to the last one. Whoever rolls 0 loses.',
+            '**Fit Duel.** Thy odds are thy share of the two fits combined, so the better armoured usually wins.',
+            '',
+            '`/duel_stats` shows a member\'s record.',
+        ].join('\n'),
+    },
+    points: {
+        label: 'Earning points',
+        title: 'Earning Points',
+        text: [
+            'Points raise thee up the `/nobility` ladder and buy thee gear. `/balance` shows thine.',
+            '',
+            '**Daily trivia.** 2 for a right answer. Some days bring a would-you-rather instead, 2 for guessing the court\'s choice, or a ranking, 5 for the closest and 2 for the next.',
+            '**Daily puzzle.** 1 to everyone who helped, if the puzzle is solved.',
+            '**WoW Trivia Wednesdays.** 2 to the champion of the evening.',
+            '**Voice.** For every hour, one point fewer than the number in the channel, so two earn 1 an hour each.',
+            '**Sunday recap.** 5, 3 and 1 for the top posts, chatter, voice and puzzles of the week, and 1 for every ten members who reacted to thy posts.',
+            '**Duels.** The wager, if thou winnest.',
+            '**Achievements.** 5 each.',
+            '**Selling.** What a buyer pays for thy gear.',
+            '**Birthdays.** A point for every year.',
+        ].join('\n'),
+    },
+};
+
+module.exports = helpGuides;

@@ -1,4 +1,4 @@
-/* Shared helper: the role members can join via /trivia_signup to be pinged
+/* Shared helper: the role members can join via /signup trivia to be pinged
  * when the daily trivia round posts (commands/passive/trivia.js). Looked up
  * by name per guild rather than stored anywhere — Discord persists the role
  * itself, so nothing needs to survive a bot restart.
@@ -22,7 +22,7 @@ const getOrCreateTriviaRole = async (guild) => {
         name: TRIVIA_ROLE_NAME,
         mentionable: true,
         color: TRIVIA_ROLE_COLOR,
-        reason: 'Auto-created for /trivia_signup',
+        reason: 'Auto-created for /signup trivia',
     });
 };
 

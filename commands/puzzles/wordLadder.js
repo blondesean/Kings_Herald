@@ -259,7 +259,7 @@ const runWordLadderSession = (guild, channel, puzzle, persist, runLabel) => {
         });
 
         // Only the real scheduled puzzle pings signed-up members
-        // (/puzzle_signup) — preview runs shouldn't spam them.
+        // (/signup puzzle) — preview runs shouldn't spam them.
         const role = persist ? findPuzzleRole(guild) : null;
         const intro = pick(flavor.wordLadderIntroLines(session.start.toUpperCase(), session.target.toUpperCase(), MAX_STEPS));
 

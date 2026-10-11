@@ -209,7 +209,7 @@ const trade = async function (interaction) {
 
 module.exports = {
     description: 'Offer a piece of gear from your bag to another member for their gear or points',
-    category: 'ROYAL CHRONICLES',
+    category: 'SHOP',
     options: [
         {
             name: 'item',

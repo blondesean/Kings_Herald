@@ -1,4 +1,4 @@
-/* Shared helper: the role members can join via /adventurer_signup to be
+/* Shared helper: the role members can join via /signup encounter to be
  * pinged when the daily boss encounter posts (commands/passive/encounter.js).
  * Looked up by name per guild rather than stored anywhere; Discord persists
  * the role itself, so nothing needs to survive a bot restart. Mirrors
@@ -22,7 +22,7 @@ const getOrCreateAdventurerRole = async (guild) => {
         name: ADVENTURER_ROLE_NAME,
         mentionable: true,
         color: ADVENTURER_ROLE_COLOR,
-        reason: 'Auto-created for /adventurer_signup',
+        reason: 'Auto-created for /signup encounter',
     });
 };
 

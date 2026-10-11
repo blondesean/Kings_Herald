@@ -39,7 +39,7 @@ const duelStats = async function (interaction) {
 
 module.exports = {
     description: "Check a member's dueling record (defaults to you)",
-    category: 'COURTLY GAMES',
+    category: 'DUELS',
     options: [
         {
             name: 'member',

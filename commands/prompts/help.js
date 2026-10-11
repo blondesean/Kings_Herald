@@ -1,13 +1,39 @@
-/* /help - the herald's scroll of services, generated from command metadata.
+/* /help [topic] - the herald's scroll of services, seen only by the asker.
  *
- * Every loaded command exports { description, category, hidden, options, run }.
- * The scroll groups visible commands by category, so a new command shows up
- * here automatically — no hand-edited list to keep in sync. Commands with
- * hidden: true (preview commands, test utilities) are omitted on purpose.
+ * Without a topic it lists the commands, grouped by each module's category
+ * and generated from command metadata, so a new command shows up here
+ * automatically. Commands with hidden: true (preview commands, test
+ * utilities) are always left out, and adminOnly ones are shown only to
+ * members with Manage Server, who are the only ones who can run them. A
+ * hand-written list of the herald's daily doings follows.
+ *
+ * With a topic it shows that guide from flavor_text/helpGuides.js.
  */
 
-// Display order for known categories; anything new lands after these.
-const CATEGORY_ORDER = ['NOBLE ANNOUNCEMENTS', 'ROYAL CHRONICLES', 'COURTLY GAMES', 'UTILITY'];
+const { ApplicationCommandOptionType, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const guides = require('../../flavor_text/helpGuides');
+
+const EMBED_COLOR = 0xd4af37;
+
+// Display order and headings; anything new lands after these.
+const CATEGORIES = [
+    ['CHARACTER', 'Thy Character'],
+    ['SHOP', 'Shop and Trading'],
+    ['GLORY', 'Points and Glory'],
+    ['DUELS', 'Duels'],
+    ['SUMMONS', 'Summons'],
+    ['UTILITY', 'Utility'],
+];
+const ADMIN_HEADING = 'For the Stewards';
+
+const DAILY = [
+    '**Trivia**, a puzzle, the shop and a boss encounter, each at its own hour between 9 AM and 9 PM Eastern',
+    '**Voice** pays points for every hour spent together',
+    '**Sunday at noon**, the weekly recap and its podiums',
+    '**Wednesday at 9 PM**, WoW trivia',
+    '**Achievements** proclaimed as they are earned',
+    '**Birthdays** honoured, and in October, a daily treat',
+].join('\n');
 
 // Render a command's usage from its name and options: /whois <member>
 const usageOf = (name, cmd) => {
@@ -17,46 +43,64 @@ const usageOf = (name, cmd) => {
     return `/${name}${opts}`;
 };
 
-const help = async function (interaction, commands) {
-    console.log("Herald providing assistance!");
-
-    // Group visible commands by category, preserving load order within each.
-    const byCategory = new Map();
-    for (const [name, cmd] of Object.entries(commands)) {
-        if (cmd.hidden) continue;
-        const category = cmd.category || 'UTILITY';
-        if (!byCategory.has(category)) byCategory.set(category, []);
-        byCategory.get(category).push({ name, cmd });
+// An embed field holds 1024 characters; a long group spills into more fields.
+const groupFields = (heading, lines) => {
+    const fields = [];
+    for (const line of lines) {
+        const last = fields[fields.length - 1];
+        if (last && `${last.value}\n${line}`.length <= 1024) last.value += `\n${line}`;
+        else fields.push({ name: fields.length ? `${heading}, continued` : heading, value: line });
     }
+    return fields;
+};
 
-    const orderedCategories = [
-        ...CATEGORY_ORDER.filter((c) => byCategory.has(c)),
-        ...[...byCategory.keys()].filter((c) => !CATEGORY_ORDER.includes(c)),
+const overview = (interaction, commands) => {
+    const isAdmin = Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
+    const groups = new Map();
+    for (const [name, cmd] of Object.entries(commands)) {
+        if (cmd.hidden || (cmd.adminOnly && !isAdmin)) continue;
+        const key = cmd.adminOnly ? ADMIN_HEADING : cmd.category || 'UTILITY';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(`\`${usageOf(name, cmd)}\` - ${cmd.description}`);
+    }
+    const headings = new Map(CATEGORIES);
+    const order = [
+        ...CATEGORIES.map(([key]) => key).filter((key) => groups.has(key)),
+        ...[...groups.keys()].filter((key) => !headings.has(key) && key !== ADMIN_HEADING),
+        ...(groups.has(ADMIN_HEADING) ? [ADMIN_HEADING] : []),
     ];
+    const embed = new EmbedBuilder()
+        .setColor(EMBED_COLOR)
+        .setTitle('The King\'s Herald: Royal Services')
+        .setDescription('Greetings, good noble! I am thy faithful herald. These are my services, and `/help topic` tells thee more of any of them.')
+        .addFields(order.flatMap((key) => groupFields(headings.get(key) || key, groups.get(key))))
+        .addFields({ name: 'Every Day in the Realm', value: DAILY })
+        .setFooter({ text: `Topics: ${Object.values(guides).map((g) => g.label).join(', ')}` });
+    return embed;
+};
 
-    const sections = orderedCategories.map((category) => {
-        const lines = byCategory
-            .get(category)
-            .map(({ name, cmd }) => `\`${usageOf(name, cmd)}\` - *${cmd.description}*`)
-            .join('\n');
-        return `**${category}**\n${lines}`;
-    });
-
-    const helpMessage = `**THE KING'S HERALD - ROYAL SERVICES**\n\n` +
-        `*Greetings, noble sir! I am thy faithful herald, ready to serve the court with these royal proclamations:*\n\n` +
-        sections.join('\n\n') + `\n\n` +
-
-        `**AUTOMATIC ROYAL SERVICES**\n` +
-        `*Royal acclaim for messages with five-and-twenty or more marks of favor*\n` +
-        `*Each Sunday at noon, a chronicle of the week's most-celebrated posts and the standings of honor, proclaimed in the town square*\n\n` +
-
-        `*"I remain thy humble servant, ready to herald thy greatness throughout the realm!"*`;
-
-    await interaction.editReply(helpMessage);
+const help = async function (interaction, commands) {
+    const topic = interaction.options.getString('topic');
+    console.log(`Herald providing assistance${topic ? ` on ${topic}` : ''}!`);
+    const guide = topic && guides[topic];
+    const embed = guide
+        ? new EmbedBuilder().setColor(EMBED_COLOR).setTitle(guide.title).setDescription(guide.text)
+        : overview(interaction, commands);
+    await interaction.editReply({ embeds: [embed] });
 };
 
 module.exports = {
-    description: 'Repeat this scroll of services',
+    description: 'Learn what the herald can do, or more of one topic (visible only to you)',
     category: 'UTILITY',
+    ephemeral: true,
+    options: [
+        {
+            name: 'topic',
+            description: 'A guide to one part of the realm',
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            choices: Object.entries(guides).map(([value, g]) => ({ name: g.label, value })),
+        },
+    ],
     run: help,
 };

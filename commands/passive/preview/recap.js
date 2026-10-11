@@ -31,7 +31,7 @@ const recap = async function (interaction) {
 
 module.exports = {
     description: 'Preview the weekly chronicle in this channel, awarding no points',
-    category: 'ROYAL CHRONICLES',
+    category: 'UTILITY',
     hidden: true, // out of the generated /help
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     run: recap,

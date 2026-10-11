@@ -65,7 +65,7 @@ const returnTitle = async function (interaction) {
 
 module.exports = {
     description: 'Send your title back to the merchant so someone else can buy it',
-    category: 'ROYAL CHRONICLES',
+    category: 'SHOP',
     ephemeral: true,
     run: returnTitle,
 };

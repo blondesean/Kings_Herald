@@ -28,6 +28,6 @@ const shop = async function (interaction) {
 
 module.exports = {
     description: "See today's shop and what is still for sale",
-    category: 'ROYAL CHRONICLES',
+    category: 'SHOP',
     run: shop,
 };

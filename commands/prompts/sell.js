@@ -66,7 +66,7 @@ const sell = async function (interaction) {
 
 module.exports = {
     description: 'Sell a piece of gear from your bag back to the merchant (visible only to you)',
-    category: 'ROYAL CHRONICLES',
+    category: 'SHOP',
     ephemeral: true,
     options: [
         {

@@ -24,7 +24,7 @@ const wardrobe = async function (interaction) {
 
 module.exports = {
     description: "Check your own character sheet privately (visible only to you)",
-    category: 'ROYAL CHRONICLES',
+    category: 'CHARACTER',
     ephemeral: true,
     run: wardrobe,
 };

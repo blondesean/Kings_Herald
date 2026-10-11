@@ -1,4 +1,4 @@
-/* Shared helper: the role members can join via /puzzle_signup to be pinged
+/* Shared helper: the role members can join via /signup puzzle to be pinged
  * when the daily Connections puzzle posts (commands/puzzles/connections.js).
  * Looked up by name per guild rather than stored anywhere — Discord persists
  * the role itself, so nothing needs to survive a bot restart. Mirrors
@@ -25,7 +25,7 @@ const getOrCreatePuzzleRole = async (guild) => {
         name: PUZZLE_ROLE_NAME,
         mentionable: true,
         color: PUZZLE_ROLE_COLOR,
-        reason: 'Auto-created for /puzzle_signup',
+        reason: 'Auto-created for /signup puzzle',
     });
 };
 

@@ -1,4 +1,4 @@
-/* Shared helper: the role members can join via /wow_trivia_signup to be
+/* Shared helper: the role members can join via /signup wow trivia to be
  * pinged when a /wow_trivia session starts (commands/passive/wowTrivia.js).
  * Looked up by name per guild rather than stored anywhere — Discord persists
  * the role itself, so nothing needs to survive a bot restart. Mirrors
@@ -26,7 +26,7 @@ const getOrCreateWowTriviaRole = async (guild) => {
         name: WOW_TRIVIA_ROLE_NAME,
         mentionable: true,
         color: WOW_TRIVIA_ROLE_COLOR,
-        reason: 'Auto-created for /wow_trivia_signup',
+        reason: 'Auto-created for /signup wow trivia',
     });
 };
 

@@ -119,7 +119,7 @@ const whois = async function (interaction) {
 
 module.exports = {
     description: 'Proclaim the titles and roles of any court member',
-    category: 'NOBLE ANNOUNCEMENTS',
+    category: 'GLORY',
     options: [
         {
             name: 'member',

@@ -108,7 +108,7 @@ const showMyths = async function (interaction) {
 
 module.exports = {
     description: "See the court's all-time records",
-    category: 'ROYAL CHRONICLES',
+    category: 'GLORY',
     run: showMyths,
     buildMyths,
 };

@@ -53,7 +53,7 @@ const showAchievements = async function (interaction) {
 
 module.exports = {
     description: 'See your achievements and progress (visible only to you)',
-    category: 'ROYAL CHRONICLES',
+    category: 'GLORY',
     ephemeral: true,
     run: showAchievements,
 };

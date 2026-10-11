@@ -26,7 +26,7 @@ const heraldChannelList = async function (interaction) {
 
 module.exports = {
     description: 'Show which channel each scheduled behavior posts to',
-    category: 'ROYAL CHRONICLES',
+    category: 'UTILITY',
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     ephemeral: true,
     run: heraldChannelList,

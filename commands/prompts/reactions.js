@@ -155,7 +155,7 @@ const reactions = async function (interaction) {
 
 module.exports = {
     description: "Chronicle one's favorite marks of expression",
-    category: 'ROYAL CHRONICLES',
+    category: 'GLORY',
     options: [
         {
             name: 'member',

@@ -31,7 +31,7 @@ const shopTest = async function (interaction) {
 
 module.exports = {
     description: 'Open a test shop now in this channel, saved so /buy works (replaces today\'s shop)',
-    category: 'ROYAL CHRONICLES',
+    category: 'UTILITY',
     hidden: true, // out of the generated /help
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     run: shopTest,

@@ -183,7 +183,7 @@ const buildTeaserEmbed = (party, maxParty, joinWindowMs, closed = false) => {
     return new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle(closed ? 'The Encounter: the party has marched' : 'The Encounter: a threat stirs')
-        .setDescription(`${pick(flavor.encounterTeaserLines())}\n\nJoin the party and choose thy destiny: how grand a challenge to embark upon, and how thou wilt fight it. The party marches when ${maxParty} are ready, or after ${minutesLabel(joinWindowMs)}. The foe's name is revealed only in battle.\n\n*Wish to be summoned the moment a threat stirs? Use /adventurer_signup!*`)
+        .setDescription(`${pick(flavor.encounterTeaserLines())}\n\nJoin the party and choose thy destiny: how grand a challenge to embark upon, and how thou wilt fight it. The party marches when ${maxParty} are ready, or after ${minutesLabel(joinWindowMs)}. The foe's name is revealed only in battle.\n\n*Wish to be summoned the moment a threat stirs? Use /signup encounter!*`)
         .addFields({ name: `The Party (${party.size}/${maxParty})`, value: names.length ? names.join('\n') : '*No one yet.*' })
         .setTimestamp();
 };

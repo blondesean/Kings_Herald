@@ -30,7 +30,7 @@ const halloweenTreatPreview = async function (interaction) {
 
 module.exports = {
     description: 'Rehearse the October Halloween treat draw in this channel, awarding no points',
-    category: 'ROYAL CHRONICLES',
+    category: 'UTILITY',
     hidden: true, // out of the generated /help
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     run: halloweenTreatPreview,

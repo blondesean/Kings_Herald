@@ -175,7 +175,7 @@ const buy = async function (interaction) {
 
 module.exports = {
     description: "Buy an item from today's shop with points",
-    category: 'ROYAL CHRONICLES',
+    category: 'SHOP',
     options: [
         {
             name: 'item',

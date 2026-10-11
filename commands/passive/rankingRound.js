@@ -309,7 +309,7 @@ const joinNames = (names) => {
 
 const formatDistance = (distance) => `${distance} of 10 pairs off`;
 
-const SIGNUP_NOTE = '\n\n*Wish to be summoned the instant future questions are posed? Use /trivia_signup!*';
+const SIGNUP_NOTE = '\n\n*Wish to be summoned the instant future questions are posed? Use /signup trivia!*';
 
 const buildResultsPost = (question, result, incompleteCount, persist) => {
     const { status, complete, consensus, winners } = result;
@@ -403,7 +403,7 @@ const runRankingRound = async function (client, options = {}) {
             const roundId = crypto.randomBytes(4).toString('hex');
 
             // Only the real scheduled round pings signed-up members
-            // (/trivia_signup) — preview runs shouldn't spam them.
+            // (/signup trivia) — preview runs shouldn't spam them.
             const { startRow, ...post } = buildQuestionPost(question, roundId);
             if (persist) {
                 const role = findTriviaRole(g);

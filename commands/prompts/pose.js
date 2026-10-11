@@ -27,7 +27,7 @@ const pose = async function (interaction) {
 
 module.exports = {
     description: 'Choose the stick figure pose shown beside your /flex sheet',
-    category: 'ROYAL CHRONICLES',
+    category: 'CHARACTER',
     ephemeral: true,
     options: [
         {

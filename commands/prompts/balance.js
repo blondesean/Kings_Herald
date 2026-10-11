@@ -28,7 +28,7 @@ const balance = async function (interaction) {
 
 module.exports = {
     description: 'Check your own point balance (visible only to you)',
-    category: 'ROYAL CHRONICLES',
+    category: 'GLORY',
     ephemeral: true,
     run: balance,
 };

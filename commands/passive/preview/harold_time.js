@@ -53,7 +53,7 @@ const haroldTime = async function (interaction) {
 
 module.exports = {
     description: "Report when today's trivia, puzzle, shop, birthday check or treat is set to fire (visible only to you)",
-    category: 'ROYAL CHRONICLES',
+    category: 'UTILITY',
     hidden: true, // out of the generated /help
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     ephemeral: true, // visible only to whoever ran it

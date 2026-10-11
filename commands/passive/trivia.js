@@ -252,7 +252,7 @@ const logRoundBreakdown = (guildId, question, participants, winners, runLabel) =
     console.log(`Trivia round (${tag}): ${winners.length} of ${participants.length} participant(s) earned points.`);
 };
 
-const SIGNUP_NOTE = '\n\n*Wish to be summoned the instant future questions are posed? Use /trivia_signup!*';
+const SIGNUP_NOTE = '\n\n*Wish to be summoned the instant future questions are posed? Use /signup trivia!*';
 
 // Lightly lambasts anyone who answered incorrectly — safe to name now that
 // the round is over and everyone's final answer is already being revealed
@@ -334,7 +334,7 @@ const runTrivia = async function (client, options = {}) {
             }
 
             // Only the real scheduled round pings signed-up members
-            // (/trivia_signup) — preview runs shouldn't spam them.
+            // (/signup trivia) — preview runs shouldn't spam them.
             const post = buildQuestionPost(question, seasonal);
             if (persist) {
                 const role = findTriviaRole(g);

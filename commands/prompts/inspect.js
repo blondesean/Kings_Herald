@@ -33,7 +33,7 @@ const inspect = async function (interaction) {
 
 module.exports = {
     description: "Check another member's character sheet privately (visible only to you)",
-    category: 'ROYAL CHRONICLES',
+    category: 'CHARACTER',
     ephemeral: true,
     options: [
         {

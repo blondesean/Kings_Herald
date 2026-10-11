@@ -52,7 +52,7 @@ const bank = async function (interaction) {
 
 module.exports = {
     description: 'See the gear in your bag that is not equipped (visible only to you)',
-    category: 'ROYAL CHRONICLES',
+    category: 'CHARACTER',
     ephemeral: true,
     run: bank,
 };

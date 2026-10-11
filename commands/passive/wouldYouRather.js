@@ -219,7 +219,7 @@ const joinNames = (names) => {
     return `${names.slice(0, MAX_NAMES_SHOWN).join(', ')}, and ${names.length - MAX_NAMES_SHOWN} more`;
 };
 
-const SIGNUP_NOTE = '\n\n*Wish to be summoned the instant future questions are posed? Use /trivia_signup!*';
+const SIGNUP_NOTE = '\n\n*Wish to be summoned the instant future questions are posed? Use /signup trivia!*';
 
 const buildResultsPost = (question, result, incompleteCount, persist) => {
     const { status, complete, counts, majority, winners } = result;
@@ -307,7 +307,7 @@ const runWouldYouRather = async function (client, options = {}) {
             }
 
             // Only the real scheduled round pings signed-up members
-            // (/trivia_signup) — preview runs shouldn't spam them.
+            // (/signup trivia) — preview runs shouldn't spam them.
             const post = buildQuestionPost(question);
             if (persist) {
                 const role = findTriviaRole(g);

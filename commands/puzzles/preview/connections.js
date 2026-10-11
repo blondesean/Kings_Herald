@@ -32,7 +32,7 @@ const connectionsPreview = async function (interaction) {
 
 module.exports = {
     description: 'Fire the daily Connections puzzle in this channel for testing, awarding no points',
-    category: 'ROYAL CHRONICLES',
+    category: 'UTILITY',
     hidden: true, // out of the generated /help
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     run: connectionsPreview,

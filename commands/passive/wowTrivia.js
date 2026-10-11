@@ -147,7 +147,7 @@ const runWowTriviaSession = async (guild, channel, totalQuestions, persist, runL
     const allQuestions = flavor.wowTriviaQuestions();
     const roundQuestions = shuffle(allQuestions).slice(0, totalQuestions);
 
-    // Ping whoever's signed up (/wow_trivia_signup), same as the daily
+    // Ping whoever's signed up (/signup wow trivia), same as the daily
     // trivia pings its own role — content carries the mention since Discord
     // doesn't notify on mentions inside embeds.
     const role = findWowTriviaRole(guild);

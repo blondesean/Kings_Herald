@@ -55,7 +55,7 @@ const equip = async function (interaction) {
 
 module.exports = {
     description: 'Equip a piece of gear from your bag (visible only to you)',
-    category: 'ROYAL CHRONICLES',
+    category: 'CHARACTER',
     ephemeral: true,
     options: [
         {

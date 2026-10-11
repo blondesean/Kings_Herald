@@ -80,7 +80,7 @@ const nobility = function (interaction) {
 
 module.exports = {
     description: 'Proclaim the ranked nobility of the realm and their standings',
-    category: 'NOBLE ANNOUNCEMENTS',
+    category: 'GLORY',
     run: nobility,
     buildNobilityChunks,
     MAX_NOBLES,

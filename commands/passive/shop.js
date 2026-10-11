@@ -176,7 +176,7 @@ const shopEmbed = (record, discounts = []) => {
     const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle("The Herald's Shop")
-        .setDescription(`${flavor.shopOpenLines()[0]}\n\nBuy with \`/buy <name>\` and bear thy spoils proudly on \`/flex\`. Each piece lends thee fit, reckoned by its fame and, mostly, its weight in coin. Seek the rarest pieces, for the court's duels favor the best-armoured, and a full kit makes thy fit the envy of the realm. The merchant packs up after three turns of the hour hand.\n\n*Wish to be summoned the moment the stalls open? Use /shop_signup!*`);
+        .setDescription(`${flavor.shopOpenLines()[0]}\n\nBuy with \`/buy <name>\` and bear thy spoils proudly on \`/flex\`. Each piece lends thee fit, reckoned by its fame and, mostly, its weight in coin. Seek the rarest pieces, for the court's duels favor the best-armoured, and a full kit makes thy fit the envy of the realm. The merchant packs up after three turns of the hour hand.\n\n*Wish to be summoned the moment the stalls open? Use /signup shop!*`);
     for (const [name, values] of sections) {
         // A field holds 1024 characters, so a long section carries over into more.
         let chunk = [];

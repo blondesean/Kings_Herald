@@ -48,7 +48,7 @@ const heraldChannel = async function (interaction) {
 
 module.exports = {
     description: 'Choose which channel a scheduled behavior posts to (omit channel to reset)',
-    category: 'ROYAL CHRONICLES',
+    category: 'UTILITY',
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     ephemeral: true,
     options: [

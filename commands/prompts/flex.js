@@ -22,6 +22,6 @@ const flex = async function (interaction) {
 
 module.exports = {
     description: "Show off your character's gear, title, class and race",
-    category: 'ROYAL CHRONICLES',
+    category: 'CHARACTER',
     run: flex,
 };
