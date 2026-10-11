@@ -44,6 +44,8 @@ const helpGuides = {
             '',
             '**Selling.** `/sell <item>` lists a piece from thy bag in the next day\'s **Discounts**, at 25% off. If it sells, thou receivest what the buyer paid. If not, half its price comes back to thee and the piece is gone.',
             '',
+            '**The fence.** `/fence` shows every piece of gear in the realm, by slot and rarity. Once a day, `/fence item` buys any one of them, shop or no shop, for its price and 50 more.',
+            '',
             '**Trading.** `/trade <item> <player> <offer>` offers gear from thy bag for gear from theirs, or for points. They have five minutes to accept.',
             '',
             '**Titles.** A new title sends thine old one back to the shelf, and `/return_title` gives it up while the shop is open.',

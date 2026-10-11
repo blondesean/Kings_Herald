@@ -185,4 +185,6 @@ module.exports = {
         },
     ],
     run: buy,
+    gearGrant,
+    recordSpending,
 };

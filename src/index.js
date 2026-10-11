@@ -203,5 +203,19 @@ client.on('interactionCreate', async (interaction) => {
     console.log("< ---------- /\\/\\ END COMMAND DECISIONING /\\/\\ ---------- >\n");
 });
 
+//Autocomplete: as a member types an option marked autocomplete: true, Discord
+//asks for suggestions. A command that has any exports an autocomplete
+//function, which must answer within 3 seconds and can't be deferred.
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isAutocomplete()) return;
+    const cmd = commands[interaction.commandName];
+    if (!cmd || typeof cmd.autocomplete !== 'function') return;
+    try {
+        await cmd.autocomplete(interaction);
+    } catch (error) {
+        console.error(`Autocomplete for /${interaction.commandName} threw:`, error.message);
+    }
+});
+
 // Herald celebrates popular messages (logic in commands/passive/celebrate.js)
 client.on('messageReactionAdd', celebrate);

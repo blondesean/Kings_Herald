@@ -830,6 +830,33 @@ const buyWithPoints = async function (guildId, userId, displayName, price, grant
     }
 };
 
+/* A /fence purchase: buyWithPoints, limited to one a day. The same update
+ * also sets fencedOn to `day`, and only lands if it isn't already `day`, so
+ * two quick purchases can't both get through. Returns { ok: true } or
+ * { ok: false, reason } with reason 'alreadyFenced', 'cannotAfford', or
+ * 'changed' (the gear changed under an equip grant; try again).
+ */
+const fenceWithPoints = async function (guildId, userId, displayName, price, grant, day) {
+    if (!isConfigured()) return { ok: false, reason: 'cannotAfford' };
+
+    const params = chargeUpdate(guildId, userId, displayName, price, grant);
+    params.UpdateExpression = params.UpdateExpression.replace('SET ', 'SET #fd = :day, ');
+    params.ConditionExpression = `(${params.ConditionExpression}) AND (attribute_not_exists(#fd) OR #fd <> :day)`;
+    params.ExpressionAttributeNames['#fd'] = 'fencedOn';
+    params.ExpressionAttributeValues[':day'] = day;
+    try {
+        await getClient().send(new UpdateCommand(params));
+        recordPoints(guildId, userId, -price, 'fence', { item: grantedItem(grant) });
+        return { ok: true };
+    } catch (error) {
+        if (error.name !== 'ConditionalCheckFailedException') throw error;
+        const { Item: item = {} } = await getClient().send(new GetCommand({ TableName: TABLE_NAME, Key: { guildId, userId } }));
+        if (item.fencedOn === day) return { ok: false, reason: 'alreadyFenced' };
+        if ((item.points || 0) < price) return { ok: false, reason: 'cannotAfford' };
+        return { ok: false, reason: 'changed' };
+    }
+};
+
 // The item id a buyWithPoints grant hands over, for the history log.
 const grantedItem = (grant) => grant.bag || (grant.equip && grant.equip.itemId) || grant.value;
 
@@ -895,6 +922,8 @@ const getCharacter = async function (guildId, userId) {
         duelLosses: item.duelLosses || 0,
         totalEarned: item.totalEarned || 0,
         earnedBaseline: item.earnedBaseline,
+        // The Eastern day of the member's last /fence purchase.
+        fencedOn: item.fencedOn || null,
     };
 };
 
@@ -1674,6 +1703,7 @@ module.exports = {
     restockShopItem,
     clearTitle,
     buyWithPoints,
+    fenceWithPoints,
     getCharacter,
     setEquipment,
     getPose,
