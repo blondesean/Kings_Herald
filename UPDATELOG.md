@@ -5,8 +5,14 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-11
+
+- One /signup command and a rebuilt /help (`21dbb0a`)
+
 ## 2026-10-10
 
+- scripts/partitionBackup.js: save and restore table partitions (`4293902`)
+- Docs: encounter privacy and tally, costs, state, regenerate UPDATELOG (`f94c3c2`)
 - Encounter: private prompts, party tally, plainer results (`ce906a0`)
 - History archive: logs, snapshots and Athena (`b670f10`)
 - Achievements, /achievements and /myths (`19bcaca`)
