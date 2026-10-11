@@ -69,16 +69,6 @@ const encounterMatchupLines = {
     ],
 };
 
-// A member's line in a victory (stances stay secret on a win).
-const encounterWinMemberLines = (name) => [
-    `${name} fought with honor.`,
-    `${name} stood firm through the fray.`,
-    `${name} answered the call and did not falter.`,
-    `${name} pressed the attack without flinching.`,
-    `${name} held the line when it mattered most.`,
-    `${name} fought as the songs say heroes do.`,
-];
-
 // The killing blow on a win. `killer` is a display name.
 const encounterKillingBlowLines = (killer, boss) => [
     `It is **${killer}** who lands the killing blow, and ${boss.name} falls!`,
@@ -91,10 +81,10 @@ const encounterKillingBlowLines = (killer, boss) => [
 ];
 
 const encounterVictoryLines = () => [
-    'Victory! The party stands triumphant over its fallen foe.',
+    'The party stands triumphant over its fallen foe.',
     'The realm is saved, and the party returns in glory!',
     'The battle is won! Raise the banners and ready the feast.',
-    'The dust settles, and the party alone remains standing. Victory!',
+    'The dust settles, and the party alone remains standing.',
     'Against the odds and the dark, the party prevails!',
 ];
 
@@ -128,28 +118,6 @@ const encounterLuckyWinLines = (boss) => [
     `The odds said no. The gear said no. The party said yes, and somehow ${boss.name} believed them.`,
     `A rumbling cave-in buried half of ${boss.name}'s strength, and the underequipped party made the most of the miracle.`,
 ];
-
-// How each member fought, revealed only after a loss. `name` is a display name.
-const encounterStanceLines = {
-    aggressive: (name) => [
-        `${name} charged in headlong, blade first.`,
-        `${name} fought with reckless fury.`,
-        `${name} threw caution to the wind and went for the throat.`,
-        `${name} pressed every attack with no thought for defense.`,
-    ],
-    balanced: (name) => [
-        `${name} held a steady line.`,
-        `${name} fought with measured skill.`,
-        `${name} struck when the moment called for it and guarded when it did not.`,
-        `${name} kept a cool head amid the chaos.`,
-    ],
-    defensive: (name) => [
-        `${name} kept shield raised and footing sure.`,
-        `${name} fought warily, guarding every step.`,
-        `${name} hung back, waiting for an opening that never came.`,
-        `${name} turned aside blow after blow, giving little ground and taking little risk.`,
-    ],
-};
 
 // What became of each member after a loss.
 const encounterInjuryLines = {
@@ -204,13 +172,11 @@ module.exports = {
     encounterNoPartyLines,
     encounterRevealLines,
     encounterMatchupLines,
-    encounterWinMemberLines,
     encounterKillingBlowLines,
     encounterVictoryLines,
     encounterDefeatLines,
     encounterUnluckyLossLines,
     encounterLuckyWinLines,
-    encounterStanceLines,
     encounterInjuryLines,
     encounterLootLines,
     encounterLootWonLines,

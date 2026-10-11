@@ -218,10 +218,16 @@ const buildPrompt = (prefix, member) => {
     };
 };
 
+// The public loot message carries one button; Need/Greed/Pass open privately
+// for each party member, so no one else sees the choices.
 const lootRow = (prefix, disabled) => new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`${prefix}need`).setLabel('Need').setStyle(ButtonStyle.Success).setDisabled(disabled),
-    new ButtonBuilder().setCustomId(`${prefix}greed`).setLabel('Greed').setStyle(ButtonStyle.Primary).setDisabled(disabled),
-    new ButtonBuilder().setCustomId(`${prefix}pass`).setLabel('Pass').setStyle(ButtonStyle.Danger).setDisabled(disabled),
+    new ButtonBuilder().setCustomId(`${prefix}open`).setLabel('Roll for this loot').setStyle(ButtonStyle.Success).setDisabled(disabled)
+);
+
+const lootChoiceRow = (prefix, current) => new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`${prefix}need`).setLabel(`Need${current === 'need' ? ' - chosen' : ''}`).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`${prefix}greed`).setLabel(`Greed${current === 'greed' ? ' - chosen' : ''}`).setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`${prefix}pass`).setLabel(`Pass${current === 'pass' ? ' - chosen' : ''}`).setStyle(ButtonStyle.Danger),
 );
 
 // ---- phases ---------------------------------------------------------------------
@@ -259,7 +265,8 @@ const gatherParty = (g, channel, message, prefix, opts) =>
                 // Reserve the place before any await, so two quick clicks can't overfill the party.
                 const member = { userId, displayName: interaction.member?.displayName || interaction.user.username, vote: null, stance: null };
                 party.set(userId, member);
-                await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
+                // discord.js 14.13's deferReply ignores flags; only ephemeral: true hides it.
+                await interaction.deferReply({ ephemeral: true }).catch(() => {});
 
                 if (persist) {
                     const injuredUntil = await pointsStore.getInjury(g.id, userId).catch(() => null);
@@ -295,11 +302,20 @@ const gatherParty = (g, channel, message, prefix, opts) =>
 // in the item's slot worth as much fit or more, a Need click is entered as
 // Greed instead, and they're told why. Gear is read at click time, so it
 // reflects anything they equipped during the loot window.
-const collectLoot = (message, members, lootWindowMs, prefix, item, guildId) =>
+// The public button opens a private prompt; its Need/Greed/Pass clicks come
+// from that private message, so the collector listens on the channel by prefix.
+const collectLoot = (channel, members, lootWindowMs, prefix, item, guildId) =>
     new Promise((resolve) => {
         const choices = new Map();
         const memberIds = new Set(members.map((m) => m.userId));
-        const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: lootWindowMs });
+        const collector = channel.createMessageComponentCollector({
+            componentType: ComponentType.Button,
+            filter: (i) => i.customId.startsWith(prefix),
+            time: lootWindowMs,
+        });
+        const choiceText = (choice) => (choice
+            ? `Thou hast chosen **${choice}**. Thou mayest change it until the rolls.`
+            : 'Need, greed or pass on this piece? Thy choice is seen by none but thee.');
 
         collector.on('collect', async (interaction) => {
             if (!memberIds.has(interaction.user.id)) {
@@ -307,6 +323,11 @@ const collectLoot = (message, members, lootWindowMs, prefix, item, guildId) =>
                 return;
             }
             let choice = interaction.customId.slice(prefix.length);
+            if (choice === 'open') {
+                const current = choices.get(interaction.user.id);
+                await interaction.reply({ content: choiceText(current), components: [lootChoiceRow(prefix, current)], flags: MessageFlags.Ephemeral }).catch(() => {});
+                return;
+            }
             let note = '';
             if (choice === 'need') {
                 const character = await pointsStore.getCharacter(guildId, interaction.user.id).catch(() => ({ gear: {} }));
@@ -317,8 +338,7 @@ const collectLoot = (message, members, lootWindowMs, prefix, item, guildId) =>
                 }
             }
             choices.set(interaction.user.id, choice);
-            const content = note || `Thou hast chosen **${choice}**. Thou mayest change it until the rolls.`;
-            await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+            await interaction.update({ content: note || choiceText(choice), components: [lootChoiceRow(prefix, choice)] }).catch(() => {});
             if (choices.size === memberIds.size) collector.stop('all');
         });
 
@@ -363,6 +383,8 @@ const runEncounterIn = async (g, channel, opts) => {
     for (const m of ready) {
         const character = await pointsStore.getCharacter(g.id, m.userId).catch(() => ({ gear: {} }));
         m.gear = character.gear || {};
+        m.title = (catalog.findEntry(character.title) || {}).name || null;
+        m.className = (catalog.findEntry(character.class) || catalog.DEFAULT_CLASS).name;
         m.fit = fitScore(m.gear);
         m.effectiveFit = m.fit * STANCES[m.stance].multiplier;
     }
@@ -387,13 +409,12 @@ const runEncounterIn = async (g, channel, opts) => {
     }
 
     // The result is two embeds in one message: the battle (who fought, and
-    // how well equipped they were) and the outcome. No fit numbers or votes
-    // are shown. Stances are only revealed on a loss, where they explain the
-    // injuries; on a win they stay secret, though they still count, since the
-    // killing blow is weighted by stance-adjusted fit.
-    const lines = ready.map((m) => (won
-        ? pick(flavor.encounterWinMemberLines(m.displayName))
-        : pick(flavor.encounterStanceLines[m.stance](m.displayName))));
+    // how well equipped they were) and the outcome, with the party's total fit
+    // and power against the boss's. The party is listed by name, title and
+    // class. No one's own fit or vote is shown. Stances are only revealed on a
+    // loss, by the injuries; on a win they stay secret, though they still
+    // count, since the killing blow is weighted by stance-adjusted fit.
+    const lines = ready.map((m) => `**${m.displayName}**${m.title ? `, ${m.title}` : ''} - ${m.className}`);
 
     // How the party's plain gear (not stance-adjusted, so stances stay secret)
     // measured up against the boss.
@@ -438,8 +459,16 @@ const runEncounterIn = async (g, channel, opts) => {
             { name: 'The Odds', value: pick(flavor.encounterMatchupLines[matchup](boss)) }
         );
 
+    // The party's totals against the boss. Only totals, so each member's
+    // stance stays secret on a win.
+    const tally = [
+        `**Party fit:** ${ready.reduce((sum, m) => sum + m.fit, 0)}`,
+        `**Party power:** ${Math.round(partyFit)}`,
+        `**Boss power:** ${bossFit}`,
+    ].join('\n');
     const outcomeEmbed = new EmbedBuilder()
         .setColor(won ? EMBED_COLOR : DEFEAT_COLOR)
+        .addFields({ name: 'The Tally', value: tally })
         .setTimestamp();
 
     if (!won) {
@@ -504,7 +533,7 @@ const runEncounterIn = async (g, channel, opts) => {
             .setDescription(`${pick(flavor.encounterLootLines(itemLabel(item)))}\n\nSlot: ${item.slot}. Party members have ${minutesLabel(lootWindowMs)}: if anyone needs, only needers roll; otherwise greeders roll. Passes never roll. Need is only for an upgrade: if thou already wearest something as fine in this slot, thy Need becomes a Greed.`)
             .setTimestamp();
         const lootMessage = await channel.send({ embeds: [lootEmbed], components: [lootRow(lootPrefix, false)] });
-        const choices = await collectLoot(lootMessage, ready, lootWindowMs, lootPrefix, item, g.id);
+        const choices = await collectLoot(channel, ready, lootWindowMs, lootPrefix, item, g.id);
         await lootMessage.edit({ components: [lootRow(lootPrefix, true)] }).catch(() => {});
         return { item, choices };
     }));
@@ -543,12 +572,12 @@ const runEncounterIn = async (g, channel, opts) => {
             await delay(rollDelayMs);
         }
 
-        const anyNeed = choices.some((c) => c.choice === 'need');
-        const outranked = anyNeed ? choices.filter((c) => c.choice === 'greed').map((c) => c.displayName) : [];
-        const passers = choices.filter((c) => c.choice === 'pass').map((c) => c.displayName);
-        const footnotes = [];
-        if (outranked.length) footnotes.push(`Greeded, but a Need comes first: ${outranked.join(', ')}`);
-        if (passers.length) footnotes.push(`Passed: ${passers.join(', ')}`);
+        // Who chose what, needs first, skipping empty groups.
+        const footnotes = [['need', 'Need'], ['greed', 'Greed'], ['pass', 'Pass']]
+            .map(([key, label]) => [label, choices.filter((c) => c.choice === key).map((c) => c.displayName)])
+            .filter(([, names]) => names.length)
+            .map(([label, names]) => `**${label}:** ${names.join(', ')}`);
+        if (footnotes.length) footnotes.unshift('');
 
         const resultEmbed = new EmbedBuilder().setColor(EMBED_COLOR).setTimestamp();
 
