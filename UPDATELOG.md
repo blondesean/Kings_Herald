@@ -7,6 +7,8 @@ Regenerate after committing and commit the refreshed file.*
 
 ## 2026-10-11
 
+- /fence: buy any gear for its price plus 50, once a day (`0af80c9`)
+- Regenerate UPDATELOG.md (`ad02a5f`)
 - One /signup command and a rebuilt /help (`21dbb0a`)
 
 ## 2026-10-10
