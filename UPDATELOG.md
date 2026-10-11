@@ -5,8 +5,56 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-10
+
+- Encounter: private prompts, party tally, plainer results (`ce906a0`)
+- History archive: logs, snapshots and Athena (`b670f10`)
+- Achievements, /achievements and /myths (`19bcaca`)
+- Sellback via /sell with a Discounts shop section, and /trade between members (`aa4d1bb`)
+- Encounter: upset flavor for unlucky losses and lucky wins (`7262e09`)
+- Encounter polish: clearer choices, flavor-only results, suspenseful loot (`39624c1`)
+- More poses, and a /pose hint on /wardrobe (`35c0137`)
+- Daily boss encounters (`078b0ae`)
+
+## 2026-10-09
+
+- Connections: fix "four kinships" win text, style final reveal as an embed (`8892cd7`)
+
+## 2026-10-08
+
+- Non-overlapping daily schedule, channel overrides, wardrobe/inspect (`a30c4c3`)
+- Shop: /shop_test saves without pinging shopaholics (`c4e0f2f`)
+
+## 2026-10-06
+
+- Word Ladder: 4-6 step bank, clearer step wording (`a34aba2`)
+
+## 2026-10-05
+
+- Would you rather: flat 2-point predictions, 3-hour window (`4301377`)
+- Recap: keep post links clickable when the post is only emoji (`165670c`)
+- Daily shop, character sheet, and admin time checks (`caae9d6`)
+
+## 2026-10-04
+
+- Recap shows podium, gain, and net change (`9b64dca`)
+
+## 2026-10-03
+
+- Fine tuning /flex and shop (`8beebd7`)
+- /fit feature intro (`adff80d`)
+
+## 2026-09-26
+
+- ladder puzzle (`5fa35bb`)
+- Ranking game (`29bf4ab`)
+- subjective trivia (`7fa3b95`)
+- longer wow trivia question wait time (`6a59491`)
+- Halloween treat (`25660a7`)
+
 ## 2026-09-20
 
+- Regenerate UPDATELOG.md (`566bf36`)
 - Bring README and CONTRIBUTING up to date (`24f8804`)
 - Limit Connections to one correct guess per person, not one guess (`5b08baf`)
 - Relabel recap deltas as podium/WoW and drop post-recap nobility (`dbafa75`)

@@ -172,6 +172,8 @@ Within ~3 minutes of merge, the change is live in the friends' production server
 - **Match the herald voice.** Bot replies should sound like a medieval town crier — "Hark!", "Forsooth!", "By my troth!", and so on. See `commands/prompts/whois.js` for the tone.
 - **Log generously.** `console.log` what your command is doing. Those logs are what we use to debug production issues in CloudWatch.
 - **One PR, one focused change.** Easier to review, easier to revert if it breaks something.
+- **Change points through `src/pointsStore.js`.** It records every change to the history log with a reason, which the archive, snapshots and achievements rely on.
+- **Hide replies with `ephemeral: true` on `deferReply`.** discord.js 14.13 ignores `flags` there, so a deferred reply meant to be private ends up public. `reply` accepts either.
 
 ## Architecture in 30 seconds
 
@@ -180,6 +182,7 @@ For a quick mental model — full details in the main [README](README.md):
 - **The bot** is a Node.js / `discord.js` process maintaining a WebSocket connection to Discord's gateway.
 - **Commands** live in `commands/prompts/*.js` (plus admin-only previews in `commands/passive/preview/` and `commands/puzzles/preview/`). `src/index.js` auto-loads them by filename, registers them as slash commands with Discord on startup, and routes `/commandname` to the file's exported `run`. See the README's "Adding a new command" for the module shape.
 - **In production**, the bot runs as a single Fargate task on AWS ECS, with the token in SSM Parameter Store and logs in CloudWatch.
+- **State** lives in one DynamoDB table keyed by guild and user (`src/pointsStore.js`). Long-term history is written to the logs as JSON (`src/historyLog.js`) and archived to S3 for Athena; see the README's "Query the history archive".
 - **Infrastructure** is defined as AWS CDK code in `infra/` (TypeScript).
 - **Deploys** happen automatically on merge to `master` via GitHub Actions, authenticated to AWS via OIDC.
 
