@@ -5,8 +5,14 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-12
+
+- Encounters: announced tiers, 3 to 20 adventurers, gear checks, softer defeats (`e36080e`)
+- /herald_channel: label the "all" scope so typing "all" finds it (`1d800b5`)
+
 ## 2026-10-11
 
+- Regenerate UPDATELOG.md (`7c0aff4`)
 - /fence: buy any gear for its price plus 50, once a day (`0af80c9`)
 - Regenerate UPDATELOG.md (`ad02a5f`)
 - One /signup command and a rebuilt /help (`21dbb0a`)
