@@ -21,7 +21,7 @@ const SCOPES = {
     birthdays: 'Birthday blessing',
     treat: 'Halloween treat',
     achievements: 'Achievement summaries',
-    all: 'Everything above with no more specific override',
+    all: 'All: everything above with no more specific override',
 };
 
 // The channel for `scope` in `guild`: the admin's override if one is set and
