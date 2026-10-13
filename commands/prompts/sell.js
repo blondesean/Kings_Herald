@@ -29,6 +29,11 @@ const sell = async function (interaction) {
         const character = await pointsStore.getCharacter(guildId, seller.id);
         const inBag = [...new Set(character.bag)].map((id) => catalog.findEntry(id)).filter(Boolean);
         const entry = matchEntry(inBag, typed);
+        if (entry && entry.unique) {
+            // A unique is one of a kind and never goes back to the merchant.
+            await interaction.editReply(pick(flavor.uniqueNotSellableLines(entry.name)));
+            return;
+        }
         if (!entry) {
             // Tell apart worn gear, things that aren't gear, and things not owned at all.
             const worn = matchEntry(Object.values(character.gear || {}).map((id) => catalog.findEntry(id)).filter(Boolean), typed);

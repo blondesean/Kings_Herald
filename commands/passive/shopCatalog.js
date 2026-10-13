@@ -15,6 +15,7 @@
  * Exposes:
  *   GEAR_SLOTS - the seven equipment slots, in display order
  *   GEAR, TITLES, CLASSES, RACES - arrays of catalog entries
+ *   UNIQUES - one-of-a-kind gear from myth, never sold (see below)
  *   DEFAULT_CLASS - the class everyone starts as
  *   findEntry(id) - the catalog entry for an id, or null
  */
@@ -445,6 +446,56 @@ const GEAR = [
     { id: 'swift_boots', name: 'Swift Boots', slot: 'boots', price: 10, franchise: 'WoW' },
 ];
 
+/* Uniques: one copy each in the whole realm, drawn from real myth, scripture
+ * and folklore rather than games. They are never sold, so they sit outside
+ * GEAR, which the shop, the fence, trades and encounter loot all draw from.
+ * They are in ALL, so a held unique can be found, equipped and shown like any
+ * other gear. Each is worth 65, well above Legendary.
+ *
+ * `origin` is the tradition it comes from. `lore` is how its holder came by
+ * it, written to follow their name: `${name} ${lore}.`
+ */
+const UNIQUE_PRICE = 65;
+const UNIQUES = [
+    // Helm
+    { id: 'helm_of_darkness', name: 'Helm of Darkness', slot: 'helm', origin: 'Greek', lore: 'was given the Helm of Darkness by the Cyclopes who forged it for Hades, and has not been seen clearly since' },
+    { id: 'aegishjalmur', name: 'Aegishjalmur, the Helm of Awe', slot: 'helm', origin: 'Norse', lore: 'took Aegishjalmur from the dragon Fafnir\'s hoard, the helm that strikes terror into all who look upon it' },
+    { id: 'tarnhelm', name: 'Tarnhelm', slot: 'helm', origin: 'Nibelung', lore: 'took the Tarnhelm from the Nibelung\'s hoard, and may now wear any shape they please, or none at all' },
+    // Chest
+    { id: 'nemean_lions_pelt', name: 'Nemean Lion\'s Pelt', slot: 'chest', origin: 'Greek', lore: 'strangled the Nemean Lion with bare hands and skinned it with its own claws, as Heracles did, for no blade could pierce it' },
+    { id: 'kavacha', name: 'Kavacha', slot: 'chest', origin: 'Hindu', lore: 'was granted the Kavacha by the sun god Surya, the armor Karna was born wearing' },
+    { id: 'armor_of_achilles', name: 'Armor of Achilles', slot: 'chest', origin: 'Greek', lore: 'was armored by Hephaestus himself, in the armor he forged for Achilles' },
+    // Pants
+    { id: 'megingjord', name: 'Megingjord', slot: 'pants', origin: 'Norse', lore: 'buckled on Megingjord, Thor\'s belt of strength, and felt their might double' },
+    { id: 'girdle_of_hippolyta', name: 'Girdle of Hippolyta', slot: 'pants', origin: 'Greek', lore: 'won the Girdle of Hippolyta from the Amazon queen, as Heracles did on his ninth labor' },
+    // Weapon
+    { id: 'mjolnir', name: 'Mjolnir', slot: 'weapon', origin: 'Norse', lore: 'gripped Mjolnir where giants had strained and failed, and the hammer rose, for they were found worthy' },
+    { id: 'gungnir', name: 'Gungnir', slot: 'weapon', origin: 'Norse', lore: 'won Gungnir from the sons of Ivaldi, the spear of Odin that never misses its mark' },
+    { id: 'tyrfing', name: 'Tyrfing', slot: 'weapon', origin: 'Norse', lore: 'forced two dwarves to forge Tyrfing, as King Svafrlami once did, and took its curse along with the blade' },
+    { id: 'staff_of_moses', name: 'Staff of Moses', slot: 'weapon', origin: 'Bible', lore: 'raised the Staff of Moses at the shore of a raging sea, and the waters parted before them' },
+    { id: 'jawbone_of_samson', name: 'Jawbone of Samson', slot: 'weapon', origin: 'Bible', lore: 'snatched the Jawbone of Samson from the dust and struck down a thousand men with it' },
+    { id: 'sword_of_goliath', name: 'Sword of Goliath', slot: 'weapon', origin: 'Bible', lore: 'felled a giant with a single stone, then drew the Sword of Goliath from his side, as David did' },
+    { id: 'kusanagi_no_tsurugi', name: 'Kusanagi-no-Tsurugi', slot: 'weapon', origin: 'Japanese', lore: 'slew an eight-headed serpent and found Kusanagi-no-Tsurugi in its tail, as Susanoo did of old' },
+    { id: 'fragarach', name: 'Fragarach, the Answerer', slot: 'weapon', origin: 'Irish', lore: 'was handed Fragarach by the sea god Manannan, and no foe it has pointed at has told a lie since' },
+    { id: 'gae_bolg', name: 'Gae Bolg', slot: 'weapon', origin: 'Irish', lore: 'trained under the warrior Scathach on her island of shadows, and left with the Gae Bolg, as Cu Chulainn did' },
+    { id: 'durendal', name: 'Durendal', slot: 'weapon', origin: 'French', lore: 'pulled Durendal from the cliff at Rocamadour, where Roland flung it so no enemy hand would take it' },
+    { id: 'ruyi_jingu_bang', name: 'Ruyi Jingu Bang', slot: 'weapon', origin: 'Chinese', lore: 'claimed Ruyi Jingu Bang from the Dragon King\'s palace beneath the sea, the pillar that held the tides, as Sun Wukong did' },
+    { id: 'harpe_of_perseus', name: 'Harpe of Perseus', slot: 'weapon', origin: 'Greek', lore: 'was given the Harpe by Hermes, as Perseus was, and took the Gorgon\'s head with it' },
+    { id: 'sudarshana_chakra', name: 'Sudarshana Chakra', slot: 'weapon', origin: 'Hindu', lore: 'earned the Sudarshana Chakra as Vishnu did, offering Shiva a thousand lotuses and, when one was missing, an eye' },
+    // Gloves
+    { id: 'airgetlam', name: 'Airgetlam, the Silver Hand', slot: 'gloves', origin: 'Irish', lore: 'lost a hand in battle, as King Nuada did, and was given Airgetlam, the Silver Hand, by the healer Dian Cecht' },
+    { id: 'jarngreipr', name: 'Jarngreipr', slot: 'gloves', origin: 'Norse', lore: 'pulled on Jarngreipr, Thor\'s iron gloves, the only grip that can hold Mjolnir' },
+    { id: 'hand_of_glory', name: 'Hand of Glory', slot: 'gloves', origin: 'Folklore', lore: 'cut the Hand of Glory from a hanged man at midnight, and all who see its light now stand frozen' },
+    // Cape
+    { id: 'golden_fleece', name: 'Golden Fleece', slot: 'cape', origin: 'Greek', lore: 'sailed with the Argonauts to Colchis, yoked the fire-breathing bulls, and took the Golden Fleece from the dragon that never sleeps' },
+    { id: 'coat_of_many_colors', name: 'Coat of Many Colors', slot: 'cape', origin: 'Bible', lore: 'was given the Coat of Many Colors, as Joseph was, and earned the envy of every brother they had' },
+    { id: 'mantle_of_elijah', name: 'Mantle of Elijah', slot: 'cape', origin: 'Bible', lore: 'caught the Mantle of Elijah as the prophet rose to heaven in a chariot of fire, as Elisha did' },
+    { id: 'valshamr', name: 'Valshamr', slot: 'cape', origin: 'Norse', lore: 'borrowed Valshamr, Freyja\'s falcon cloak, and has not given it back' },
+    // Boots
+    { id: 'seven_league_boots', name: 'Seven-League Boots', slot: 'boots', origin: 'Folklore', lore: 'stole the Seven-League Boots from a sleeping ogre, as Hop-o\'-My-Thumb did, and now crosses seven leagues in a stride' },
+    { id: 'shoe_of_vidar', name: 'Shoe of Vidar', slot: 'boots', origin: 'Norse', lore: 'laced the Shoe of Vidar, stitched from every scrap of leather ever cut away, the boot that will hold open Fenrir\'s jaws at Ragnarok' },
+].map((entry) => ({ ...entry, price: UNIQUE_PRICE, unique: true }));
+
 const TITLES = [
     { id: 'crystal_champion', name: 'Champion of the Crystals', price: 10, franchise: 'Final Fantasy' },
     { id: 'crystal_bearer', name: 'Crystal Bearer', price: 10, franchise: 'Final Fantasy' },
@@ -575,15 +626,19 @@ const RACES = [
     { id: 'tiefling', name: 'Tiefling', price: 10, franchise: 'Generic' },
 ];
 
-const ALL = [...GEAR, ...TITLES, ...CLASSES, ...RACES];
+const ALL = [...GEAR, ...UNIQUES, ...TITLES, ...CLASSES, ...RACES];
 
 const findEntry = (id) => ALL.find((entry) => entry.id === id) || null;
 
 /* Rarity label for gear, from its price alone (so it can't drift from the
- * price). Common 10, uncommon 15-20, rare 25-30, epic 35-45, legendary 50.
+ * price). Common 10, uncommon 15-20, rare 25-30, epic 35-45, legendary 50,
+ * and anything above 50 is a unique. RARITIES is the shop's ladder, indexed by
+ * encounter tier, so Unique is not in it.
  */
 const RARITIES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+const UNIQUE_RARITY = 'Unique';
 const rarityFor = (price) => {
+    if (price > 50) return UNIQUE_RARITY;
     if (price >= 50) return 'Legendary';
     if (price >= 35) return 'Epic';
     if (price >= 25) return 'Rare';
@@ -591,4 +646,4 @@ const rarityFor = (price) => {
     return 'Common';
 };
 
-module.exports = { GEAR_SLOTS, DEFAULT_CLASS, GEAR, TITLES, CLASSES, RACES, ALL, findEntry, rarityFor, RARITIES };
+module.exports = { GEAR_SLOTS, DEFAULT_CLASS, GEAR, UNIQUES, TITLES, CLASSES, RACES, ALL, findEntry, rarityFor, RARITIES, UNIQUE_RARITY, UNIQUE_PRICE };

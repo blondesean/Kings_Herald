@@ -160,6 +160,12 @@ const notSellableLines = (name) => [
     `**${name}** is not a piece of gear, so the merchant will not buy it back.`,
 ];
 
+// A unique is one of a kind, so the merchant will not take it.
+const uniqueNotSellableLines = (name) => [
+    `**${name}** is one of a kind. No merchant in the realm would dare put a price on it.`,
+    `The merchant will not touch **${name}**. Such things are earned, not sold.`,
+];
+
 const confirmCancelledLines = () => [
     'Very well. Nothing has changed.',
 ];
@@ -175,6 +181,7 @@ module.exports = {
     listedLines,
     sellEquippedLines,
     notSellableLines,
+    uniqueNotSellableLines,
     purchasedEquippedLines,
     titleReturnPromptLines,
     titleReturnedLines,
