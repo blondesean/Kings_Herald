@@ -1,17 +1,18 @@
 /* Boss roster for the daily encounter (see commands/passive/encounter.js).
  *
- * BOSSES has one list per voteable difficulty, Easy to Max, in the same order
- * as RARITIES in shopCatalog.js: a boss from tier i drops gear of rarity i
- * (two pieces per win; see DROPS_PER_WIN). The boss is hidden until the
- * battle — the party's averaged difficulty vote picks the tier, then a random
- * boss from that tier is revealed in the result. `epithet` is a short flavor
+ * BOSSES has one list per difficulty, Easy to Max, in the same order as
+ * RARITIES in shopCatalog.js: a boss from tier i drops gear of rarity i (one
+ * piece per 2.5 members; see dropsFor in encounter.js). The tier is rolled
+ * and announced when the threat is posted (OPEN_TIERS in encounter.js lists
+ * which can come up); the boss itself stays hidden until it is revealed in
+ * the result. `epithet` is a short flavor
  * tag shown with the name.
  *
  * RAID is a separate, grander tier for the most storied lore bosses, fought
  * by a raid rather than a party: no party cap, so the boss is measured at the
  * Epic threshold per entrant (THRESHOLD_TIER), since a big raid naturally
  * brings members with less gear. It drops Legendary gear. It is NOT reachable
- * yet — it isn't in the difficulty vote or the daily lineup — and is defined
+ * yet — it isn't in OPEN_TIERS or the daily lineup — and is defined
  * here so it can be wired in later.
  *
  * Drawn from the same franchises as the shop catalog; like the catalog, this

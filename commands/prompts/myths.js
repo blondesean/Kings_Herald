@@ -7,8 +7,10 @@
  *   - Finest Fit: the highest fit worn right now
  *   - Greatest Duel: the biggest wager won, from the duel history
  * Kept as records when they happen (pointsStore.setMythIfHigher):
- *   - Mightiest Party: the most power, meaning fit after stance multipliers,
- *     ever brought to an encounter, win or lose (commands/passive/encounter.js)
+ *   - Mightiest Party: the highest average power per member, meaning fit
+ *     after stance multipliers, ever brought to an encounter, win or lose
+ *     (commands/passive/encounter.js). Stored as 'party_average'; the older
+ *     'party' record held total power and is no longer shown.
  *   - Longest Week in Voice: saved by the weekly recap before it resets the
  *     week's tally (commands/passive/weeklyRecap.js). A week still under way
  *     shows if it has already beaten the record.
@@ -45,11 +47,11 @@ const buildMyths = async (guildId) => {
 
     const fields = [];
 
-    const party = myths.party;
+    const party = myths.party_average;
     fields.push({
         name: 'Mightiest Party',
         value: party
-            ? `**${party.value}** power: ${joinNames(party.members)}, against ${party.boss} on ${party.difficulty}, and they ${party.won ? 'won' : 'fell'}. ${party.day}`
+            ? `**${party.value}** average power across ${party.size}: ${joinNames(party.members)}, against ${party.boss} on ${party.difficulty}, and they ${party.won ? 'won' : 'fell'}. ${party.day}`
             : 'No party has yet taken the field.',
     });
 

@@ -17,7 +17,7 @@ const encounterTeaserLines = () => [
 
 // The private prompt shown to a member who joins.
 const encounterPromptLine = () =>
-    'Thou hast joined the party! Thy destiny is thine own to choose: name how grand a challenge thou wouldst embark upon, from a humble skirmish to a legend-making trial, and how thou wilt meet it. The party\'s voices together decide the quest. Thy choices stay hidden until the battle, and thou mayest change them until then.';
+    'Thou hast joined the party! Choose how thou wilt meet the foe. Thy stance stays hidden until the battle, and thou mayest change it until then.';
 
 // A member can't join because they're still recovering.
 const encounterInjuredLines = (untilLabel) => [
@@ -36,6 +36,16 @@ const encounterNoPartyLines = () => [
     'The banners were raised, but no one marched beneath them. The menace fades into the mist, unchallenged and unforgiving.',
     'Not a blade was drawn this day. The beast grows bolder for it, and the Herald fears its return.',
 ];
+
+// Too few joined to march. `names` are those who did, `min` how many it takes.
+const encounterTooFewLines = (names, min) => {
+    const who = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    return [
+        `${who} stood ready, but it takes ${min} to march. The threat slips away, and the brave few stand down unhurt.`,
+        `Only ${who} answered the call. ${min} at the least must march together, so the foe goes unchallenged this day.`,
+        `${who} sharpened their blades in vain: a party needs ${min} to set out. The threat fades back into the dark.`,
+    ];
+};
 
 // The reveal at the start of the result post. `boss` is { name, epithet };
 // `threat` describes the difficulty, e.g. "a relatively easy threat".
@@ -119,13 +129,14 @@ const encounterLuckyWinLines = (boss) => [
     `A rumbling cave-in buried half of ${boss.name}'s strength, and the underequipped party made the most of the miracle.`,
 ];
 
-// What became of each member after a loss.
+// The members a loss singles out, by the stance they fought in. Balanced and
+// Aggressive are injured; Defensive saw the blow coming and fended it off.
 const encounterInjuryLines = {
     defensive: (name) => [
-        `${name}'s caution pays off: they walk away unhurt and may fight again tomorrow.`,
-        `Shield held high, ${name} escapes without a scratch.`,
-        `${name} retreats in good order, bruised in pride but nothing more.`,
-        `${name} slips away from the rout unharmed, ready for another day.`,
+        `The foe's wrath falls on ${name}, but their shield is already raised. They turn the blow aside and walk away unhurt.`,
+        `${name} is singled out for punishment, yet stands firm behind their guard, and not a blow lands true.`,
+        `The killing stroke comes for ${name}, who parries it at the last instant and slips away without a scratch.`,
+        `${name} draws the foe's fury and weathers it, braced and wary, sparing themselves any wound.`,
     ],
     balanced: (name, days) => [
         `${name} limps away with minor wounds and must rest ${days} day${days === 1 ? '' : 's'}.`,
@@ -140,6 +151,29 @@ const encounterInjuryLines = {
         `${name} is dragged from the fray half-conscious, and will not stand again for ${days} days.`,
     ],
 };
+
+// After a loss, everyone the injuries passed over. `names` is already joined.
+const encounterUnhurtLines = (names) => [
+    `${names} escape the rout unhurt.`,
+    `The rest, ${names}, fall back in good order without a scratch.`,
+    `${names} live to fight another day, unharmed.`,
+];
+
+// The herald's check on the forming party, when its odds look poor.
+// `percent` is the win chance, such as "62%".
+const encounterOutmatchedLines = (percent) => [
+    `The herald surveys the gathering party and frowns: it appears outmatched, with perhaps ${percent} odds of victory. Any who would rather not march may leave the party now.`,
+    `A word of warning: as it stands, the party looks outmatched, the odds near ${percent}. Better geared fighters would be welcome, and any who wish to withdraw may do so now.`,
+    `The scouts report grim tidings: this party appears outmatched, with only about ${percent} odds. Leave now if thou wouldst not risk it.`,
+];
+
+// A member whose gear alone gives a party like them under a 10% chance is
+// turned away at the door. The fit it takes is deliberately not told.
+const encounterTooWeakLines = (fit, difficulty) => [
+    `Thy gear, ${fit} fit, would scarcely scratch a ${difficulty} foe. Gather gear and return another day.`,
+    `The herald bars thy way, kindly: ${fit} fit is too slight for a ${difficulty} threat. Easier quarry awaits thee.`,
+    `With ${fit} fit thou wouldst only drag the party down against a ${difficulty} foe.`,
+];
 
 // The loot post. `item` is the label "[Rarity] Name".
 const encounterLootLines = (item) => [
@@ -170,6 +204,10 @@ module.exports = {
     encounterPromptLine,
     encounterInjuredLines,
     encounterNoPartyLines,
+    encounterTooFewLines,
+    encounterUnhurtLines,
+    encounterOutmatchedLines,
+    encounterTooWeakLines,
     encounterRevealLines,
     encounterMatchupLines,
     encounterKillingBlowLines,

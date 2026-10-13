@@ -69,7 +69,7 @@ const ACHIEVEMENTS = [
     { id: 'race', name: 'Born Anew', description: 'Choose a race', stat: 'hasRace', goal: 1 },
     { id: 'title', name: 'Titled Noble', description: 'Earn a title', stat: 'hasTitle', goal: 1 },
     { id: 'lucky_break', name: 'Lucky Break', description: 'Win an encounter thy party was outmatched in', counter: 'lucky_wins', goal: 1 },
-    { id: 'full_muster', name: 'Full Muster', description: 'Win an encounter with a full party of 5', counter: 'full_party_wins', goal: 1 },
+    { id: 'full_muster', name: 'Full Muster', description: 'Win an encounter with a party of 5 or more', counter: 'full_party_wins', goal: 1 },
     { id: 'death_roller', name: 'Death Roller', description: 'Win a Death Roll duel', stat: 'deathRollWins', goal: 1 },
     { id: 'humbled', name: 'Humbled', description: 'Lose 10 duels', stat: 'duelLosses', goal: 10 },
     { id: 'mind_reader', name: 'Mind Reader', description: "Predict the group's would-you-rather pick 5 times", counter: 'wyr_predictions', goal: 5 },
