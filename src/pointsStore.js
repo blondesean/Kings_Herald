@@ -1718,6 +1718,46 @@ const clearChannelOverride = async function (guildId, scope) {
     }));
 };
 
+/* The server's campaign (see src/campaign.js): one item per guild under
+ * CAMPAIGN#<guildId>, holding when each milestone first happened, e.g.
+ * hardClearedAt, and the day the lore drops began. Each milestone is written
+ * once, conditionally, so only the first clear counts.
+ */
+const CAMPAIGN_PREFIX = 'CAMPAIGN#';
+const CAMPAIGN_SORT_KEY = 'STATE';
+
+const getCampaign = async function (guildId) {
+    if (!isConfigured()) return {};
+
+    const result = await getClient().send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: CAMPAIGN_PREFIX + guildId, userId: CAMPAIGN_SORT_KEY },
+    }));
+    const { guildId: _g, userId: _u, ...campaign } = result.Item || {};
+    return campaign;
+};
+
+// Sets campaign field `field` to `value` only if it has never been set.
+// Returns true if this call set it.
+const setCampaignOnce = async function (guildId, field, value) {
+    if (!isConfigured()) return false;
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId: CAMPAIGN_PREFIX + guildId, userId: CAMPAIGN_SORT_KEY },
+            UpdateExpression: 'SET #f = :v',
+            ConditionExpression: 'attribute_not_exists(#f)',
+            ExpressionAttributeNames: { '#f': field },
+            ExpressionAttributeValues: { ':v': value },
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
 /* Tips to the herald (see commands/prompts/tip.js). Own partition, so the
  * herald never shows up on /nobility. One item keyed HERALD holds the guild's
  * running { total, count }, and one item per tipper, keyed by their userId,
@@ -2076,6 +2116,8 @@ module.exports = {
     tradeCharacters,
     tipHerald,
     getHeraldTips,
+    getCampaign,
+    setCampaignOnce,
     getAchievements,
     getAllAchievements,
     bumpCounters,

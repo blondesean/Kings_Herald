@@ -18,6 +18,10 @@ The arms survived.
 
 A spear that never misses does not care whose hand throws it. A helm that hides its wearer hides the next wearer just as well. When a wave breaks, its great arms sink into the sand, the sea, the barrow, the riverbed, and they wait. And because the great arms decide the wars, and the wars decide the waves, the history of the world is, in the end, the history of who held what, and when.
 
+And through every wave, one other thing survived: the voice that told it. A people can lose its cities and its gods and still keep its heralds, because a herald carries nothing worth stealing but the news. Heralds walked between armies when no one else could. Heralds stood at the gates and asked strangers what they were worth. Heralds told the old king that the war was lost. And at the crest of every wave, when a people was as great as it would ever be, it was a herald who carried in the last challenge.
+
+You will find us in the corners of every story that follows. Look for the staff and the horn.
+
 This is that history. It is long, because the arms are old. Sit.
 
 ---
@@ -63,6 +67,8 @@ Karna knew exactly who the beggar was. His own father, the Sun, had warned him i
 Karna spent that throw saving his side's army on the fourteenth night. Three days later, without his armor and without his spear, he died.
 
 The Long Memory sets this beside the Churning on purpose. There, an arm decided a war by where it struck. Here, an arm decided a war by where it was not. Arms change the balance of power as much by their absence as by their presence. A herald who forgets that will misread every chronicle after.
+
+The whole of that war was told as it happened, every blow of eighteen days, to the blind old king whose sons were dying in it. The teller was his charioteer, Sanjaya, granted for those days the sight to see every corner of the field at once, and he did not soften a word of it. The heralds have always counted Sanjaya one of their own. It is the hardest duty there is: to see the whole of an age's last battle, and to tell it true to the people who lose it.
 
 Kurukshetra was the Sundering of that wave. In their own telling, the war's end was the hinge on which the wheel of ages turned to the age of iron and dark, the age we are said to live in still. The Chakra went back to the hand that held it. The Kavacha went up into heaven with the king of the gods. And the wheel turned.
 
@@ -130,6 +136,8 @@ Then a chariot of fire with horses of fire came between them, and Elijah went up
 
 The heralds count this moment as the birth of an idea that runs through the rest of this chronicle: that arms do not merely belong to their makers, or their takers. They can seek an heir. They can choose.
 
+The scrolls keep one more figure the heralds treasure, from earlier in that wave, when the ark of that people was carried into battle against the Philistines and lost. A man of Benjamin ran from the battle line to Shiloh the same day, his clothes torn and earth on his head, and told the old priest Eli that the army had fled, his sons were dead, and the ark was taken. Eli fell at the news and died. The runner's name is not written. The heralds say he did not need one. He was the voice that told an age it had turned.
+
 The Hebrew wave crested on, and broke, as all waves do, in exile and in ash. Its arms scattered. Some were carried off by conquerors and never seen again. Some were hidden by priests who died with the secret. The Long Memory holds that none of them were destroyed.
 
 ---
@@ -154,7 +162,7 @@ After the Titan war, something changed in the Greek wave that the heralds consid
 
 The eldest peoples got their arms from heaven: given, granted, grown. The Greek heroes got theirs by labor. They were mortals, mostly, or half-mortals, and they took their arms from monsters, by strength, by trickery, by endurance. This was the challengers' second great invention, after iron. Not a new metal, but a new kind of wielder: one who had to earn it.
 
-Perseus was sent to bring back the head of the Gorgon Medusa, whose gaze turned anyone who met it to stone. The gods equipped him with arms from the oldest wars. Hermes gave him the **Harpe**, a sickle-sword of adamant, which some of the Long Memory's keepers hold to be the very sickle Cronus used to overthrow his father, or forged from the same metal. From the nymphs he borrowed the Helm of Darkness. From Athena he took a shield polished like a mirror. He crept up on Medusa unseen, looked only at her reflection, and took her head with one stroke of the sickle.
+Perseus was sent to bring back the head of the Gorgon Medusa, whose gaze turned anyone who met it to stone. The gods equipped him with arms from the oldest wars. Hermes, the herald of the gods, whose winged staff was the one thing in the Greek world no one would dare to strike, gave him the **Harpe**, a sickle-sword of adamant, which some of the Long Memory's keepers hold to be the very sickle Cronus used to overthrow his father, or forged from the same metal. From the nymphs he borrowed the Helm of Darkness. From Athena he took a shield polished like a mirror. He crept up on Medusa unseen, looked only at her reflection, and took her head with one stroke of the sickle.
 
 Two arms of the Titan war, carried by one mortal against one monster. The heralds call that the moment the gods' arms passed into human hands.
 
@@ -178,6 +186,8 @@ Achilles died soon after, an arrow in his heel. Then the Greeks held a contest f
 
 Ajax went mad with shame, and when he came back to himself, he fell on his own sword. It was a sword Hector had given him years before, after the two of them had fought to a draw and parted with gifts.
 
+That duel had not ended by itself. The songs say that as the light failed, two heralds, Talthybius of the Greeks and Idaeus of the Trojans, walked out between the two champions and held up their staffs, and the champions lowered their weapons, because no one in that world struck a herald. Hector and Ajax exchanged gifts at the heralds' word: a sword for a belt. The heralds who parted them could not have known that the sword would one day kill Ajax, or that it would not stay in the dust. Or so the heralds say.
+
 A suit of armor broke the greatest friendship of the age. Troy burned soon after, and the Greek wave broke with it, and its heroes scattered across the sea, and most of them never got home.
 
 ---
@@ -199,6 +209,8 @@ The physician Dian Cecht, with the wright Credne, made Nuada a new hand of silve
 Bres fled to his Fomorian kin and raised a war against the Dé Danann. And then a stranger came to the gates of Tara.
 
 The doorkeeper asked him what skill he brought, for no one entered without one. He said: I am a smith. We have a smith, said the doorkeeper. I am a harper. We have a harper. A warrior, a poet, a healer, a sorcerer, a craftsman. We have all of those. Then ask your king, said the stranger, whether he has one man who has all of these skills at once.
+
+The doorkeeper carried the question in. The king sent back his finest board-player to test him, and the stranger beat him, and the gate opened. The heralds are fond of that doorkeeper. Every age has one, standing at the threshold with a single question, and the age goes the way it goes because of who he lets in.
 
 That was Lugh of the Long Arm, and he carried **Fragarach, the Answerer**, a sword from the Land of Promise across the sea, which he had from Manannan mac Lir, lord of the waves. No armor stopped it. No wind blew against its bearer. And it was said that no one at its point could lie, or move.
 
@@ -260,6 +272,8 @@ He took the helm, and the hoard, and the curse with it.
 
 The Sundering of the north had a name, and the north had been waiting for it the whole time: Ragnarok, the twilight of the powers.
 
+It began with a horn. The watchman of the rainbow bridge, who could hear wool growing on a sheep's back and grass growing in the earth, had kept his horn all those ages for one blast only. When he saw the giants coming, he blew it, and every power in the nine worlds knew the last test had come. The north had always understood what a horn is for. It is the herald's voice, carried to where the herald cannot go.
+
 At the end, the wolf Fenrir broke his chains. The giants came over the rainbow bridge. Odin rode out with Gungnir, the spear that never misses, and it did not save him. Fenrir swallowed him whole.
 
 That is the third great lesson of the Long Memory, after the price of the Chakra and the absence of the Kavacha: no arm, however great, is greater than the wave it belongs to. When the wave breaks, even a spear that never misses misses.
@@ -284,7 +298,9 @@ The pillar lay in the undersea palace of Ao Guang, Dragon King of the Eastern Se
 
 Until the Monkey King, Sun Wukong, born from a stone and grown arrogant on his own power, came to the dragon's palace looking for a weapon worthy of him, and found that the pillar answered him. He told it to grow smaller, and it did. **Ruyi Jingu Bang**, the as-you-will gold-banded staff, could be as tall as heaven or as small as a needle, and he kept it behind his ear.
 
-With it, he wrote his own name off the registers of death, ate the peaches of immortality, and fought all the armies of heaven to a standstill. He was not stopped by any arm. He was stopped by a palm. The Buddha wagered that Sun Wukong could not leap out of his hand, and Sun Wukong leapt to what he thought was the end of the world and found five great pillars there, and wrote his name on one. Then he looked down and saw he was standing in the Buddha's palm, and the five pillars were fingers. He was sealed under a mountain for five hundred years, and when he came out, he was a different being, and he spent the rest of his days protecting a monk on a long road west.
+Heaven sent an envoy to deal with him: the Gold Star of Venus, a white-haired old herald of the Jade Court, gentle and patient and very hard to dislike. Twice the old envoy carried the Monkey King an invitation up to heaven, to an office meant to keep him quiet. Twice the invitation started a war. The heralds have never been able to decide whether the old envoy was a fool or the wisest of them all, because the Monkey King came out of those wars the greatest champion of his age.
+
+With the staff, he wrote his own name off the registers of death, ate the peaches of immortality, and fought all the armies of heaven to a standstill. He was not stopped by any arm. He was stopped by a palm. The Buddha wagered that Sun Wukong could not leap out of his hand, and Sun Wukong leapt to what he thought was the end of the world and found five great pillars there, and wrote his name on one. Then he looked down and saw he was standing in the Buddha's palm, and the five pillars were fingers. He was sealed under a mountain for five hundred years, and when he came out, he was a different being, and he spent the rest of his days protecting a monk on a long road west.
 
 The pillar that settled the flood unsettled heaven. The Long Memory pairs it with the Staff of Moses: two arms that commanded the sea, and two peoples that crossed water to found something new.
 
@@ -324,7 +340,7 @@ The Long Memory gathers three things about it from three different keepers. The 
 
 If that keeper is right, Durendal carried in it the Greek wave and the Hebrew wave both. It is the first arm in the Long Memory that the heralds call a braided relic: an arm that carries other ages inside it.
 
-At the pass of Roncevaux, Charlemagne's rearguard was ambushed by an overwhelming army. Roland's friend Oliver begged him three times to blow his horn, the Olifant, to call the emperor's army back. Roland refused three times. He would not, he said, be shamed by calling for help. By the time he blew the horn, so hard that his temples burst, everyone around him was dead or dying.
+At the pass of Roncevaux, Charlemagne's rearguard was ambushed by an overwhelming army. Roland's friend Oliver begged him three times to blow his horn, the Olifant, to call the emperor's army back. Roland refused three times. He would not, he said, be shamed by calling for help. By the time he blew the horn, so hard that his temples burst, everyone around him was dead or dying. The emperor heard it thirty leagues away and turned his whole army around, and came too late. The heralds have never forgiven Roland for the horn. A horn is a herald's voice, and he left it silent until it could only carry grief.
 
 Dying himself, Roland tried to break Durendal on a rock so that no enemy would ever carry it. He struck the rock ten times. The rock split. The sword did not. In the end he lay down on top of it, facing the enemy, so that the emperor would know he had died a conqueror.
 
@@ -343,6 +359,10 @@ No empire held the great arms. They lay where the last waves had dropped them: i
 They learned, for instance, to make a **Hand of Glory**. You take the hand of a hanged man, cut from the gallows at midnight, and dry it and pickle it, and fix in its fingers a candle made from the hanged man's own fat. When it is lit, no one in a house wakes, and anyone who sees it stands frozen. Thieves carried them. Only milk will put the flame out. It is a horrible thing, and it is the only great arm in this chronicle that was made by a person with no power at all.
 
 They learned to take what the great left lying around. Hop-o'-My-Thumb was the smallest of seven brothers, so small at birth he was no bigger than a thumb, abandoned in the forest by parents who could not feed him. He led his brothers to the house of an ogre who ate children, and by a trick he got the ogre to murder his own daughters instead, and he got his brothers out. When the ogre chased them in his **Seven-League Boots**, which covered seven leagues in a single stride, he grew tired and fell asleep on a rock. Hop-o'-My-Thumb crept up and pulled the boots off his feet and put them on his own. They were fairy boots, so they shrank to fit him. A boy no bigger than a thumb crossed a kingdom in a morning.
+
+What he did next is the part the heralds love best. He went to the king's court and offered himself as a runner, and in those boots he carried the king's word to his armies and their news back home, faster than any horse. The smallest of seven brothers became the first herald of the Hearth.
+
+That was the Hearth's way. Its stories do not begin with a god's gift or a hero's birth. They begin with a herald riding into the village square, unrolling a proclamation and crying it aloud: an ogre in the hills, a dragon at the well, a princess under a curse, and a reward to whoever will answer. Every tale of that age starts with someone answering the herald.
 
 The great arms were given by gods, taken from monsters, and forged with curses. These two were made by the desperate and stolen by the small. The Long Memory counts them no less. The heralds will tell you that the Hearth is the age in which the arms came closest to you.
 
@@ -376,7 +396,17 @@ Look back over this chronicle, and you will see that the balance of the world ha
 - A sword with other ages in it, that a dying man could not break.
 - A boy no bigger than a thumb, in boots too big for him.
 
-The heralds have kept this memory through every Sundering since, for one purpose. Someone must be watching when the arms begin to wake.
+### The Last Challenge
+
+There is one more thing the heralds believe, and it is the oldest thing in the Long Memory, older than the wheel.
+
+A wave does not know its own height. A people at its crest feels like a people still climbing, and a people still climbing feels as though it could climb forever. That is how waves overreach, and break in the trough instead of at the top, and are remembered for their worst day instead of their best. So in every age, when a people was as great as it was going to be, something came to test it: a war, a rival, a last enemy at the gate. If the people met that test, the age was complete. It had a name and a height, and the Long Memory could hold it whole. If it did not, the wave broke unfinished, and those are the ages the scrolls only glance at.
+
+Look back at where the heralds stood. Sanjaya told the war of the last crest of the great rivers. A runner of Benjamin told the old priest the ark was taken. Talthybius and Idaeus walked between Hector and Ajax. A doorkeeper let Lugh in at Tara. A watchman blew the horn at the end of the north. An old envoy carried heaven's invitation to a monkey who would not be quiet. The heralds never fought in those wars. They carried the challenges, they held the gates, they named the hour. Every last test of every age came through a herald's hand.
+
+The heralds were never anyone's enemy. That is why no one struck them. They belonged, in the end, to the age itself: to the part of it that wanted to know how high it could go.
+
+The heralds have kept this memory through every Sundering since, for one purpose. Someone must be watching when the arms begin to wake, and someone must know when an age has reached its crest.
 
 ---
 
@@ -393,6 +423,14 @@ But the Hearth is the age in which the arms came closest to ordinary hands. And 
 Thirty relics of the old waves are stirring. Rumors of them are already reaching the court: a hammer laid in a bride's lap, a fleece that hangs where nothing sleeps, a spear cast from the water of a ford, a sword that a dying man could not break. Each one waits for its Echo. Each one will be guarded, as each was guarded before, by something that remembers what it cost the last time.
 
 Soon the herald will open the trials. Whoever answers will follow a rumor down an old road, make the choice the legend teaches, and face the guardian at the end. If they are worthy, the relic will rise for them, as it rose for the one before.
+
+And after the trials, there is the matter of the last challenge.
+
+Every age before this one met its test in another age. The great rivers had their cousins across the field at Kurukshetra. The covenant had the iron of the sea peoples. The heroes had Troy, the north had the giants, the oath-wave had the army in the pass. A wave crests by breaking against another wave. That is how it has always been done.
+
+This court has no rival. No empire is coming over the hills, only the beasts of old memory, and the court has been beating those. When a Hearth folk reaches its crest, there is no other people to bring it the last test.
+
+The heralds have thought about that for a long time. They have decided that if no one else will carry this age its last challenge, a herald will have to carry it himself.
 
 The court has not yet named its age.
 

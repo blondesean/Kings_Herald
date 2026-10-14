@@ -17,7 +17,7 @@ const helpGuides = {
         text: [
             'Once a day a threat stirs, and the herald calls for a party of 3 to 20. The foe grows to match the party\'s size.',
             '',
-            '**The threat.** Each day\'s threat is Easy, Medium or Hard, a third of the time each, and the herald names it before anyone joins, so thou mayest choose thy fights. The foe itself is revealed only in battle.',
+            '**The threat.** Each day\'s threat is Easy, Medium or Hard, equally likely. The court\'s first Hard victory draws Extreme threats too, and its first Extreme victory draws Max. The herald names the threat before anyone joins, so thou mayest choose thy fights. The foe itself is revealed only in battle.',
             '',
             '**Joining.** Click **Join the party**, and thou art asked, privately, for thy stance. If thy gear is too slight for the threat, thou art turned away. Every 15 minutes the herald weighs the party, and if its odds look poor, says so and lets any who wish leave.',
             '',
@@ -101,7 +101,7 @@ const helpGuides = {
         text: [
             'Deeds the herald records, each worth **5 points**, earned once.',
             '',
-            '`/achievements` shows every one, earned or not, with thy progress, such as 7/10. Only thou seest it.',
+            '`/achievements` shows every one, earned or not, with thy progress, such as 7/10. Only thou seest it. A few deeds are kept secret, and appear only once done.',
             '',
             '**How they unlock.** Most are announced the moment they happen, in the game where thou earnest them. The herald also counts every hour and proclaims any deed it finds, such as points earned in voice.',
             '',

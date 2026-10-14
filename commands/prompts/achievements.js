@@ -3,6 +3,7 @@
  *
  * Looking is itself an achievement, so the first look unlocks one. The list
  * is private, but an unlock is announced in the channel like any other.
+ * Secret achievements are left out until earned.
  */
 
 const { EmbedBuilder } = require('discord.js');
@@ -25,18 +26,20 @@ const showAchievements = async function (interaction) {
         ]);
         const stats = achievements.statsFrom(character, pose);
 
+        // A secret achievement only appears, and only counts toward the total,
+        // once it is earned.
         const earned = [];
         const locked = [];
         for (const a of achievements.ACHIEVEMENTS) {
             if (state.unlocked[a.id]) {
                 earned.push(`**${a.name}**: ${a.description}`);
-            } else {
+            } else if (!a.secret) {
                 const progress = achievements.progressFor(a, state, stats);
                 locked.push(`**${a.name}**: ${a.description}${progress ? `, ${progress}` : ''}`);
             }
         }
 
-        const total = achievements.ACHIEVEMENTS.length;
+        const total = earned.length + locked.length;
         const sections = [];
         if (earned.length) sections.push(`__Earned__\n${earned.join('\n')}`);
         if (locked.length) sections.push(`__Yet to earn__\n${locked.join('\n')}`);

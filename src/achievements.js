@@ -86,6 +86,9 @@ const ACHIEVEMENTS = [
     { id: 'good_owner', name: 'Who Is a Good Pet', description: 'Pet thy pet with /pet', counter: 'pets_petted', goal: 1 },
     { id: 'gambler', name: 'Roll the Bones', description: "Roll the herald's dice with /gamble", counter: 'gambles', goal: 1 },
     { id: 'lucky_roll', name: 'Fortune Favours the Bold', description: 'Win a Legendary piece with /gamble', counter: 'gamble_wins', goal: 1 },
+    // Secret: not listed in /achievements until earned, so they spoil nothing.
+    { id: 'echo', name: 'Echo of the Ages', description: 'Win a trial and claim a relic', counter: 'trials_won', goal: 1, secret: true },
+    { id: 'age_named', name: 'The Age Is Named', description: 'Fight in the party that defeats the Herald', counter: 'herald_wins', goal: 1, secret: true },
 ];
 
 const byId = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));

@@ -90,6 +90,19 @@ const encounterKillingBlowLines = (killer, boss) => [
     `**${killer}** delivers the blow that ends it. Let the bards remember that name!`,
 ];
 
+// The server's first win at a tier opened the next one (src/campaign.js).
+// `difficulty` is the newly opened tier's name, e.g. 'Extreme'.
+const encounterTierOpenedLines = (difficulty) => [
+    `Word of this victory travels far beyond the court, and older, fiercer things have heard it. They are stirring in answer. From this day, **${difficulty}** threats may come over the hills.`,
+    `The herald lowers his scroll. "Mark this day. A court that can do what you just did has been noticed, by things that do not notice small courts." From this day, **${difficulty}** threats may answer the call.`,
+];
+
+// The server's first Max win: the lore drops begin the next morning.
+const encounterFirstMaxLines = () => [
+    'The herald stands very still after the blow falls. Then he rolls up his scroll without reading the rest of it. "Come and hear me tomorrow morning," he says quietly. "All of you. There is something I have kept a very long time."',
+    'For once, the herald proclaims nothing. He looks at the fallen foe for a long while, and then at the party, as though counting them. "Tomorrow morning," he says at last. "I have a story the court is finally ready to hear."',
+];
+
 const encounterVictoryLines = () => [
     'The party stands triumphant over its fallen foe.',
     'The realm is saved, and the party returns in glory!',
@@ -232,6 +245,8 @@ module.exports = {
     encounterMatchupLines,
     encounterKillingBlowLines,
     encounterVictoryLines,
+    encounterTierOpenedLines,
+    encounterFirstMaxLines,
     encounterDefeatLines,
     encounterUnluckyLossLines,
     encounterLuckyWinLines,

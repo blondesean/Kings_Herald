@@ -22,6 +22,7 @@ const SCOPES = {
     treat: 'Halloween treat',
     achievements: 'Achievement summaries',
     pets: 'Unhappy pets calling in the morning',
+    lore: 'Lore and the herald\'s proclamations',
     all: 'All: everything above with no more specific override',
 };
 

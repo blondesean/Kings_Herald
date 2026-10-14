@@ -8,7 +8,8 @@
  *
  * The shop isn't placed: it opens on its own cron at noon Eastern (9 AM
  * Pacific) and closes on another at midnight Eastern, with an announcement.
- * The games keep clear of the noon slot (SHOP_SLOT) so the opening post
+ * The games keep clear of the noon slot (SHOP_SLOT), and of 9 AM for the
+ * morning lore drops, so neither post
  * never lands on top of one of them.
  *
  * Each game's *kind* has to be decided here, before placement, because the
@@ -82,13 +83,17 @@ const ENCOUNTER_WINDOW_MS = JOIN_WINDOW_MS + LOOT_RESOLVE_MS;
 const fireTimes = { trivia: null, puzzle: null, shop: null, encounter: null };
 const getFireTime = (game) => fireTimes[game] || null;
 
-// True if a game running over slots [start, end) would touch the shop's slot,
-// counting a game that ends right at noon, since its wrap-up posts then.
-const hitsShop = (start, end) => start <= SHOP_SLOT && SHOP_SLOT <= end;
+// Slots no game may touch: 9 AM, when the morning lore drops post (see
+// src/campaign.js), and noon, when the shop opens.
+const RESERVED_SLOTS = [0, SHOP_SLOT];
+
+// The reserved slot a game running over slots [start, end) would touch,
+// counting a game that ends right on it, since its wrap-up posts then; or -1.
+const reservedHit = (start, end) => RESERVED_SLOTS.find((slot) => start <= slot && slot <= end) ?? -1;
 
 /* Picks a non-overlapping start slot (in SLOT_MINUTES units, 0-based) for
  * each duration in `durationsMs`, within a SLOT_COUNT-slot window, at least
- * BUFFER_SLOTS apart, clear of SHOP_SLOT, and no earlier than its entry in
+ * BUFFER_SLOTS apart, clear of RESERVED_SLOTS, and no earlier than its entry in
  * `earliest` (a slot; missing means the window's start). Tries random placements first
  * (fast, and keeps every day's lineup differently shaped); if 500 random
  * tries all collide — very unlikely given how much slack the window has —
@@ -112,7 +117,7 @@ const placeSlots = (durationsMs, random = Math.random, earliest = []) => {
             if (latestStart < firstSlot(i)) { ok = false; break; }
             const start = firstSlot(i) + Math.floor(random() * (latestStart - firstSlot(i) + 1));
             const end = start + length;
-            if (hitsShop(start, end) || busy.some(([bs, be]) => start < be + BUFFER_SLOTS && bs < end + BUFFER_SLOTS)) {
+            if (reservedHit(start, end) >= 0 || busy.some(([bs, be]) => start < be + BUFFER_SLOTS && bs < end + BUFFER_SLOTS)) {
                 ok = false;
                 break;
             }
@@ -126,7 +131,7 @@ const placeSlots = (durationsMs, random = Math.random, earliest = []) => {
     // spare slots split randomly between the gaps, so it still always fits
     // and still lands at different times each day.
     console.log('Daily lineup: random placement kept colliding; spreading the games out instead.');
-    const used = lengths.reduce((a, b) => a + b, 0) + BUFFER_SLOTS * (lengths.length - 1) + 1; // + the shop's slot
+    const used = lengths.reduce((a, b) => a + b, 0) + BUFFER_SLOTS * (lengths.length - 1) + RESERVED_SLOTS.length;
     const slack = Math.max(0, SLOT_COUNT - used);
     if (used > SLOT_COUNT) {
         console.error('Daily lineup: the day\'s games do not fit the window even back-to-back — some will run past 9 PM.');
@@ -140,7 +145,7 @@ const placeSlots = (durationsMs, random = Math.random, earliest = []) => {
         cursor += cuts[k] - previousCut;
         previousCut = cuts[k];
         cursor = Math.max(cursor, firstSlot(i));
-        if (hitsShop(cursor, cursor + lengths[i])) cursor = SHOP_SLOT + 1;
+        for (let hit = reservedHit(cursor, cursor + lengths[i]); hit >= 0; hit = reservedHit(cursor, cursor + lengths[i])) cursor = hit + 1;
         starts[i] = cursor;
         cursor += lengths[i] + BUFFER_SLOTS;
     });
@@ -236,4 +241,4 @@ const scheduleDailyLineup = function (client) {
     console.log(`Daily lineup scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), trivia/puzzle/encounter placed without overlap across ${WINDOW_HOURS}h, clear of the shop, which opens "${SHOP_OPEN_CRON}" and closes "${SHOP_CLOSE_CRON}".`);
 };
 
-module.exports = { scheduleDailyLineup, getFireTime, placeSlots, SLOT_COUNT, SLOT_MINUTES, SHOP_SLOT, ENCOUNTER_EARLIEST_SLOT };
+module.exports = { scheduleDailyLineup, getFireTime, placeSlots, SLOT_COUNT, SLOT_MINUTES, SHOP_SLOT, ENCOUNTER_EARLIEST_SLOT, RESERVED_SLOTS };

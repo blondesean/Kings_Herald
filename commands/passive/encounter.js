@@ -2,8 +2,11 @@
  *
  * Once a day (placed by src/dailyLineup.js so it never overlaps the trivia,
  * puzzle or shop), the Herald announces that an unnamed threat stirs. Members
- * The difficulty is rolled when the threat is posted, from OPEN_TIERS
- * (Easy, Medium and Hard, equally likely), and announced up front so members
+ * The difficulty is rolled when the threat is posted, equally likely among
+ * the tiers the server has opened: Easy, Medium and Hard to begin with, then
+ * Extreme after its first Hard win and Max after its first Extreme win (see
+ * src/campaign.js, which also starts the lore drops on the first Max win),
+ * and announced up front so members
  * can decide whether to answer. They click "Join the party" (up to
  * MAX_PARTY, 20) and are privately prompted for a stance: Aggressive (fit
  * x1.15), Balanced (x1), Defensive (x0.9) or Plunder (x0.8). It stays secret and can be
@@ -18,7 +21,8 @@
  *     summed over all slots) x that tier's assumed kit coverage x party
  *     size. Coverage is 1/2 for Easy (half the slots in Common), 3/4 for
  *     Medium, and a full kit from Hard up (see TIER_COVERAGE), since players
- *     fill slots gradually.
+ *     fill slots gradually. Max is the exception: halfway between Extreme and
+ *     a full Legendary kit, so Legendary gear has the edge on it.
  *   - Party fit = each member's equipped fit (read at battle time) x their
  *     stance multiplier, summed. A member whose bags hold finer gear than
  *     they wear is offered "Suit up in my best" in their prompt; if chosen,
@@ -75,6 +79,7 @@ const { findAdventurerRole } = require('../../src/adventurerRole');
 const { fitScore, totalFit, bestKit } = require('../../src/character');
 const { petBonus } = require('../../src/pets');
 const achievements = require('../../src/achievements');
+const campaign = require('../../src/campaign');
 const { recordHistory } = require('../../src/historyLog');
 const catalog = require('./shopCatalog');
 const { easternDay } = require('./shop');
@@ -138,7 +143,9 @@ const TIER_COVERAGE = [0.75, 0.875, 1, 1, 1];
 // Medium have none, so a strong enough party is sure of the win; from Hard up
 // no fight is ever a sure thing, and the harder the boss the bigger the risk.
 const TIER_LOSS_FLOOR = [0, 0, 0.01, 0.03, 0.05];
-const bossFitPerEntrant = (tier) => {
+const EXTREME_TIER = 3;
+const MAX_TIER = 4;
+const kitFitFor = (tier) => {
     const rarity = catalog.RARITIES[tier];
     const fullKit = catalog.GEAR_SLOTS.reduce((sum, slot) => {
         const prices = catalog.GEAR.filter((e) => e.slot === slot && catalog.rarityFor(e.price) === rarity).map((e) => e.price);
@@ -146,6 +153,13 @@ const bossFitPerEntrant = (tier) => {
     }, 0);
     return Math.round(fullKit * TIER_COVERAGE[tier]);
 };
+// Max sits halfway between Extreme and a full Legendary kit, so a party in
+// Legendary gear goes in with the edge. A full Legendary kit is kept for the
+// Herald himself (HERALD_FIT_PER_ENTRANT), the one foe meant to be an even match.
+const bossFitPerEntrant = (tier) => (tier === MAX_TIER
+    ? Math.round((kitFitFor(EXTREME_TIER) + kitFitFor(MAX_TIER)) / 2)
+    : kitFitFor(tier));
+const HERALD_FIT_PER_ENTRANT = kitFitFor(MAX_TIER);
 
 // Chance (0-1) of a win, from party fit / boss fit, capped by the tier's
 // loss floor. Without a tier, the uncapped curve (reaching 100% at 140%).
@@ -154,11 +168,11 @@ const winChance = (ratio, tier = null) => {
     return tier === null ? raw : Math.min(raw, 1 - TIER_LOSS_FLOOR[tier]);
 };
 
-// The tiers the daily encounter can roll, each equally likely: Easy, Medium
-// and Hard for now. Extreme and Max still exist (bosses, odds, achievements)
-// and only need adding here.
+// The tiers every server can roll, each equally likely: Easy, Medium and Hard.
+// The first Hard win opens Extreme, and the first Extreme win opens Max (see
+// src/campaign.js); the real encounter rolls from the server's open tiers.
 const OPEN_TIERS = [0, 1, 2];
-const rollTier = (random = Math.random) => OPEN_TIERS[Math.floor(random() * OPEN_TIERS.length)];
+const rollTier = (random = Math.random, tiers = OPEN_TIERS) => tiers[Math.floor(random() * tiers.length)];
 
 // The party's win chance at `tier` from each member's { fit, stance } (no
 // stance yet counts as Balanced).
@@ -497,8 +511,16 @@ const runEncounterIn = async (g, channel, opts) => {
     const tag = `Encounter (${runLabel}) (guild ${g.id})`;
     const roundId = crypto.randomBytes(4).toString('hex');
     const prefix = `enc_${roundId}_`;
-    // Rolled up front and announced, so members choose whether to answer.
-    const tier = opts.tier ?? rollTier();
+    // Rolled up front and announced, so members choose whether to answer. The
+    // real encounter rolls from the tiers this server has opened (src/campaign.js).
+    let tier = opts.tier;
+    if (tier === undefined || tier === null) {
+        const open = persist ? await campaign.openTiers(g.id).catch((error) => {
+            console.error(`${tag}: could not read the campaign; rolling the base tiers:`, error.message);
+            return OPEN_TIERS;
+        }) : OPEN_TIERS;
+        tier = rollTier(Math.random, open);
+    }
 
     // Only the real scheduled encounter pings the Adventurers; a rehearsal doesn't.
     const role = persist ? findAdventurerRole(g) : null;
@@ -689,6 +711,18 @@ const runEncounterIn = async (g, channel, opts) => {
             displayName: m.displayName,
             counts: { ...shared, ...(m === killer ? { heroics: 1 } : {}) },
         })), channel);
+
+        // The server's first win at Hard opens Extreme, at Extreme opens Max,
+        // and at Max starts the lore drops (src/campaign.js).
+        const milestone = await campaign.recordWin(g.id, tier).catch((error) => {
+            console.error(`${tag}: failed to record the campaign milestone:`, error.message);
+            return null;
+        });
+        if (milestone && milestone.opened !== undefined) {
+            await channel.send(pick(flavor.encounterTierOpenedLines(DIFFICULTIES[milestone.opened])));
+        } else if (milestone && milestone.loreBegins) {
+            await channel.send(pick(flavor.encounterFirstMaxLines()));
+        }
     }
 
     // Loot: dropsFor(party size) distinct random pieces of the tier's rarity, each
@@ -872,6 +906,7 @@ const runEncounter = async function (client, options = {}) {
 module.exports = {
     runEncounter,
     bossFitPerEntrant,
+    HERALD_FIT_PER_ENTRANT,
     winChance,
     TIER_COVERAGE,
     TIER_LOSS_FLOOR,

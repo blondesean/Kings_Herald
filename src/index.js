@@ -43,6 +43,7 @@ const { scheduleBirthdays } = require('./../commands/passive/birthdays');
 const { schedulePetCalls } = require('./../commands/passive/petCalls');
 const { scheduleHalloweenTreat } = require('./../commands/passive/halloweenTreat');
 const { scheduleAchievements } = require('./achievements');
+const { scheduleLoreDrops } = require('./campaign'); // the lore drops after the first Max win
 const { scheduleSnapshots } = require('./snapshots'); // daily standings for the history log
 const { recordHistory } = require('./historyLog');
 
@@ -137,6 +138,7 @@ client.on('ready', (c) => {
     schedulePetCalls(client);
     startVoiceTracking(client);
     scheduleAchievements(client);
+    scheduleLoreDrops(client);
     scheduleSnapshots(client);
 });
 
