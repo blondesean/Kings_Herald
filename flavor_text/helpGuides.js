@@ -38,7 +38,7 @@ const helpGuides = {
         label: 'Shop, selling and trading',
         title: 'The Merchant\'s Stalls',
         text: [
-            'Once a day the merchant opens for three hours with 5 pieces of gear, a title, a class and a race. See it with `/shop`.',
+            'Every day at 9 AM Pacific the merchant opens until 9 PM Pacific with 5 pieces of gear, a title, a class and a race. See it with `/shop`.',
             '',
             '**Buying.** `/buy <name>`. Each piece of gear has two copies for the whole court, and a title only one. Gear goes to thy bag, seen with `/bank`, and `/equip` puts it on. A class, race or title takes hold at once.',
             '',

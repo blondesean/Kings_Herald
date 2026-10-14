@@ -7,8 +7,8 @@
  * exactly one letter of the last word on the ladder, and it becomes the new
  * last word. Every rung must be a real word (the dictionary is
  * wordLadderWords.txt, see wordLadderGraph.js) that isn't already on the
- * ladder. The target must be reached within MAX_STEPS words, the target
- * itself counting as the last one.
+ * ladder. The target must be reached within as many words as the puzzle's own
+ * route, e.g. 4 for COLD to WARM, the target itself counting as the last one.
  *
  * Every message is checked in this order before it can count (see the
  * 'collect' handler and applyWord):
@@ -25,8 +25,8 @@
  * rung per puzzle; a ladder of N steps needs N different people.
  *
  * Nothing can be taken back, so a wasted rung is possible. The puzzle bank
- * (wordLadderPuzzles.js) holds puzzles solvable in 4, 5 or 6 steps. The
- * six-step ones leave no room for a wasted word, and the five-step ones leave one. After each rung the game
+ * (wordLadderPuzzles.js) holds puzzles of 4, 5 or 6 steps, and the limit is
+ * exactly that, so there's no room for a wasted word. After each rung the game
  * also checks (breadth-first, without reusing words) whether the target is
  * still reachable in the steps left, and ends the puzzle at once if it isn't.
  *
@@ -57,8 +57,6 @@ const wordLadderPuzzles = require('./wordLadderPuzzles');
 const { isWord, differsByOneLetter, remainingDistance } = require('./wordLadderGraph');
 const flavor = require('../../flavor_text');
 
-// Words the court may add, counting the target as the last one.
-const MAX_STEPS = 6;
 const POINTS_PER_SOLVE = 1; // each contributor, on a full solve; same as Connections
 
 // Same window as Connections.
@@ -113,6 +111,9 @@ const createSession = (puzzle) => {
         puzzle,
         start,
         target: puzzle.target.toLowerCase(),
+        // Words the court may add, counting the target as the last one: the
+        // length of the puzzle's own route.
+        maxSteps: puzzle.route.length - 1,
         chain: [start],
         used: new Set([start]),
         // userId -> { displayName, word } for every member who laid a rung.
@@ -151,9 +152,9 @@ const applyWord = (session, word, user) => {
 
     if (word === session.target) {
         session.result = 'solved';
-    } else if (stepsUsed(session) >= MAX_STEPS) {
+    } else if (stepsUsed(session) >= session.maxSteps) {
         session.result = 'outOfSteps';
-    } else if (remainingDistance(word, session.target, session.used) > MAX_STEPS - stepsUsed(session)) {
+    } else if (remainingDistance(word, session.target, session.used) > session.maxSteps - stepsUsed(session)) {
         session.result = 'stuck';
     }
 
@@ -171,9 +172,9 @@ const buildBoardEmbed = (session) =>
         .addFields(
             { name: 'Goal', value: `**${session.start.toUpperCase()}** to **${session.target.toUpperCase()}**` },
             { name: 'Ladder So Far', value: upper(session.chain).join(' > ') },
-            { name: 'Steps', value: `${stepsUsed(session)} of ${MAX_STEPS} used`, inline: true }
+            { name: 'Steps', value: `${stepsUsed(session)} of ${session.maxSteps} used`, inline: true }
         )
-        .setFooter({ text: `Type one word that changes exactly one letter of the last word on the ladder. One rung per noble, and only real words count. Reach ${session.target.toUpperCase()} within ${MAX_STEPS} steps (one step per new word, the target included), and each of you who laid a rung earns ${POINTS_PER_SOLVE} point.` })
+        .setFooter({ text: `Type one word that changes exactly one letter of the last word on the ladder. One rung per noble, and only real words count. Reach ${session.target.toUpperCase()} within ${session.maxSteps} steps (one step per new word, the target included), and each of you who laid a rung earns ${POINTS_PER_SOLVE} point.` })
         .setTimestamp();
 
 // ---- one session --------------------------------------------------------------
@@ -196,7 +197,7 @@ const runWordLadderSession = (guild, channel, puzzle, persist, runLabel) => {
             } else if (outcome.type === 'notOneLetter') {
                 await channel.send(pick(flavor.wordLadderNotOneLetterLines(solverName, word.toUpperCase(), outcome.tail.toUpperCase())));
             } else if (outcome.type === 'accepted') {
-                console.log(`${tag}: ${solverName} (${message.author.id}) added ${word.toUpperCase()} (step ${stepsUsed(session)}/${MAX_STEPS}).`);
+                console.log(`${tag}: ${solverName} (${message.author.id}) added ${word.toUpperCase()} (step ${stepsUsed(session)}/${session.maxSteps}).`);
                 await channel.send(pick(flavor.wordLadderAcceptedLines(solverName, word.toUpperCase())));
                 if (outcome.result) {
                     collector.stop(outcome.result);
@@ -261,7 +262,7 @@ const runWordLadderSession = (guild, channel, puzzle, persist, runLabel) => {
         // Only the real scheduled puzzle pings signed-up members
         // (/signup puzzle) — preview runs shouldn't spam them.
         const role = persist ? findPuzzleRole(guild) : null;
-        const intro = pick(flavor.wordLadderIntroLines(session.start.toUpperCase(), session.target.toUpperCase(), MAX_STEPS));
+        const intro = pick(flavor.wordLadderIntroLines(session.start.toUpperCase(), session.target.toUpperCase(), session.maxSteps));
 
         channel.send(role ? `<@&${role.id}> ${intro}` : intro)
             .then(() => channel.send({ embeds: [buildBoardEmbed(session)] }))
@@ -311,4 +312,4 @@ const runWordLadder = async function (client, options = {}) {
     }));
 };
 
-module.exports = { runWordLadder, createSession, applyWord, MAX_STEPS, POINTS_PER_SOLVE };
+module.exports = { runWordLadder, createSession, applyWord, POINTS_PER_SOLVE };

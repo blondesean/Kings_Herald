@@ -78,6 +78,8 @@ const ACHIEVEMENTS = [
     { id: 'full_kit', name: 'Full Kit', description: 'Wear something in every gear slot', stat: 'fullKit', goal: 1 },
     { id: 'legendary', name: 'Legendary', description: 'Wear a Legendary piece', stat: 'legendary', goal: 1 },
     { id: 'dealmaker', name: 'Dealmaker', description: 'Complete a /trade', counter: 'trades', goal: 1 },
+    { id: 'tipper', name: 'A Coin for the Herald', description: 'Tip the herald with /tip', counter: 'tips', goal: 1 },
+    { id: 'patron', name: 'Patron of the Herald', description: 'Tip the herald 25 points in all', counter: 'tipped', goal: 25 },
 ];
 
 const byId = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));

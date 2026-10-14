@@ -8,8 +8,8 @@
  * Every puzzle was vetted the same way: both words are ordinary (not
  * profanity, not a name, not an inflected form like "-s" or "-ed"), and a
  * route of 3 or 4 steps exists using only everyday words, with at least one
- * other everyday-word route too. That keeps the game's 6-step limit
- * comfortable even after a wasted word, and it means a puzzle can be won
+ * other everyday-word route too. The game's step limit is the length of
+ * `route`, as the herald announces it, and it means a puzzle can be won
  * without knowing obscure Scrabble words (the dictionary that judges guesses
  * is far more permissive than that). Words are uppercase for display.
  * Lengths run from 3 to 6 letters; a ladder never changes a word's length.

@@ -1550,6 +1550,101 @@ const clearChannelOverride = async function (guildId, scope) {
     }));
 };
 
+/* Tips to the herald (see commands/prompts/tip.js). Own partition, so the
+ * herald never shows up on /nobility. One item keyed HERALD holds the guild's
+ * running { total, count }, and one item per tipper, keyed by their userId,
+ * holds what they have given in all.
+ */
+const TIP_PREFIX = 'TIP#';
+const TIP_HERALD_KEY = 'HERALD';
+
+/* Move `amount` points from a member to the herald, in one transaction: the
+ * member must still have the points when it lands. Returns
+ * { total, count, given } after the tip, or null if they can't afford it.
+ */
+const tipHerald = async function (guildId, tipper, amount) {
+    if (!isConfigured()) return null;
+
+    try {
+        await getClient().send(new TransactWriteCommand({
+            TransactItems: [
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId, userId: tipper.id },
+                        UpdateExpression: 'SET #dn = :n ADD #pts :neg, #wl :amount',
+                        ConditionExpression: '#pts >= :amount',
+                        ExpressionAttributeNames: { '#dn': 'displayName', '#pts': 'points', '#wl': 'weeklyLost' },
+                        ExpressionAttributeValues: { ':n': tipper.displayName || 'a noble', ':neg': -amount, ':amount': amount },
+                    },
+                },
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId: TIP_PREFIX + guildId, userId: TIP_HERALD_KEY },
+                        UpdateExpression: 'ADD #total :amount, #count :one',
+                        ExpressionAttributeNames: { '#total': 'total', '#count': 'count' },
+                        ExpressionAttributeValues: { ':amount': amount, ':one': 1 },
+                    },
+                },
+                {
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { guildId: TIP_PREFIX + guildId, userId: tipper.id },
+                        UpdateExpression: 'SET #dn = :n ADD #given :amount',
+                        ExpressionAttributeNames: { '#dn': 'displayName', '#given': 'given' },
+                        ExpressionAttributeValues: { ':n': tipper.displayName || 'a noble', ':amount': amount },
+                    },
+                },
+            ],
+        }));
+    } catch (error) {
+        if (cancelledBy(error)) return null;
+        throw error;
+    }
+    recordPoints(guildId, tipper.id, -amount, 'tip');
+
+    const [herald, mine] = await Promise.all([TIP_HERALD_KEY, tipper.id].map((userId) => getClient().send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: TIP_PREFIX + guildId, userId },
+    }))));
+    return {
+        total: (herald.Item && herald.Item.total) || amount,
+        count: (herald.Item && herald.Item.count) || 1,
+        given: (mine.Item && mine.Item.given) || amount,
+    };
+};
+
+/* Every tip the herald has had in a guild:
+ * { total, count, tippers: [{ userId, displayName, given }] }, biggest givers first.
+ */
+const getHeraldTips = async function (guildId) {
+    const tips = { total: 0, count: 0, tippers: [] };
+    if (!isConfigured()) return tips;
+
+    let startKey;
+    do {
+        const result = await getClient().send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: '#g = :g',
+            ExpressionAttributeNames: { '#g': 'guildId' },
+            ExpressionAttributeValues: { ':g': TIP_PREFIX + guildId },
+            ExclusiveStartKey: startKey,
+        }));
+        for (const item of result.Items || []) {
+            if (item.userId === TIP_HERALD_KEY) {
+                tips.total = item.total || 0;
+                tips.count = item.count || 0;
+            } else {
+                tips.tippers.push({ userId: item.userId, displayName: item.displayName || 'a noble', given: item.given || 0 });
+            }
+        }
+        startKey = result.LastEvaluatedKey;
+    } while (startKey);
+    tips.tippers.sort((a, b) => b.given - a.given);
+    return tips;
+};
+
 /* Swap the equipped gear and bag in one write. `expectedBag` must match what's
  * stored now, so a stale read can't duplicate or lose an item. Returns false if
  * the bag changed under us.
@@ -1719,6 +1814,8 @@ module.exports = {
     buyListing,
     expireListing,
     tradeCharacters,
+    tipHerald,
+    getHeraldTips,
     getAchievements,
     getAllAchievements,
     bumpCounters,

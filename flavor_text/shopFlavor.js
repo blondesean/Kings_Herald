@@ -13,6 +13,13 @@ const shopClosedLines = () => [
     'The merchant has packed his wares for the day. Come back when the Herald next opens the stalls.',
 ];
 
+// Posted at midnight Eastern, when the day's shop closes.
+const shopClosingLines = () => [
+    'Midnight tolls! The merchant draws the shutters and packs his wares. The stalls open anew at the ninth hour, Pacific.',
+    'Hear ye! The shop is closed for the night. Whatever went unsold returns to the merchant\'s cart. Fresh wares come with the morrow.',
+    'The candles gutter and the merchant locks his strongbox. The shop is shut until the morrow, good nobles.',
+];
+
 const notInShopLines = (name) => [
     `The merchant has no **${name}** on his shelves today.`,
     `**${name}** is not among today's wares, good noble.`,
@@ -163,6 +170,7 @@ module.exports = {
     confirmExpiredLines,
     shopOpenLines,
     shopClosedLines,
+    shopClosingLines,
     notInShopLines,
     soldOutLines,
     cannotAffordLines,

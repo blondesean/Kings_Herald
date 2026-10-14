@@ -1,15 +1,13 @@
 /* Passive behavior: the Herald's daily shop.
  *
- * Once a day, at a random 15-minute slot between 9 AM and 9 PM Eastern,
- * placed by src/dailyLineup.js so it doesn't overlap the daily trivia or
- * puzzle slot (both posted to the same channel), the Herald opens the
- * shop and posts its stock:
+ * Once a day at noon Eastern, 9 AM Pacific (src/dailyLineup.js keeps the
+ * day's games clear of that slot), the Herald opens the shop and posts its stock:
  *   - 5 gear pieces, drawn at random from the catalog
  *   - 1 title, 1 class and 1 race
  * Gear and titles have 2 copies (titles: 1) shared by the whole server. Once
  * they're gone, that item is sold out until the next day. Callings and kindreds
- * never run out. The shop stays open for OPEN_MS (180
- * minutes) after it posts, and its stock resets at midnight Eastern.
+ * never run out. The shop stays open until midnight Eastern, 9 PM Pacific,
+ * when its stock resets and the Herald announces the closing (closeShopNow).
  *
  * Gear members sold back with /sell on an earlier day also goes on sale, in
  * a Discounts section shown only when there is some (see DISCOUNT below).
@@ -39,7 +37,7 @@ const catalog = require('./shopCatalog');
 const flavor = require('../../flavor_text');
 
 const TIMEZONE = 'America/New_York';
-const OPEN_MS = 3 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 const COPIES_PER_ITEM = 2;
 // Titles are unique: one copy, so only one noble can bear each at a time.
 const COPIES_PER_TITLE = 1;
@@ -54,6 +52,20 @@ const easternDay = (date = new Date()) => {
     const parts = new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
     const get = (type) => parts.find((p) => p.type === type).value;
     return `${get('year')}-${get('month')}-${get('day')}`;
+};
+
+// The first moment of the next Eastern day, when the shop closes and its
+// stock resets. Starts from the wall-clock time left in the day, then steps by
+// the hour to land exactly on the day change, which a DST shift can move by one.
+const nextEasternMidnight = (now = Date.now()) => {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(now));
+    const get = (type) => Number(parts.find((p) => p.type === type).value);
+    const elapsed = ((get('hour') * 60 + get('minute')) * 60 + get('second')) * 1000 + (now % 1000);
+    const today = easternDay(new Date(now));
+    let midnight = now + 24 * HOUR_MS - elapsed;
+    while (easternDay(new Date(midnight - 1)) !== today) midnight -= HOUR_MS;
+    while (easternDay(new Date(midnight)) === today) midnight += HOUR_MS;
+    return midnight;
 };
 
 const pickOne = (list, random) => list[Math.floor(random() * list.length)];
@@ -90,7 +102,7 @@ const stockRecord = (now = Date.now(), random = Math.random) => {
         items,
         stock: Object.fromEntries(items.filter(isLimited).map((id) => [id, copiesFor(id)])),
         openedAt: now,
-        closesAt: now + OPEN_MS,
+        closesAt: nextEasternMidnight(now),
     };
 };
 
@@ -176,7 +188,7 @@ const shopEmbed = (record, discounts = []) => {
     const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle("The Herald's Shop")
-        .setDescription(`${flavor.shopOpenLines()[0]}\n\nBuy with \`/buy <name>\` and bear thy spoils proudly on \`/flex\`. Each piece lends thee fit, reckoned by its fame and, mostly, its weight in coin. Seek the rarest pieces, for the court's duels favor the best-armoured, and a full kit makes thy fit the envy of the realm. The merchant packs up after three turns of the hour hand.\n\n*Wish to be summoned the moment the stalls open? Use /signup shop!*`);
+        .setDescription(`${flavor.shopOpenLines()[0]}\n\nBuy with \`/buy <name>\` and bear thy spoils proudly on \`/flex\`. Each piece lends thee fit, reckoned by its fame and, mostly, its weight in coin. Seek the rarest pieces, for the court's duels favor the best-armoured, and a full kit makes thy fit the envy of the realm. The merchant packs up at the stroke of midnight.\n\n*Wish to be summoned the moment the stalls open? Use /signup shop!*`);
     for (const [name, values] of sections) {
         // A field holds 1024 characters, so a long section carries over into more.
         let chunk = [];
@@ -215,14 +227,8 @@ const openShopNow = async function (client, options = {}) {
 
             const record = stockRecord();
             if (persist) await pointsStore.openShop(g.id, record);
+            // Whatever is left unsold is paid out by closeShopNow at midnight.
             const discounts = await stockDiscounts(g.id, record, persist);
-            if (persist && discounts.length) {
-                // Pays out whatever is left unsold at closing. A restart loses
-                // this timer, so the next opening settles them instead.
-                setTimeout(() => {
-                    settleListings(g.id).catch((error) => console.error(`Shop (guild ${g.id}): settling listings failed:`, error));
-                }, OPEN_MS + 1000);
-            }
             // Only the real opening pings the shopaholics; a test shop doesn't.
             const role = ping ? findShopRole(g) : null;
             await channel.send({
@@ -237,6 +243,31 @@ const openShopNow = async function (client, options = {}) {
     }
 };
 
+/* Close the day's shop at midnight Eastern: pays out unsold discounts and
+ * announces the closing, in each guild whose shop opened on the day that just
+ * ended. Called by src/dailyLineup.js. A guild whose shop never opened that
+ * day, say after a restart, gets no announcement.
+ */
+const closeShopNow = async function (client, now = Date.now()) {
+    const endedDay = easternDay(new Date(now - 60 * 1000));
+    for (const g of client.guilds.cache.values()) {
+        try {
+            const record = await pointsStore.getShop(g.id);
+            if (!record || record.day !== endedDay) continue;
+
+            // The cron can fire a hair before the recorded closing time.
+            await settleListings(g.id, Math.max(now, record.closesAt));
+            const channel = await resolveChannel(g, 'shop', findAnnounceChannel);
+            if (!channel) continue;
+            const lines = flavor.shopClosingLines();
+            await channel.send(lines[Math.floor(Math.random() * lines.length)]);
+            console.log(`Shop (guild ${g.id}) closed for ${endedDay}.`);
+        } catch (guildError) {
+            console.error(`Shop failed to close for guild "${g.name}":`, guildError);
+        }
+    }
+};
+
 // Today's open shop for a guild, or null if it hasn't opened yet, has closed,
 // or was opened on an earlier day.
 const currentOpenShop = async function (guildId, now = Date.now()) {
@@ -246,6 +277,6 @@ const currentOpenShop = async function (guildId, now = Date.now()) {
 };
 
 module.exports = {
-    openShopNow, pickDailyStock, easternDay, stockRecord, shopEmbed, kindOf, currentOpenShop,
+    openShopNow, closeShopNow, pickDailyStock, easternDay, nextEasternMidnight, stockRecord, shopEmbed, kindOf, currentOpenShop,
     discountsFor, settleListings, discountPrice, unsoldRefund,
 };

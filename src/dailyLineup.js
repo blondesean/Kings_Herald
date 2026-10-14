@@ -1,17 +1,22 @@
-/* Coordinates the three scheduled games that share the announce channel and
- * a random daily time slot — trivia (and its subjective variants: would you
- * rather, ranking), the puzzle slot (Connections or Word Ladder), and the
- * shop — so their open windows never land on top of each other. WoW Trivia
- * Wednesdays runs in its own channel and isn't part of this; duels,
+/* Coordinates the scheduled games that share the announce channel and a
+ * random daily time slot — trivia (and its subjective variants: would you
+ * rather, ranking), the puzzle slot (Connections or Word Ladder) and the boss
+ * encounter — so their open windows never land on top of each other. WoW
+ * Trivia Wednesdays runs in its own channel and isn't part of this; duels,
  * confirmation prompts and Death Roll are member-initiated, not scheduled,
  * so they don't need coordinating either.
+ *
+ * The shop isn't placed: it opens on its own cron at noon Eastern (9 AM
+ * Pacific) and closes on another at midnight Eastern, with an announcement.
+ * The games keep clear of the noon slot (SHOP_SLOT) so the opening post
+ * never lands on top of one of them.
  *
  * Each game's *kind* has to be decided here, before placement, because the
  * kind decides how long its window stays open (a would-you-rather round is
  * open for 3 hours, a factual question for 30 minutes, and so on) — and the
  * placement below needs to know every window's length to keep them apart.
- * A single 9 AM Eastern cron rolls all three kinds, places their windows in
- * the shared 9 AM-9 PM span with a buffer between each, then a setTimeout
+ * A single 9 AM Eastern cron rolls the kinds, places their windows in the
+ * shared 9 AM-9 PM span with a buffer between each, then a setTimeout
  * per game fires it at its chosen moment, passing the already-rolled kind so
  * the game doesn't roll it again.
  *
@@ -21,7 +26,7 @@
  * are unchanged and still used directly by their preview commands.
  *
  * Exposes:
- *   scheduleDailyLineup(client) - registers the daily cron (call once, on ready)
+ *   scheduleDailyLineup(client) - registers the daily crons (call once, on ready)
  * The daily boss encounter (commands/passive/encounter.js) is placed the
  * same way, reserving ENCOUNTER_WINDOW_MS: an hour to form the party plus an
  * hour for need/greed/pass.
@@ -34,20 +39,22 @@ const cron = require('node-cron');
 const { runTrivia, rollToday } = require('../commands/passive/trivia');
 const { runConnectionsPuzzle } = require('../commands/puzzles/connections');
 const { runWordLadder } = require('../commands/puzzles/wordLadder');
-const { openShopNow } = require('../commands/passive/shop');
+const { openShopNow, closeShopNow } = require('../commands/passive/shop');
 const { runEncounter, JOIN_WINDOW_MS, LOOT_WINDOW_MS } = require('../commands/passive/encounter');
 
-// The shared window: 9 AM to 9 PM Eastern. Shop needs to fit inside this
-// (its stock resets at midnight, and it's open for 3 hours), so the other two
-// games use the same span rather than their old 9 AM-to-midnight window —
-// simpler to reason about, and 48 fifteen-minute slots is still plenty of
-// spread for a 12-hour day.
+// The shared window: 9 AM to 9 PM Eastern, 48 fifteen-minute slots.
 const WINDOW_CRON = '0 9 * * *';
 const TIMEZONE = 'America/New_York';
 const WINDOW_HOURS = 12;
 const SLOT_MINUTES = 15;
 const SLOT_MS = SLOT_MINUTES * 60 * 1000;
 const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES;
+
+// The shop opens at noon Eastern, 9 AM Pacific, and closes at midnight
+// Eastern. Noon is slot 12 of the window, and no game's window may touch it.
+const SHOP_OPEN_CRON = '0 12 * * *';
+const SHOP_CLOSE_CRON = '0 0 * * *';
+const SHOP_SLOT = 12;
 
 // At least one empty slot between any two games' windows, so a wrap-up
 // message and the next game's opening post don't land in the same breath.
@@ -62,7 +69,6 @@ const TRIVIA_WINDOW_MS = 30 * 60 * 1000;
 const WYR_WINDOW_MS = 3 * 60 * 60 * 1000;
 const RANKING_WINDOW_MS = 30 * 60 * 1000;
 const PUZZLE_WINDOW_MS = 60 * 60 * 1000;
-const SHOP_WINDOW_MS = 3 * 60 * 60 * 1000;
 const ENCOUNTER_WINDOW_MS = JOIN_WINDOW_MS + LOOT_WINDOW_MS;
 
 // The Date each game is armed to fire today, or null once it has fired (or
@@ -71,15 +77,19 @@ const ENCOUNTER_WINDOW_MS = JOIN_WINDOW_MS + LOOT_WINDOW_MS;
 const fireTimes = { trivia: null, puzzle: null, shop: null, encounter: null };
 const getFireTime = (game) => fireTimes[game] || null;
 
+// True if a game running over slots [start, end) would touch the shop's slot,
+// counting a game that ends right at noon, since its wrap-up posts then.
+const hitsShop = (start, end) => start <= SHOP_SLOT && SHOP_SLOT <= end;
+
 /* Picks a non-overlapping start slot (in SLOT_MINUTES units, 0-based) for
  * each duration in `durationsMs`, within a SLOT_COUNT-slot window, at least
- * BUFFER_SLOTS apart. Tries random placements first (fast, and keeps every
- * day's lineup differently shaped); if 500 random tries all collide — very
- * unlikely given how much slack the window has — falls back to packing them
- * back-to-back in a random order, which always fits unless the total
- * duration plus buffers exceeds the window (logged, not thrown, since a
- * slightly-overrun shop or trivia round is a far smaller problem than a
- * crashed scheduler).
+ * BUFFER_SLOTS apart and clear of SHOP_SLOT. Tries random placements first
+ * (fast, and keeps every day's lineup differently shaped); if 500 random
+ * tries all collide — very unlikely given how much slack the window has —
+ * falls back to packing them back-to-back in a random order, stepping over
+ * the shop's slot, which always fits unless the total duration plus buffers
+ * exceeds the window (logged, not thrown, since a slightly-overrun trivia
+ * round is a far smaller problem than a crashed scheduler).
  */
 const placeSlots = (durationsMs, random = Math.random) => {
     const lengths = durationsMs.map((ms) => Math.ceil(ms / SLOT_MS));
@@ -95,7 +105,7 @@ const placeSlots = (durationsMs, random = Math.random) => {
             if (latestStart < 0) { ok = false; break; }
             const start = Math.floor(random() * (latestStart + 1));
             const end = start + length;
-            if (busy.some(([bs, be]) => start < be + BUFFER_SLOTS && bs < end + BUFFER_SLOTS)) {
+            if (hitsShop(start, end) || busy.some(([bs, be]) => start < be + BUFFER_SLOTS && bs < end + BUFFER_SLOTS)) {
                 ok = false;
                 break;
             }
@@ -109,7 +119,7 @@ const placeSlots = (durationsMs, random = Math.random) => {
     // spare slots split randomly between the gaps, so it still always fits
     // and still lands at different times each day.
     console.log('Daily lineup: random placement kept colliding; spreading the games out instead.');
-    const used = lengths.reduce((a, b) => a + b, 0) + BUFFER_SLOTS * (lengths.length - 1);
+    const used = lengths.reduce((a, b) => a + b, 0) + BUFFER_SLOTS * (lengths.length - 1) + 1; // + the shop's slot
     const slack = Math.max(0, SLOT_COUNT - used);
     if (used > SLOT_COUNT) {
         console.error('Daily lineup: the day\'s games do not fit the window even back-to-back — some will run past 9 PM.');
@@ -122,6 +132,7 @@ const placeSlots = (durationsMs, random = Math.random) => {
     order.forEach((i, k) => {
         cursor += cuts[k] - previousCut;
         previousCut = cuts[k];
+        if (hitsShop(cursor, cursor + lengths[i])) cursor = SHOP_SLOT + 1;
         starts[i] = cursor;
         cursor += lengths[i] + BUFFER_SLOTS;
     });
@@ -129,15 +140,18 @@ const placeSlots = (durationsMs, random = Math.random) => {
 };
 
 /* Register the daily lineup. Call once after the client is ready. Fires at
- * 9 AM Eastern: rolls each game's kind, places their windows, and arms three
- * setTimeouts. If the bot restarts between 9 AM and a chosen fire time, that
- * game is skipped for the day — no state persisted across restarts, same as
- * the schedulers this replaces.
+ * 9 AM Eastern: rolls each game's kind, places their windows, and arms a
+ * setTimeout for each. If the bot restarts between 9 AM and a chosen fire
+ * time, that game is skipped for the day — no state persisted across
+ * restarts, same as the schedulers this replaces. Two more crons open the
+ * shop at noon and close it at midnight Eastern.
  */
 const scheduleDailyLineup = function (client) {
-    if (!cron.validate(WINDOW_CRON)) {
-        console.error(`Daily lineup: invalid cron expression "${WINDOW_CRON}"; not scheduled.`);
-        return;
+    for (const expression of [WINDOW_CRON, SHOP_OPEN_CRON, SHOP_CLOSE_CRON]) {
+        if (!cron.validate(expression)) {
+            console.error(`Daily lineup: invalid cron expression "${expression}"; not scheduled.`);
+            return;
+        }
     }
 
     cron.schedule(
@@ -149,20 +163,20 @@ const scheduleDailyLineup = function (client) {
                 : subjectiveKind === 'ranking' ? RANKING_WINDOW_MS : WYR_WINDOW_MS;
             const ladder = Math.random() < LADDER_CHANCE;
 
-            const [triviaSlot, puzzleSlot, shopSlot, encounterSlot] = placeSlots([triviaWindowMs, PUZZLE_WINDOW_MS, SHOP_WINDOW_MS, ENCOUNTER_WINDOW_MS]);
+            const [triviaSlot, puzzleSlot, encounterSlot] = placeSlots([triviaWindowMs, PUZZLE_WINDOW_MS, ENCOUNTER_WINDOW_MS]);
             const windowOpenedAt = Date.now();
             const slotTime = (slot) => windowOpenedAt + slot * SLOT_MS;
 
             fireTimes.trivia = new Date(slotTime(triviaSlot));
             fireTimes.puzzle = new Date(slotTime(puzzleSlot));
-            fireTimes.shop = new Date(slotTime(shopSlot));
+            fireTimes.shop = new Date(slotTime(SHOP_SLOT));
             fireTimes.encounter = new Date(slotTime(encounterSlot));
 
             const triviaKindLabel = !roll.subjective ? `factual${roll.seasonal ? ', seasonal' : ''}` : subjectiveKind;
             console.log(
                 `Daily lineup: trivia (${triviaKindLabel}) at ~${fireTimes.trivia.toISOString()}, ` +
                 `puzzle (${ladder ? 'Word Ladder' : 'Connections'}) at ~${fireTimes.puzzle.toISOString()}, ` +
-                `shop at ~${fireTimes.shop.toISOString()}, encounter at ~${fireTimes.encounter.toISOString()}.`
+                `encounter at ~${fireTimes.encounter.toISOString()}.`
             );
 
             setTimeout(() => {
@@ -181,13 +195,6 @@ const scheduleDailyLineup = function (client) {
             }, slotTime(puzzleSlot) - Date.now());
 
             setTimeout(() => {
-                fireTimes.shop = null;
-                openShopNow(client, { persist: true }).catch((error) =>
-                    console.error('Scheduled shop opening failed:', error)
-                );
-            }, slotTime(shopSlot) - Date.now());
-
-            setTimeout(() => {
                 fireTimes.encounter = null;
                 runEncounter(client, { persist: true }).catch((error) =>
                     console.error('Scheduled encounter failed:', error)
@@ -197,7 +204,24 @@ const scheduleDailyLineup = function (client) {
         { timezone: TIMEZONE }
     );
 
-    console.log(`Daily lineup scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), trivia/puzzle/shop/encounter placed without overlap across ${WINDOW_HOURS}h.`);
+    cron.schedule(
+        SHOP_OPEN_CRON,
+        () => {
+            fireTimes.shop = null;
+            openShopNow(client, { persist: true }).catch((error) => console.error('Scheduled shop opening failed:', error));
+        },
+        { timezone: TIMEZONE }
+    );
+
+    cron.schedule(
+        SHOP_CLOSE_CRON,
+        () => {
+            closeShopNow(client).catch((error) => console.error('Scheduled shop closing failed:', error));
+        },
+        { timezone: TIMEZONE }
+    );
+
+    console.log(`Daily lineup scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), trivia/puzzle/encounter placed without overlap across ${WINDOW_HOURS}h, clear of the shop, which opens "${SHOP_OPEN_CRON}" and closes "${SHOP_CLOSE_CRON}".`);
 };
 
-module.exports = { scheduleDailyLineup, getFireTime, placeSlots, SLOT_COUNT, SLOT_MINUTES };
+module.exports = { scheduleDailyLineup, getFireTime, placeSlots, SLOT_COUNT, SLOT_MINUTES, SHOP_SLOT };
