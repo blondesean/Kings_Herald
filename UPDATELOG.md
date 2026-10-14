@@ -5,8 +5,13 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-13
+
+- /tip and /balance_herald, word ladder step limits, shop open noon to midnight (`08c4fba`)
+
 ## 2026-10-12
 
+- Regenerate UPDATELOG.md (`5ba7b1f`)
 - Encounters: announced tiers, 3 to 20 adventurers, gear checks, softer defeats (`e36080e`)
 - /herald_channel: label the "all" scope so typing "all" finds it (`1d800b5`)
 
