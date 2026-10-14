@@ -5,8 +5,13 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-14
+
+- Encounters: hide the boss's power and the odds (`a5036bf`)
+
 ## 2026-10-13
 
+- Regenerate UPDATELOG.md (`2154c70`)
 - /tip and /balance_herald, word ladder step limits, shop open noon to midnight (`08c4fba`)
 
 ## 2026-10-12
