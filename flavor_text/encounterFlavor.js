@@ -159,12 +159,12 @@ const encounterUnhurtLines = (names) => [
     `${names} live to fight another day, unharmed.`,
 ];
 
-// The herald's check on the forming party, when its odds look poor.
-// `percent` is the win chance, such as "62%".
-const encounterOutmatchedLines = (percent) => [
-    `The herald surveys the gathering party and frowns: it appears outmatched, with perhaps ${percent} odds of victory. Any who would rather not march may leave the party now.`,
-    `A word of warning: as it stands, the party looks outmatched, the odds near ${percent}. Better geared fighters would be welcome, and any who wish to withdraw may do so now.`,
-    `The scouts report grim tidings: this party appears outmatched, with only about ${percent} odds. Leave now if thou wouldst not risk it.`,
+// The herald's check on the forming party, when its odds look poor. The odds
+// themselves are never told, to keep the foe a mystery.
+const encounterOutmatchedLines = () => [
+    'The herald surveys the gathering party and frowns: it appears outmatched. Any who would rather not march may leave the party now.',
+    'A word of warning: as it stands, the party looks outmatched. Better geared fighters would be welcome, and any who wish to withdraw may do so now.',
+    'The scouts report grim tidings: this party appears outmatched. Leave now if thou wouldst not risk it.',
 ];
 
 // A member whose gear alone gives a party like them under a 10% chance is

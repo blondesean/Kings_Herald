@@ -23,7 +23,7 @@ const helpGuides = {
             '',
             '**Stances.** Aggressive fights at +15% fit, but if hurt in a loss, rests two days. Balanced fights at thy true fit and rests one day if hurt. Defensive fights at -15% and fends off any blow aimed at it.',
             '',
-            '**Fit and power.** Thy fit is the worth of the gear thou wearest. Power is fit after thy stance. The party\'s power against the boss\'s sets the odds: about 80% at an even match, better above it, falling fast below it, and never quite certain.',
+            '**Fit and power.** Thy fit is the worth of the gear thou wearest. Power is fit after thy stance. The party\'s power against the foe\'s, which is never told, sets the odds. Better gear means better odds, but victory is never quite certain.',
             '',
             '**The march.** The party marches when 20 are ready, or an hour after the threat stirs. Fewer than 3, and no one marches. If thou choosest no stance, thou fightest Balanced.',
             '',

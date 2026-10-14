@@ -340,7 +340,7 @@ const gatherParty = (g, channel, message, prefix, opts) =>
                 console.log(`${tag}: roster check, ${members.length} in the party, ${percent(chance)} odds.`);
                 if (chance >= WARN_CHANCE) return;
                 const warning = await channel.send({
-                    content: pick(flavor.encounterOutmatchedLines(percent(chance))),
+                    content: pick(flavor.encounterOutmatchedLines()),
                     components: [leaveRow(prefix, false)],
                 }).catch((error) => console.error(`${tag}: failed to post the roster warning:`, error.message));
                 if (warning) warnings.push(warning);
@@ -548,7 +548,7 @@ const runEncounterIn = async (g, channel, opts) => {
 
     // The result is two embeds in one message: the battle (who fought, and
     // how well equipped they were) and the outcome, with the party's total fit
-    // and power against the boss's. The party is listed by name, title and
+    // and power, but not the boss's. The party is listed by name, title and
     // class. No one's own fit is shown. Stances are only revealed on a
     // loss, by the injuries; on a win they stay secret, though they still
     // count, since the killing blow is weighted by stance-adjusted fit.
@@ -597,12 +597,11 @@ const runEncounterIn = async (g, channel, opts) => {
             { name: 'The Odds', value: pick(flavor.encounterMatchupLines[matchup](boss)) }
         );
 
-    // The party's totals against the boss. Only totals, so each member's
-    // stance stays secret on a win.
+    // The party's totals. Only totals, so each member's stance stays secret
+    // on a win, and never the boss's, so the foe's strength stays a mystery.
     const tally = [
         `**Party fit:** ${ready.reduce((sum, m) => sum + m.fit, 0)}`,
         `**Party power:** ${Math.round(partyFit)}`,
-        `**Boss power:** ${bossFit}`,
     ].join('\n');
     const outcomeEmbed = new EmbedBuilder()
         .setColor(won ? EMBED_COLOR : DEFEAT_COLOR)
