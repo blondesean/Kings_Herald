@@ -5,8 +5,17 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-17
+
+- Encounters: no loss cap on Easy and Medium, Hard 99%, Extreme 97%, Max 95% (`6f9dcd0`)
+- Plunder achievements: Goblin Mode and Caught Red-Handed (`a7e7c02`)
+- /puppet: admins make the herald speak (`6e94c80`)
+- Encounters: Plunder stance, Defensive eased to -10% (`0bcc445`)
+- Suit up in thy best: fight in owned gear without equipping it (`a56db46`)
+
 ## 2026-10-14
 
+- Regenerate UPDATELOG.md (`dddc4ae`)
 - Encounters: hide the boss's power and the odds (`a5036bf`)
 
 ## 2026-10-13
