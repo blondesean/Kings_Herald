@@ -21,7 +21,7 @@ const helpGuides = {
             '',
             '**Joining.** Click **Join the party**, and thou art asked, privately, for thy stance. If thy gear is too slight for the threat, thou art turned away. Every 15 minutes the herald weighs the party, and if its odds look poor, says so and lets any who wish leave.',
             '',
-            '**Stances.** Aggressive fights at +15% fit, but if hurt in a loss, rests two days. Balanced fights at thy true fit and rests one day if hurt. Defensive fights at -15% and fends off any blow aimed at it.',
+            '**Stances.** Aggressive fights at +15% fit, but if hurt in a loss, rests two days. Balanced fights at thy true fit and rests one day if hurt. Defensive fights at -10% and fends off any blow aimed at it. Plunder fights at -20%, but on a victory thou makest off with a piece of the foe\'s hoard, of the same rarity as its drops, besides any loot thou rollest for. If a loss singles thee out, greed is punished: two days\' rest.',
             '',
             '**Fit and power.** Thy fit is the worth of the gear thou wearest. Dressed for show with finer arms in thy bags? Thy prompt offers **Suit up in my best**, and thou fightest in thy finest pieces for that battle alone. Thy wardrobe is never touched. Power is fit after thy stance. The party\'s power against the foe\'s, which is never told, sets the odds. Better gear means better odds, but victory is never quite certain.',
             '',

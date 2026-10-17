@@ -7,7 +7,7 @@
  *    that rarity, summed, times the tier's assumed kit coverage), the average
  *    member fit for 0% and 80% odds, and the tier's win cap.
  * 2. Win chance by party fit / boss fit for all-Balanced, all-Aggressive and
- *    all-Defensive parties (before each tier's cap).
+ *    all-Defensive and all-Plunder parties (before each tier's cap).
  * 3. A grid: a party whose members average a given fit, against each
  *    difficulty (Balanced, tier caps applied).
  */
@@ -30,9 +30,9 @@ console.log(`${'Raid*'.padEnd(12)}${RAID.DROP_RARITY.padEnd(12)}${pad(raidFit, 1
 console.log('* Raid: not reachable yet; no party cap, Epic threshold per entrant.');
 
 console.log('\n2. Win chance by party fit / boss fit (whole party in one stance, before the cap)\n');
-console.log('Ratio   Balanced   Aggressive   Defensive');
+console.log('Ratio   Balanced   Aggressive   Defensive   Plunder');
 for (let r = 0.5; r <= 1.5001; r += 0.05) {
-    console.log(`${pad(pct(r), 5)}${pad(pct(winChance(r)), 11)}${pad(pct(winChance(r * STANCES.aggressive.multiplier)), 13)}${pad(pct(winChance(r * STANCES.defensive.multiplier)), 12)}`);
+    console.log(`${pad(pct(r), 5)}${pad(pct(winChance(r)), 11)}${pad(pct(winChance(r * STANCES.aggressive.multiplier)), 13)}${pad(pct(winChance(r * STANCES.defensive.multiplier)), 12)}${pad(pct(winChance(r * STANCES.plunder.multiplier)), 10)}`);
 }
 
 console.log('\n3. Average member fit vs each difficulty (all Balanced, caps applied; party size cancels out)\n');

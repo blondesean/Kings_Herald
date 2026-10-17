@@ -6,7 +6,7 @@
  * (Easy, Medium and Hard, equally likely), and announced up front so members
  * can decide whether to answer. They click "Join the party" (up to
  * MAX_PARTY, 20) and are privately prompted for a stance: Aggressive (fit
- * x1.15), Balanced (x1) or Defensive (x0.85). It stays secret and can be
+ * x1.15), Balanced (x1), Defensive (x0.9) or Plunder (x0.8). It stays secret and can be
  * changed until the battle, which starts when JOIN_WINDOW_MS runs out, or as
  * soon as the party is full and everyone has chosen. Everyone who joined
  * fights; a stance left unchosen is Balanced. Fewer than MIN_PARTY (3) and
@@ -36,10 +36,12 @@
  * chosen): if anyone needs, only the
  * needers roll 1-100; otherwise the greeders do; passes never roll; ties at
  * the top re-roll. The winner gets the item the same way as a /buy — into an
- * empty slot, else the bag.
+ * empty slot, else the bag. Besides, each Plunder member makes off with a
+ * random piece of the tier's rarity that isn't among the boss's drops,
+ * granted the same way and announced publicly (which reveals their stance).
  * On a loss, the foe singles out INJURED_PER_LOSS (2) members, the less fit
  * the likelier (see pickTargets). A Balanced target sits out the next day, an
- * Aggressive one the next two (restDays); a Defensive target fends the blow
+ * Aggressive or Plunder one the next two (restDays); a Defensive target fends the blow
  * off unhurt. Everyone else escapes unhurt. An injured member can't join an
  * encounter until it passes.
  *
@@ -105,7 +107,10 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const STANCES = {
     aggressive: { label: 'Aggressive', multiplier: 1.15, restDays: 2, style: ButtonStyle.Danger },
     balanced: { label: 'Balanced', multiplier: 1, restDays: 1, style: ButtonStyle.Primary },
-    defensive: { label: 'Defensive', multiplier: 0.85, restDays: 0, style: ButtonStyle.Success },
+    defensive: { label: 'Defensive', multiplier: 0.9, restDays: 0, style: ButtonStyle.Success },
+    // Fights at -20%, but on a win also makes off with a random piece of the
+    // tier's rarity besides the boss's drops (see plunderFor).
+    plunder: { label: 'Plunder', multiplier: 0.8, restDays: 2, style: ButtonStyle.Secondary },
 };
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
@@ -187,6 +192,19 @@ const pickTargets = (members, count = INJURED_PER_LOSS, random = Math.random) =>
 
 // The member who lands the killing blow, weighted by effective fit. If
 // nobody has any fit, everyone has an equal chance.
+// After a win, one random piece of `pool` (the tier's gear) per plunderer,
+// never one of the boss's `drops`, and distinct from each other while the
+// pool lasts. Returns [{ member, item }].
+const plunderFor = (plunderers, pool, drops, random = Math.random) => {
+    const fresh = pool.filter((e) => !drops.includes(e));
+    if (!fresh.length) return [];
+    let left = [...fresh];
+    return plunderers.map((member) => {
+        if (!left.length) left = [...fresh];
+        return { member, item: left.splice(Math.floor(random() * left.length), 1)[0] };
+    });
+};
+
 const pickKiller = (members, random = Math.random) => {
     const total = members.reduce((sum, m) => sum + m.effectiveFit, 0);
     if (total <= 0) return members[Math.floor(random() * members.length)];
@@ -314,7 +332,7 @@ const buildPrompt = (prefix, member, tier) => {
         ));
     }
     return {
-        content: `${flavor.encounterPromptLine()}\n\n${threatLine(tier)}\n**Thy stance:** ${stance}\nAggressive fights at +15% fit but risks two days' rest on a loss; Defensive at -15% but escapes unhurt; Balanced at thy true fit, one day's rest. If thou choosest nothing, thou fightest Balanced.${kitText}${status}`,
+        content: `${flavor.encounterPromptLine()}\n\n${threatLine(tier)}\n**Thy stance:** ${stance}\nAggressive fights at +15% fit but risks two days' rest on a loss; Defensive at -10% but escapes unhurt; Balanced at thy true fit, one day's rest. Plunder fights at -20%, and on a victory thou makest off with a piece of the foe's hoard besides its drops, but if caught in a loss, two days' rest and nothing gained. If thou choosest nothing, thou fightest Balanced.${kitText}${status}`,
         components,
     };
 };
@@ -719,6 +737,50 @@ const runEncounterIn = async (g, channel, opts) => {
         items.push(remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0]);
     }
 
+    // Plunder: each Plunder member makes off with their own piece, announced
+    // before the boss's drops are rolled for.
+    const plunderers = ready.filter((m) => m.stance === 'plunder');
+    const plundered = plunderFor(plunderers, pool, items);
+    if (plundered.length) {
+        const lines = [];
+        for (const { member, item } of plundered) {
+            let result = 'skipped';
+            if (persist) {
+                result = await pointsStore.grantGear(g.id, member.userId, member.displayName, item.id, item.slot).catch((error) => {
+                    console.error(`${tag}: failed to grant plunder:`, error.message);
+                    return 'failed';
+                });
+            }
+            console.log(`${tag}: ${member.displayName} (${member.userId}) plundered ${item.name} (${result}).`);
+            recordHistory('loot', {
+                guildId: g.id,
+                encounterId: roundId,
+                rehearsal: !persist,
+                item: item.id,
+                slot: item.slot,
+                price: item.price,
+                plunder: true,
+                winnerId: member.userId,
+                result,
+            });
+            const note = !persist ? '' : result === 'equipped' ? ' It is equipped at once.' : result === 'bagged' ? ' It goes to their bag.' : '';
+            lines.push(`${pick(flavor.encounterPlunderLines(member.displayName, itemLabel(item)))}${note}`);
+            if (result === 'equipped' || result === 'bagged') {
+                const entry = { userId: member.userId, displayName: member.displayName };
+                await achievements.record(g.id, [{ ...entry, counts: { loot: 1 } }], channel);
+                await achievements.checkStats(g.id, [entry], channel);
+            }
+        }
+        await channel.send({
+            embeds: [new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle(`Plunder from ${boss.name}'s hoard`)
+                .setDescription(`${fieldValue(lines, 3800)}${persist ? '' : '\n\n*A rehearsal: the plunder was not truly granted.*'}`)
+                .setTimestamp()],
+            allowedMentions: { parse: [] },
+        });
+    }
+
     const drops = await Promise.all(items.map(async (item, k) => {
         const lootPrefix = `encloot_${roundId}_${k}_`;
         const lootEmbed = new EmbedBuilder()
@@ -859,6 +921,7 @@ module.exports = {
     TIER_LOSS_FLOOR,
     OPEN_TIERS,
     rollTier,
+    plunderFor,
     partyChance,
     joinFitFor,
     pickTargets,

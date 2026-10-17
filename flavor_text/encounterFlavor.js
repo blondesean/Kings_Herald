@@ -129,8 +129,9 @@ const encounterLuckyWinLines = (boss) => [
     `A rumbling cave-in buried half of ${boss.name}'s strength, and the underequipped party made the most of the miracle.`,
 ];
 
-// The members a loss singles out, by the stance they fought in. Balanced and
-// Aggressive are injured; Defensive saw the blow coming and fended it off.
+// The members a loss singles out, by the stance they fought in. Balanced,
+// Aggressive and Plunder are injured; Defensive saw the blow coming and
+// fended it off.
 const encounterInjuryLines = {
     defensive: (name) => [
         `The foe's wrath falls on ${name}, but their shield is already raised. They turn the blow aside and walk away unhurt.`,
@@ -150,7 +151,26 @@ const encounterInjuryLines = {
         `${name} charged too deep and paid for it. The healers give them ${days} days to mend.`,
         `${name} is dragged from the fray half-conscious, and will not stand again for ${days} days.`,
     ],
+    // Plunder: their greed is punished.
+    plunder: (name, days) => [
+        `${name} was elbow-deep in the foe's coffers when the blow fell. Greed has its price: ${days} days abed, and empty-handed.`,
+        `${name} turned from the fight to fill their pockets and was caught with both hands full. They must rest ${days} days, with nothing to show for it.`,
+        `The foe found ${name} crouched over its treasure, and taught them a lesson in greed. ${days} days to mend, not a coin the richer.`,
+        `${name} reached for one more gilded trinket, and paid for it in blood. The healers give them ${days} days, and the trinket stays behind.`,
+        `Caught red-handed in the hoard, ${name} is beaten soundly and dragged out by the ankles. ${days} days' rest, and the pockets turned out.`,
+    ],
 };
+
+// After a win, each member who fought in the Plunder stance makes off with a
+// piece of the foe's hoard. `item` is the label "[Rarity] Name".
+const encounterPlunderLines = (name, item) => [
+    `While the party fought, ${name} was distracted by a glittering cache in the corner, and walks away with **${item}**.`,
+    `${name} had one eye on the foe and the other on its wares, and now has **${item}** to show for it.`,
+    `Like a rogue in the night, ${name} slipped behind the lines and made off with **${item}**.`,
+    `${name} went full goblin mode in the treasure pile, and emerges clutching **${item}**, cackling.`,
+    `Before the dust settles, ${name} has already pried **${item}** loose from the foe's hoard.`,
+    `${name} fought, after a fashion, but mostly looted. They come away with **${item}**.`,
+];
 
 // After a loss, everyone the injuries passed over. `names` is already joined.
 const encounterUnhurtLines = (names) => [
@@ -216,6 +236,7 @@ module.exports = {
     encounterUnluckyLossLines,
     encounterLuckyWinLines,
     encounterInjuryLines,
+    encounterPlunderLines,
     encounterLootLines,
     encounterLootWonLines,
     encounterLootAllPassedLines,
