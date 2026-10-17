@@ -80,6 +80,8 @@ const ACHIEVEMENTS = [
     { id: 'dealmaker', name: 'Dealmaker', description: 'Complete a /trade', counter: 'trades', goal: 1 },
     { id: 'tipper', name: 'A Coin for the Herald', description: 'Tip the herald with /tip', counter: 'tips', goal: 1 },
     { id: 'patron', name: 'Patron of the Herald', description: 'Tip the herald 25 points in all', counter: 'tipped', goal: 25 },
+    { id: 'goblin_mode', name: 'Goblin Mode', description: "Plunder a piece from a boss's hoard", counter: 'plunders', goal: 1 },
+    { id: 'red_handed', name: 'Caught Red-Handed', description: 'Be struck down while plundering in a lost encounter', counter: 'plunder_caught', goal: 1 },
 ];
 
 const byId = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));

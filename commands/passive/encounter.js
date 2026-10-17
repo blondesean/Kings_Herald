@@ -700,6 +700,11 @@ const runEncounterIn = async (g, channel, opts) => {
             .setDescription(`${pick(matchup === 'exceptional' ? flavor.encounterUnluckyLossLines(boss) : flavor.encounterDefeatLines(boss))}\n\n${fieldValue(injuries, 3000)}${persist ? '' : '\n\n*A rehearsal: no injuries were truly suffered.*'}`);
         recordEncounter(null);
         await channel.send({ embeds: [battleEmbed, outcomeEmbed] });
+        // A plunderer the foe singled out was caught red-handed.
+        const caught = targets.filter((m) => m.stance === 'plunder');
+        if (persist && caught.length) {
+            await achievements.record(g.id, caught.map((m) => ({ userId: m.userId, displayName: m.displayName, counts: { plunder_caught: 1 } })), channel);
+        }
         return;
     }
 
@@ -767,7 +772,7 @@ const runEncounterIn = async (g, channel, opts) => {
             lines.push(`${pick(flavor.encounterPlunderLines(member.displayName, itemLabel(item)))}${note}`);
             if (result === 'equipped' || result === 'bagged') {
                 const entry = { userId: member.userId, displayName: member.displayName };
-                await achievements.record(g.id, [{ ...entry, counts: { loot: 1 } }], channel);
+                await achievements.record(g.id, [{ ...entry, counts: { loot: 1, plunders: 1 } }], channel);
                 await achievements.checkStats(g.id, [entry], channel);
             }
         }
