@@ -46,8 +46,8 @@ const fitDuelBareHandedLines = (challenger, target) => [
 ];
 
 // The odds shown on the challenge post.
-const fitDuelOddsLine = (challenger, challengerFit, challengerPct, target, targetFit, targetPct) =>
-    `Odds: **${challenger}** ${challengerPct}% (fit ${challengerFit}), **${target}** ${targetPct}% (fit ${targetFit}). Thy kit decides it, not the dice.`;
+const fitDuelOddsLine = (challenger, challengerFit, target, targetFit) =>
+    `**${challenger}** stands at fit ${challengerFit}, **${target}** at fit ${targetFit}. Thy kit decides it, not the dice.`;
 
 module.exports = {
     fitDuelOpenLines,

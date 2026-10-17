@@ -8,6 +8,7 @@
  *
  * Exposes:
  *   fitScore(gear) - total price of the equipped gear (the /nobility figure)
+ *   bestKit(character) - { [slot]: itemId }, the finest owned piece per slot
  *   bagBySlot(bag) - { [slot]: [entry, ...] } for /bank
  *   renderSheet({ displayName, character }) - the /flex block, as a string
  *   equipPlan(character, itemId) - the new { gear, bag } if the item is equipped,
@@ -43,6 +44,20 @@ const bagBySlot = (bag = []) => {
         if (entry && bySlot[entry.slot]) bySlot[entry.slot].push(entry);
     }
     return bySlot;
+};
+
+// The finest kit the member owns: in each slot, whichever is worth more of
+// what they wear and what's in their bag. Used for the encounter's "suit up"
+// choice; nothing is actually equipped.
+const bestKit = (character = {}) => {
+    const gear = { ...(character.gear || {}) };
+    for (const id of character.bag || []) {
+        const entry = findEntry(id);
+        if (!entry || !GEAR_SLOTS.includes(entry.slot)) continue;
+        const worn = findEntry(gear[entry.slot]);
+        if (!worn || entry.price > worn.price) gear[entry.slot] = id;
+    }
+    return gear;
 };
 
 // Pads or cuts `text` to exactly `length` characters, so the box lines up.
@@ -146,4 +161,4 @@ const matchEntry = (entries, typed) => {
     ) || null;
 };
 
-module.exports = { fitScore, bagBySlot, renderSheet, equipPlan, matchEntry, WIDTH };
+module.exports = { fitScore, bestKit, bagBySlot, renderSheet, equipPlan, matchEntry, WIDTH };

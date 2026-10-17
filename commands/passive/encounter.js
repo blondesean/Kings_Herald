@@ -20,7 +20,10 @@
  *     Medium, and a full kit from Hard up (see TIER_COVERAGE), since players
  *     fill slots gradually.
  *   - Party fit = each member's equipped fit (read at battle time) x their
- *     stance multiplier, summed.
+ *     stance multiplier, summed. A member whose bags hold finer gear than
+ *     they wear is offered "Suit up in my best" in their prompt; if chosen,
+ *     they fight with the finest piece they own in each slot (bestKit), and
+ *     the fight is recorded that way, but their equipped gear never changes.
  *   - Win chance comes from the ratio party/boss (see winChance): 80% at an
  *     even match, +5% per 10% over, -20% per 10% under (0% at 60%), capped
  *     per tier so there's always some risk (TIER_LOSS_FLOOR: Easy 98%,
@@ -66,7 +69,7 @@ const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findAdventurerRole } = require('../../src/adventurerRole');
-const { fitScore } = require('../../src/character');
+const { fitScore, bestKit } = require('../../src/character');
 const achievements = require('../../src/achievements');
 const { recordHistory } = require('../../src/historyLog');
 const catalog = require('./shopCatalog');
@@ -278,6 +281,17 @@ const joinRow = (prefix, disabled) => new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`${prefix}join`).setLabel('Join the party').setStyle(ButtonStyle.Success).setDisabled(disabled)
 );
 
+// A member's two kits: what they wear, and the finest they own (see bestKit).
+const kitsOf = (character = {}) => {
+    const worn = character.gear || {};
+    const best = bestKit(character);
+    return { worn, best, wornFit: fitScore(worn), bestFit: fitScore(best) };
+};
+// Whether the member fights in their best kit: only if they chose to, and it's
+// actually finer than what they wear.
+const suitsUp = (member) => Boolean(member.suitUp) && member.bestFit > member.wornFit;
+const fightingFit = (member) => (suitsUp(member) ? member.bestFit : member.wornFit);
+
 const buildPrompt = (prefix, member, tier) => {
     const stanceRow = new ActionRowBuilder().addComponents(
         Object.entries(STANCES).map(([key, s]) =>
@@ -286,9 +300,22 @@ const buildPrompt = (prefix, member, tier) => {
     );
     const stance = member.stance ? STANCES[member.stance].label : 'not chosen, so Balanced';
     const status = member.stance ? '\n\n**Thou art ready.** Change it until the battle begins.' : '';
+    const components = [stanceRow];
+    // Only offered when the bags hold something finer than what's worn. The
+    // swap is for this fight alone: nothing is equipped, so the outfit a member
+    // wears for show is never touched.
+    let kitText = '';
+    if (member.bestFit > member.wornFit) {
+        const best = suitsUp(member);
+        kitText = `\n\n**Thy gear:** ${best ? `thy finest, fit ${member.bestFit}` : `as thou art dressed, fit ${member.wornFit}`}\nThy bags hold finer arms than thou wearest. Shall the herald suit thee up in thy best for this fight, fit ${member.bestFit}? Thy wardrobe stays just as it is.`;
+        components.push(new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`${prefix}kit_best`).setLabel(`Suit up in my best${best ? ' - chosen' : ''}`).setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`${prefix}kit_worn`).setLabel(`Fight as I am dressed${best ? '' : ' - chosen'}`).setStyle(ButtonStyle.Secondary),
+        ));
+    }
     return {
-        content: `${flavor.encounterPromptLine()}\n\n${threatLine(tier)}\n**Thy stance:** ${stance}\nAggressive fights at +15% fit but risks two days' rest on a loss; Defensive at -15% but escapes unhurt; Balanced at thy true fit, one day's rest. If thou choosest nothing, thou fightest Balanced.${status}`,
-        components: [stanceRow],
+        content: `${flavor.encounterPromptLine()}\n\n${threatLine(tier)}\n**Thy stance:** ${stance}\nAggressive fights at +15% fit but risks two days' rest on a loss; Defensive at -15% but escapes unhurt; Balanced at thy true fit, one day's rest. If thou choosest nothing, thou fightest Balanced.${kitText}${status}`,
+        components,
     };
 };
 
@@ -321,7 +348,13 @@ const gatherParty = (g, channel, message, prefix, opts) =>
         const party = new Map();
         const refresh = () => message.edit({ embeds: [buildTeaserEmbed(party, tier, maxParty, minParty, joinWindowMs)] }).catch(() => {});
         const allReady = () => Boolean(maxParty) && party.size >= maxParty && [...party.values()].every((m) => m.stance);
-        const fitOf = (userId) => pointsStore.getCharacter(g.id, userId).then((c) => fitScore(c.gear || {}), () => 0);
+        // Re-reads a member's kits (gear may have changed) and sets their fit
+        // from their suit-up choice.
+        const refreshKits = async (member) => {
+            const character = await pointsStore.getCharacter(g.id, member.userId).catch(() => ({}));
+            Object.assign(member, kitsOf(character));
+            member.fit = fightingFit(member);
+        };
 
         const collector = channel.createMessageComponentCollector({
             componentType: ComponentType.Button,
@@ -335,7 +368,7 @@ const gatherParty = (g, channel, message, prefix, opts) =>
             checks.push(setTimeout(async () => {
                 if (!party.size) return;
                 const members = [...party.values()];
-                for (const m of members) m.fit = await fitOf(m.userId); // gear may have changed
+                for (const m of members) await refreshKits(m);
                 const chance = partyChance(members, tier);
                 console.log(`${tag}: roster check, ${members.length} in the party, ${percent(chance)} odds.`);
                 if (chance >= WARN_CHANCE) return;
@@ -376,7 +409,7 @@ const gatherParty = (g, channel, message, prefix, opts) =>
                     return;
                 }
                 // Reserve the place before any await, so two quick clicks can't overfill the party.
-                const member = { userId, displayName: interaction.member?.displayName || interaction.user.username, stance: null };
+                const member = { userId, displayName: interaction.member?.displayName || interaction.user.username, stance: null, suitUp: false };
                 party.set(userId, member);
                 // discord.js 14.13's deferReply ignores flags; only ephemeral: true hides it.
                 await interaction.deferReply({ ephemeral: true }).catch(() => {});
@@ -389,11 +422,12 @@ const gatherParty = (g, channel, message, prefix, opts) =>
                         return;
                     }
                 }
-                // Too little gear to help a party at this tier: turned away.
-                member.fit = await fitOf(userId);
-                if (partyChance([{ fit: member.fit }], tier) < JOIN_CHANCE - 1e-9) {
+                // Too little gear to help a party at this tier, even suited up
+                // in their best: turned away.
+                await refreshKits(member);
+                if (partyChance([{ fit: member.bestFit }], tier) < JOIN_CHANCE - 1e-9) {
                     party.delete(userId);
-                    await interaction.editReply({ content: pick(flavor.encounterTooWeakLines(member.fit, DIFFICULTIES[tier])) }).catch(() => {});
+                    await interaction.editReply({ content: pick(flavor.encounterTooWeakLines(member.bestFit, DIFFICULTIES[tier])) }).catch(() => {});
                     return;
                 }
                 await interaction.editReply(buildPrompt(prefix, member, tier)).catch(() => {});
@@ -408,6 +442,14 @@ const gatherParty = (g, channel, message, prefix, opts) =>
             }
             const wasReady = Boolean(member.stance);
             if (action.startsWith('stance_')) member.stance = action.slice('stance_'.length);
+            if (action.startsWith('kit_')) {
+                // Deferred first: the gear read can outlast Discord's 3 seconds.
+                await interaction.deferUpdate().catch(() => {});
+                member.suitUp = action === 'kit_best';
+                await refreshKits(member);
+                await interaction.editReply(buildPrompt(prefix, member, tier)).catch(() => {});
+                return;
+            }
             await interaction.update(buildPrompt(prefix, member, tier)).catch(() => {});
             if (!wasReady && member.stance) await refresh();
             if (allReady()) collector.stop('ready');
@@ -422,8 +464,8 @@ const gatherParty = (g, channel, message, prefix, opts) =>
     });
 
 // Need/greed/pass on the dropped item. Resolves with the choices.
-// Need is only allowed for an upgrade: if the member already wears something
-// in the item's slot worth as much fit or more, a Need click is entered as
+// Need is only allowed for an upgrade: if the member already owns something,
+// worn or bagged, in the item's slot worth as much fit or more, a Need click is entered as
 // Greed instead, and they're told why. Gear is read at click time, so it
 // reflects anything they equipped during the loot window.
 // The public button opens a private prompt; its Need/Greed/Pass clicks come
@@ -454,11 +496,13 @@ const collectLoot = (channel, members, lootWindowMs, prefix, item, guildId) =>
             }
             let note = '';
             if (choice === 'need') {
+                // Measured against the finest piece they own for the slot, worn
+                // or bagged, so dressing down for show doesn't earn a Need.
                 const character = await pointsStore.getCharacter(guildId, interaction.user.id).catch(() => ({ gear: {} }));
-                const worn = catalog.findEntry((character.gear || {})[item.slot]);
-                if (worn && worn.price >= item.price) {
+                const owned = catalog.findEntry(bestKit(character)[item.slot]);
+                if (owned && owned.price >= item.price) {
                     choice = 'greed';
-                    note = `Thy **${itemLabel(worn)}** is already as fine as this ${item.slot} or finer, so thou canst not need it. Thou art entered for the **greed** roll instead.`;
+                    note = `Thou already ownest **${itemLabel(owned)}**, as fine as this ${item.slot} or finer, so thou canst not need it. Thou art entered for the **greed** roll instead.`;
                 }
             }
             choices.set(interaction.user.id, choice);
@@ -510,9 +554,13 @@ const runEncounterIn = async (g, channel, opts) => {
     }
 
     // Fit is read at battle time, so gear changed during the join window counts.
+    // A member who chose to suit up fights in their finest kit; their stored
+    // gear is never changed, but the fight is recorded as if they wore it.
     for (const m of ready) {
         const character = await pointsStore.getCharacter(g.id, m.userId).catch(() => ({ gear: {} }));
-        m.gear = character.gear || {};
+        Object.assign(m, kitsOf(character));
+        m.suitedUp = suitsUp(m);
+        m.gear = m.suitedUp ? m.best : m.worn;
         m.title = (catalog.findEntry(character.title) || {}).name || null;
         m.className = (catalog.findEntry(character.class) || catalog.DEFAULT_CLASS).name;
         m.fit = fitScore(m.gear);
@@ -584,6 +632,7 @@ const runEncounterIn = async (g, channel, opts) => {
             fit: m.fit,
             power: Math.round(m.effectiveFit),
             gear: m.gear,
+            suitedUp: m.suitedUp,
             injuryDays: injured.includes(m) ? STANCES[m.stance].restDays : 0,
         })),
     });
@@ -675,7 +724,7 @@ const runEncounterIn = async (g, channel, opts) => {
         const lootEmbed = new EmbedBuilder()
             .setColor(EMBED_COLOR)
             .setTitle(`Loot dropped from ${boss.name}, ${k + 1} of ${items.length}`)
-            .setDescription(`${pick(flavor.encounterLootLines(itemLabel(item)))}\n\nSlot: ${item.slot}. Party members have ${minutesLabel(lootWindowMs)}: if anyone needs, only needers roll; otherwise greeders roll. Passes never roll. Need is only for an upgrade: if thou already wearest something as fine in this slot, thy Need becomes a Greed.`)
+            .setDescription(`${pick(flavor.encounterLootLines(itemLabel(item)))}\n\nSlot: ${item.slot}. Party members have ${minutesLabel(lootWindowMs)}: if anyone needs, only needers roll; otherwise greeders roll. Passes never roll. Need is only for an upgrade: if thou already ownest something as fine for this slot, worn or in thy bags, thy Need becomes a Greed.`)
             .setTimestamp();
         const lootMessage = await channel.send({ embeds: [lootEmbed], components: [lootRow(lootPrefix, false)] });
         const choices = await collectLoot(channel, ready, lootWindowMs, lootPrefix, item, g.id);

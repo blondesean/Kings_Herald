@@ -16,7 +16,7 @@
  *   button   - every button click: { ..., customId, messageId }
  *              (see the interactionCreate handler in src/index.js)
  *   encounter - every boss fight: boss, difficulty, odds, outcome, killer, and
- *              per member their vote, stance, fit, power, gear and injury
+ *              per member their vote, stance, fit, power, gear, suitedUp and injury
  *              (commands/passive/encounter.js)
  *   loot     - every loot roll: item, each member's need/greed/pass, the
  *              rolls and the winner, linked to its fight by encounterId
