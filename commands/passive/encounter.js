@@ -25,9 +25,10 @@
  *     they fight with the finest piece they own in each slot (bestKit), and
  *     the fight is recorded that way, but their equipped gear never changes.
  *   - Win chance comes from the ratio party/boss (see winChance): 80% at an
- *     even match, +5% per 10% over, -20% per 10% under (0% at 60%), capped
- *     per tier so there's always some risk (TIER_LOSS_FLOOR: Easy 98%,
- *     Medium 97%, Hard 95%, Extreme 93%, Max 90%).
+ *     even match, +5% per 10% over, -20% per 10% under (0% at 60%), so
+ *     100% at 140%. From Hard up it's capped so there's always some risk
+ *     (TIER_LOSS_FLOOR: Hard 99%, Extreme 97%, Max 95%); Easy and Medium
+ *     have no cap.
  * On a win, one member lands the killing blow — weighted by each member's
  * effective (stance-adjusted) fit — and the boss drops one piece per
  * ADVENTURERS_PER_DROP (2.5) members, rounded down (2 for a party of 5),
@@ -129,9 +130,10 @@ const pick = (lines, random = Math.random) => lines[Math.floor(random() * lines.
 const TIER_FLOOR = [10, 15, 25, 35, 50];
 const TIER_COVERAGE = [0.75, 0.875, 1, 1, 1];
 
-// The chance a party always loses at each tier, however overgeared — so no
-// fight is ever a sure thing, and the harder the boss the bigger the risk.
-const TIER_LOSS_FLOOR = [0.02, 0.03, 0.05, 0.07, 0.10];
+// The chance a party always loses at each tier, however overgeared. Easy and
+// Medium have none, so a strong enough party is sure of the win; from Hard up
+// no fight is ever a sure thing, and the harder the boss the bigger the risk.
+const TIER_LOSS_FLOOR = [0, 0, 0.01, 0.03, 0.05];
 const bossFitPerEntrant = (tier) => {
     const rarity = catalog.RARITIES[tier];
     const fullKit = catalog.GEAR_SLOTS.reduce((sum, slot) => {
