@@ -455,10 +455,22 @@ const joinMentions = (ids) => {
 // bare URL even inside a masked link's label text, which breaks the outer
 // [text](url) link entirely and shows it as raw, unclickable text. A post
 // that's just a link ends up with nothing left, same as a wordless one.
+// Custom emoji, mentions and markdown break the label the same way, so emoji
+// become their :name:, mentions their plain name, and markdown characters go.
 const URL_PATTERN = /https?:\/\/\S+/gi;
+const plainTokens = (message, text) => {
+    const mentions = message.mentions || {};
+    return text
+        .replace(/<a?:(\w+):\d+>/g, ':$1:')
+        .replace(/<@!?(\d+)>/g, (_, id) => `@${mentions.members?.get(id)?.displayName || mentions.users?.get(id)?.username || 'someone'}`)
+        .replace(/<@&(\d+)>/g, (_, id) => `@${mentions.roles?.get(id)?.name || 'role'}`)
+        .replace(/<#(\d+)>/g, (_, id) => `#${mentions.channels?.get(id)?.name || 'channel'}`)
+        .replace(/<t:\d+(:\w)?>/g, 'a moment')
+        .replace(/[<>`*_~|\\]/g, '');
+};
 const snippetOf = (message) => {
     const hadUrl = URL_PATTERN.test(message.content || '');
-    const raw = (message.content || '').replace(URL_PATTERN, '').replace(/\s+/g, ' ').replace(/[[\]]/g, '').trim();
+    const raw = plainTokens(message, (message.content || '').replace(URL_PATTERN, '')).replace(/\s+/g, ' ').replace(/[[\]]/g, '').trim();
     if (!raw) {
         if (message.attachments?.size) return 'a wordless offering of images';
         return hadUrl ? 'a proclamation of but a single link' : 'a wordless proclamation';
