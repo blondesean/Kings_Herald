@@ -5,8 +5,13 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-18
+
+- Recap: keep post links clickable when the post has custom emoji or mentions (`4074725`)
+
 ## 2026-10-17
 
+- Regenerate UPDATELOG.md (`c677aac`)
 - Encounters: no loss cap on Easy and Medium, Hard 99%, Extreme 97%, Max 95% (`6f9dcd0`)
 - Plunder achievements: Goblin Mode and Caught Red-Handed (`a7e7c02`)
 - /puppet: admins make the herald speak (`6e94c80`)
