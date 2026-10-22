@@ -5,24 +5,22 @@
  * back if the payment fails, so a sold-out item can't be charged for and a
  * charged item can't go unfilled.
  *
- * Gear goes to the bag; classes and races take effect at once, replacing the
- * old one. A title is unique: buying one while already bearing another asks
- * for confirmation first, then sends the old title back to the shelves.
+ * Gear goes to the bag (or straight on, into an empty slot). Titles, classes
+ * and races are worn at once, and the one replaced is kept in the member's
+ * cosmetics, to wear again with /equip. One already owned isn't sold again.
  *
  * A piece in the Discounts section (sold back by a member with /sell) is
  * bought before a full-price copy of the same piece. Taking the listing,
  * charging the buyer and paying the seller happen in one transaction.
  * Nobody can buy their own listing.
  *
- * Public, so the purchase is announced in the channel, in character. Any
- * confirmation is private.
+ * Public, so the purchase is announced in the channel, in character.
  */
 
 const { ApplicationCommandOptionType } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { currentOpenShop, easternDay, kindOf, discountsFor, discountPrice } = require('../passive/shop');
-const { matchEntry } = require('../../src/character');
-const { askConfirm } = require('../../src/confirm');
+const { matchEntry, stashFor } = require('../../src/character');
 const achievements = require('../../src/achievements');
 const catalog = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
@@ -36,6 +34,14 @@ const FIELD_FOR_KIND = { title: 'title', class: 'class', race: 'race' };
 const gearGrant = (entry, character) => (!(character.gear || {})[entry.slot]
     ? { equip: { slot: entry.slot, itemId: entry.id, gear: character.gear || {} } }
     : { bag: entry.id });
+
+// A title, class or race is worn at once; the one it replaces is kept in the
+// buyer's cosmetics, to wear again with /equip.
+const cosmeticGrant = (entry, kind, character) => {
+    const field = FIELD_FOR_KIND[kind];
+    const stash = stashFor(character, field);
+    return stash ? { field, value: entry.id, stash } : { field, value: entry.id };
+};
 
 // Adds to the buyer's lifetime shop spending, the Biggest Spender myth (/myths).
 const recordSpending = (guildId, buyer, price) =>
@@ -66,14 +72,14 @@ const purchase = async (guildId, day, buyer, entry, kind, character) => {
     const taken = limited ? await pointsStore.takeShopStock(guildId, day, entry.id, Date.now()) : true;
     if (!taken) return { ok: false, reason: 'soldOut' };
 
-    const grant = kind === 'gear' ? gearGrant(entry, character) : { field: FIELD_FOR_KIND[kind], value: entry.id };
+    const grant = kind === 'gear' ? gearGrant(entry, character) : cosmeticGrant(entry, kind, character);
     const paid = await pointsStore.buyWithPoints(guildId, buyer.id, buyer.displayName, entry.price, grant);
     if (!paid) {
         if (limited) await pointsStore.returnShopStock(guildId, entry.id);
         return { ok: false, reason: 'cannotAfford' };
     }
     await recordSpending(guildId, buyer, entry.price);
-    return { ok: true, equipped: grant.equip !== undefined };
+    return { ok: true, equipped: grant.equip !== undefined, stashed: grant.stash || null };
 };
 
 const buy = async function (interaction) {
@@ -127,31 +133,17 @@ const buy = async function (interaction) {
         const kind = kindOf(entry);
         const character = await pointsStore.getCharacter(guildId, buyer.id);
 
-        // A second title: confirm the swap before anything is taken.
-        if (kind === 'title' && character.title) {
-            if (character.title === entry.id) {
-                await interaction.editReply(`Thou already bearest **${entry.name}**, good noble.`);
+        // A title, class or race they already own needs no buying: it's worn,
+        // or waiting in their cosmetics for /equip.
+        if (kind !== 'gear') {
+            if (character[FIELD_FOR_KIND[kind]] === entry.id) {
+                await interaction.editReply(pick(flavor.alreadyWornLines(entry.name)));
                 return;
             }
-            const held = catalog.findEntry(character.title);
-            await interaction.editReply('Thy request awaits thy word, in secret.');
-            const confirmed = await askConfirm(interaction, pick(flavor.titleSwapPromptLines(held.name, entry.name, entry.price)));
-            if (!confirmed) return;
-
-            const result = await purchase(guildId, record.day, buyer, entry, kind, character);
-            if (!result.ok) {
-                const lines = result.reason === 'soldOut' ? flavor.soldOutLines(entry.name, kind === 'title') : flavor.cannotAffordLines(entry.name, entry.price);
-                await interaction.followUp(pick(lines));
+            if (character.cosmetics.includes(entry.id)) {
+                await interaction.editReply(pick(flavor.alreadyOwnedLines(entry.name)));
                 return;
             }
-
-            // The old title goes back on the shelf only once the new one is paid for.
-            // Its copy can't be refused: the shop is still open, checked above.
-            await pointsStore.restockShopItem(guildId, record.day, held.id, Date.now());
-            console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) swapped ${held.name} for ${entry.name} (${easternDay()}).`);
-            await interaction.editReply(pick(flavor.titleSwappedLines(`<@${buyer.id}>`, held.name, entry.name)));
-            await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
-            return;
         }
 
         const result = await purchase(guildId, record.day, buyer, entry, kind, character);
@@ -161,10 +153,13 @@ const buy = async function (interaction) {
             return;
         }
 
-        console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) bought ${entry.name} for ${entry.price}${result.equipped ? ', equipped' : ''} (${easternDay()}).`);
-        const line = result.equipped
-            ? pick(flavor.purchasedEquippedLines(`<@${buyer.id}>`, entry.name))
-            : pick(flavor.purchasedLines(`<@${buyer.id}>`, entry.name, kind));
+        const stashed = result.stashed && catalog.findEntry(result.stashed);
+        console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) bought ${entry.name} for ${entry.price}${result.equipped ? ', equipped' : ''}${stashed ? `, stored ${stashed.name}` : ''} (${easternDay()}).`);
+        let line;
+        if (result.equipped) line = pick(flavor.purchasedEquippedLines(`<@${buyer.id}>`, entry.name));
+        else if (stashed && kind === 'title') line = pick(flavor.titleSwappedLines(`<@${buyer.id}>`, stashed.name, entry.name));
+        else line = pick(flavor.purchasedLines(`<@${buyer.id}>`, entry.name, kind));
+        if (stashed) line += `\n${flavor.cosmeticStoredLine(stashed.name)}`;
         await interaction.editReply(line);
         await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
     } catch (error) {

@@ -1,7 +1,9 @@
-/* /equip <item> - put a piece of gear from your bag into its slot.
+/* /equip <item> - put a piece of gear from your bag into its slot, or wear a
+ * title, class or race you own.
  *
- * Whatever was in that slot goes back to your bag, so nothing is lost. The
- * write is conditional on the bag being the one we read, so two quick
+ * Whatever was in that slot goes back to your bag, and a replaced title,
+ * class or race back to your cosmetics, so nothing is lost. The write is
+ * conditional on the bag (or cosmetics) being the one we read, so two quick
  * commands can't duplicate or lose an item.
  *
  * Private, so only you see the reply. Your sheet is shown by /flex.
@@ -9,13 +11,31 @@
 
 const { ApplicationCommandOptionType } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
-const { equipPlan, matchEntry } = require('../../src/character');
+const { equipPlan, wearPlan, stashFor, cosmeticField, matchEntry } = require('../../src/character');
 const achievements = require('../../src/achievements');
 const { rarityFor } = require('../passive/shopCatalog');
 const catalog = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
+
+// Puts on a title, class or race from the member's cosmetics; the one it
+// replaces goes into the cosmetics in its place.
+const wearCosmetic = async (interaction, character, entry) => {
+    const guildId = interaction.guild.id;
+    const userId = interaction.member.id;
+    const plan = wearPlan(character, entry.id);
+    const saved = await pointsStore.wearCosmetic(guildId, userId, plan.field, plan.old, plan.value, character.cosmetics, plan.cosmetics);
+    if (!saved) {
+        await interaction.editReply(pick(flavor.bagChangedLines()));
+        return;
+    }
+    const stored = stashFor(character, plan.field);
+    const storedName = stored ? catalog.findEntry(stored).name : null;
+    console.log(`Equip (guild ${guildId}): ${interaction.member.displayName} (${userId}) wore ${entry.name}${storedName ? `, stored ${storedName}` : ''}.`);
+    await interaction.editReply(pick(flavor.cosmeticWornLines(entry.name, storedName)));
+    await achievements.checkStats(guildId, [{ userId, displayName: interaction.member.displayName }], interaction.channel);
+};
 
 const equip = async function (interaction) {
     const typed = interaction.options.getString('item');
@@ -27,9 +47,20 @@ const equip = async function (interaction) {
         const inBag = [...new Set(character.bag)].map((id) => catalog.findEntry(id)).filter(Boolean);
         const entry = matchEntry(inBag, typed);
         if (!entry) {
-            // Tell apart "not in the bag" from "not gear at all" for a clearer reply.
+            const owned = [...new Set(character.cosmetics)].map((id) => catalog.findEntry(id)).filter(Boolean);
+            const cosmetic = matchEntry(owned, typed);
+            if (cosmetic) {
+                await wearCosmetic(interaction, character, cosmetic);
+                return;
+            }
+            // Tell apart "not in the bag" from "a title, class or race not owned" for a clearer reply.
             const known = matchEntry(catalog.ALL, typed);
-            const reply = known && !known.slot ? flavor.notGearLines(known.name) : flavor.notInBagLines(typed);
+            let reply = flavor.notInBagLines(typed);
+            if (known && cosmeticField(known)) {
+                reply = character[cosmeticField(known)] === known.id ? flavor.alreadyWornLines(known.name) : flavor.notInCosmeticsLines(known.name);
+            } else if (known && !known.slot) {
+                reply = flavor.notGearLines(known.name);
+            }
             await interaction.editReply(pick(reply));
             return;
         }
@@ -54,13 +85,13 @@ const equip = async function (interaction) {
 };
 
 module.exports = {
-    description: 'Equip a piece of gear from your bag (visible only to you)',
+    description: 'Equip gear from your bag, or a title, class or race you own (visible only to you)',
     category: 'CHARACTER',
     ephemeral: true,
     options: [
         {
             name: 'item',
-            description: 'The exact name of the gear in your bag, as shown in /bank',
+            description: 'The exact name of the gear, title, class or race, as shown in /bank',
             type: ApplicationCommandOptionType.String,
             required: true,
         },

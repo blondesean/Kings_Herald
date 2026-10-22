@@ -55,7 +55,7 @@ const purchasedLines = (buyer, name, kind) => {
         `A new title for ${buyer}: **${name}**. Let the realm take note.`,
     ];
     if (kind === 'class') return [
-        `${buyer} takes up the class of **${name}**, leaving the old one behind.`,
+        `${buyer} takes up the class of **${name}**.`,
         `The Herald records a new class for ${buyer}: **${name}**.`,
     ];
     return [
@@ -82,6 +82,27 @@ const notGearLines = (name) => [
     `**${name}** is not a piece of gear, so it cannot be equipped.`,
 ];
 
+// Titles, classes and races kept in the member's cosmetics (see /buy, /equip).
+const cosmeticStoredLine = (name) => `*${name} is kept in their bank, to wear again with \`/equip\`.*`;
+
+const cosmeticWornLines = (name, stored) => [
+    stored
+        ? `Thou now wearest **${name}**. **${stored}** goes back to thy bank.`
+        : `Thou now wearest **${name}**.`,
+];
+
+const notInCosmeticsLines = (name) => [
+    `Thou dost not own **${name}**, good noble. Check \`/bank\` for the titles, classes and races thou hast.`,
+];
+
+const alreadyWornLines = (name) => [
+    `Thou already wearest **${name}**, good noble.`,
+];
+
+const alreadyOwnedLines = (name) => [
+    `**${name}** is already thine, waiting in thy bank. Wear it with \`/equip\`.`,
+];
+
 const bagChangedLines = () => [
     'Thy bag changed while the Herald was looking. Try again.',
 ];
@@ -89,11 +110,6 @@ const bagChangedLines = () => [
 // Asks the holder to confirm sending their title back to the shop.
 const titleReturnPromptLines = (title) => [
     `Wilt thou send **${title}** back to the merchant? It will return to the shelves for another noble to claim.`,
-];
-
-// Asks whether to swap titles, with the new one's price.
-const titleSwapPromptLines = (oldTitle, newTitle, price) => [
-    `Thou already bearest **${oldTitle}**. Send it back to the merchant and take **${newTitle}** for ${price} points?`,
 ];
 
 const titleReturnedLines = (name, title) => [
@@ -161,7 +177,6 @@ module.exports = {
     notSellableLines,
     purchasedEquippedLines,
     titleReturnPromptLines,
-    titleSwapPromptLines,
     titleReturnedLines,
     titleSwappedLines,
     titleNotHeldLines,
@@ -179,5 +194,10 @@ module.exports = {
     equippedLines,
     notInBagLines,
     notGearLines,
+    cosmeticStoredLine,
+    cosmeticWornLines,
+    notInCosmeticsLines,
+    alreadyWornLines,
+    alreadyOwnedLines,
     bagChangedLines,
 };

@@ -225,7 +225,7 @@ const grant = (guildId, member, id, channel) => safely('grant', async () => {
  */
 const estimateBaseline = (item, duelLosses) => {
     const priceOf = (id) => (catalog.findEntry(id) || { price: 0 }).price;
-    const owned = [...Object.values(item.gear || {}), ...(item.bag || []), item.title, item.class, item.race]
+    const owned = [...Object.values(item.gear || {}), ...(item.bag || []), ...(item.cosmetics || []), item.title, item.class, item.race]
         .filter(Boolean)
         .reduce((sum, id) => sum + priceOf(id), 0);
     return Math.max(0, (item.points || 0) + owned + duelLosses - (item.totalEarned || 0));

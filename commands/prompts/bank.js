@@ -1,10 +1,10 @@
-/* /bank - see the gear you own that isn't equipped, by slot. Private, so only
- * you see your bag.
+/* /bank - see the gear you own that isn't equipped, by slot, and the titles,
+ * classes and races you own but aren't wearing. Private, so only you see it.
  */
 
 const pointsStore = require('../../src/pointsStore');
-const { bagBySlot } = require('../../src/character');
-const { GEAR_SLOTS, rarityFor } = require('../passive/shopCatalog');
+const { bagBySlot, cosmeticField } = require('../../src/character');
+const { GEAR_SLOTS, rarityFor, findEntry } = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
@@ -12,10 +12,12 @@ const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 // Room left for the list after the heading and footer, under Discord's limit.
 const MAX_LIST_CHARS = 1800;
 
+const COSMETIC_LABELS = [['title', 'Titles'], ['class', 'Classes'], ['race', 'Races']];
+
 const bank = async function (interaction) {
     try {
         const character = await pointsStore.getCharacter(interaction.guild.id, interaction.member.id);
-        if (!character.bag.length) {
+        if (!character.bag.length && !character.cosmetics.length) {
             await interaction.editReply(pick(flavor.bankEmptyLines()));
             return;
         }
@@ -41,9 +43,20 @@ const bank = async function (interaction) {
             if (names.length) lines.push(`**${label}:** ${names.join(', ')}`);
         }
 
+        // Titles, classes and races owned but not worn, by kind.
+        const cosmetics = [...new Set(character.cosmetics)].map((id) => findEntry(id)).filter(Boolean);
+        const cosmeticLines = [];
+        for (const [field, label] of COSMETIC_LABELS) {
+            const names = cosmetics.filter((entry) => cosmeticField(entry) === field).map((entry) => entry.name);
+            if (names.length) cosmeticLines.push(`**${label}:** ${names.join(', ')}`);
+        }
+
         const hidden = character.bag.length - shown;
         const more = hidden > 0 ? `\n*…and ${hidden} more not shown.*` : '';
-        await interaction.editReply(`**Thy bag**\n${lines.join('\n')}${more}\n\nEquip one with \`/equip <name>\`.`);
+        const sections = [];
+        if (lines.length) sections.push(`**Thy bag**\n${lines.join('\n')}${more}`);
+        if (cosmeticLines.length) sections.push(`**Thy finery**\n${cosmeticLines.join('\n')}`);
+        await interaction.editReply(`${sections.join('\n\n')}\n\nEquip one with \`/equip <name>\`.`);
     } catch (error) {
         console.error('Error showing the bag:', error);
         await interaction.editReply('Alack! The ledger is sealed to mine eyes at present. Pray try again anon!');
@@ -51,7 +64,7 @@ const bank = async function (interaction) {
 };
 
 module.exports = {
-    description: 'See the gear in your bag that is not equipped (visible only to you)',
+    description: 'See the gear, titles, classes and races you own but are not wearing (visible only to you)',
     category: 'CHARACTER',
     ephemeral: true,
     run: bank,

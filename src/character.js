@@ -5,6 +5,7 @@
  *   gear  - { [slot]: itemId } for equipped items (see GEAR_SLOTS)
  *   bag   - [itemId, ...] owned gear not currently equipped (duplicates allowed)
  *   title, class, race - a single catalog id each (class defaults to peasant)
+ *   cosmetics - [itemId, ...] titles, classes and races owned but not worn
  *
  * Exposes:
  *   fitScore(gear) - total price of the equipped gear (the /nobility figure)
@@ -13,9 +14,14 @@
  *   renderSheet({ displayName, character }) - the /flex block, as a string
  *   equipPlan(character, itemId) - the new { gear, bag } if the item is equipped,
  *                                  or null if it isn't in the bag
+ *   cosmeticField(entry) - 'title', 'class' or 'race' for those entries, else null
+ *   stashFor(character, field) - the id a new title, class or race would put
+ *                                into cosmetics, or null
+ *   wearPlan(character, itemId) - { field, value, old, cosmetics } to wear a
+ *                                 title, class or race from cosmetics, or null
  */
 
-const { GEAR_SLOTS, DEFAULT_CLASS, findEntry, rarityFor } = require('../commands/passive/shopCatalog');
+const { GEAR_SLOTS, DEFAULT_CLASS, TITLES, CLASSES, RACES, findEntry, rarityFor } = require('../commands/passive/shopCatalog');
 const { POSES, poseLines } = require('./poses');
 
 const WIDTH = 32; // width of the /flex box, in characters (kept narrow for phones)
@@ -150,6 +156,38 @@ const equipPlan = (character = {}, itemId) => {
     return { gear, bag };
 };
 
+// The character field a title, class or race fills, or null for anything else.
+const cosmeticField = (entry) => {
+    if (TITLES.includes(entry)) return 'title';
+    if (CLASSES.includes(entry)) return 'class';
+    if (RACES.includes(entry)) return 'race';
+    return null;
+};
+
+// What goes into the cosmetics list when `field` is replaced: the old id, or
+// null if there was none (the default Peasant class isn't kept).
+const stashFor = (character, field) => {
+    const old = character[field];
+    return old && old !== DEFAULT_CLASS.id ? old : null;
+};
+
+/* Wearing a title, class or race from the cosmetics list takes it out of the
+ * list and puts the one it replaces in, so nothing is lost. Returns
+ * { field, value, old, cosmetics }, or null if it isn't in the list.
+ */
+const wearPlan = (character = {}, itemId) => {
+    const entry = findEntry(itemId);
+    const field = entry && cosmeticField(entry);
+    const cosmetics = [...(character.cosmetics || [])];
+    const index = cosmetics.indexOf(itemId);
+    if (!field || index === -1) return null;
+
+    cosmetics.splice(index, 1);
+    const old = stashFor(character, field);
+    if (old) cosmetics.push(old);
+    return { field, value: itemId, old: character[field] || null, cosmetics };
+};
+
 // The entry whose name (or id) matches what someone typed, ignoring case and
 // surrounding spaces, or null. Items are matched by full name only, so typing
 // "fire" won't guess "Fire Cape".
@@ -161,4 +199,4 @@ const matchEntry = (entries, typed) => {
     ) || null;
 };
 
-module.exports = { fitScore, bestKit, bagBySlot, renderSheet, equipPlan, matchEntry, WIDTH };
+module.exports = { fitScore, bestKit, bagBySlot, renderSheet, equipPlan, cosmeticField, stashFor, wearPlan, matchEntry, WIDTH };

@@ -814,7 +814,9 @@ const returnShopStock = async function (guildId, itemId) {
  *   { equip: { slot, itemId, gear } }  - gear for an empty slot, equipped at once.
  *                                        `gear` is the member's current gear map,
  *                                        and the write only lands if it's unchanged
- *   { field, value }                   - title, class or race, replacing the old one
+ *   { field, value, stash }            - title, class or race, replacing the old one.
+ *                                        `stash` is the old one's id, kept in the
+ *                                        member's cosmetics; omitted when there is none
  * Returns true on success, false if the member can't afford it.
  */
 const buyWithPoints = async function (guildId, userId, displayName, price, grant) {
@@ -882,6 +884,17 @@ const chargeUpdate = (guildId, userId, displayName, price, grant) => {
             condition += ' AND attribute_not_exists(#gear)';
         }
         update = 'SET #dn = :n, #gear = :newGear ADD #pts :neg, #wl :lost';
+    } else if (grant.stash) {
+        // The one it replaces goes to the cosmetics list, and only if it's
+        // still the one worn, so a racing purchase can't lose it.
+        names['#field'] = grant.field;
+        names['#cos'] = 'cosmetics';
+        values[':value'] = grant.value;
+        values[':old'] = grant.stash;
+        values[':stash'] = [grant.stash];
+        values[':empty'] = [];
+        condition += ' AND #field = :old';
+        update = 'SET #dn = :n, #field = :value, #cos = list_append(if_not_exists(#cos, :empty), :stash) ADD #pts :neg, #wl :lost';
     } else {
         names['#field'] = grant.field;
         values[':value'] = grant.value;
@@ -898,9 +911,11 @@ const chargeUpdate = (guildId, userId, displayName, price, grant) => {
     };
 };
 
-// A member's character and points: { points, displayName, gear, bag, title, class, race }.
+// A member's character and points: { points, displayName, gear, bag, title,
+// class, race, cosmetics }. `cosmetics` holds the titles, classes and races
+// they own but aren't wearing.
 const getCharacter = async function (guildId, userId) {
-    const empty = { points: 0, displayName: null, gear: {}, bag: [], title: null, class: null, race: null };
+    const empty = { points: 0, displayName: null, gear: {}, bag: [], title: null, class: null, race: null, cosmetics: [] };
     if (!isConfigured()) return empty;
 
     const result = await getClient().send(new GetCommand({
@@ -917,6 +932,7 @@ const getCharacter = async function (guildId, userId) {
         title: item.title || null,
         class: item.class || null,
         race: item.race || null,
+        cosmetics: item.cosmetics || [],
         // Read by the achievement checks (src/achievements.js).
         duelWins: item.duelWins || 0,
         duelLosses: item.duelLosses || 0,
@@ -1668,6 +1684,40 @@ const setEquipment = async function (guildId, userId, expectedBag, gear, bag) {
     }
 };
 
+/* Wear a title, class or race from the member's cosmetics: `field` becomes
+ * `value` and the cosmetics list becomes `cosmetics` (the worn one taken out,
+ * the old one put in). Lands only if the list is still `expectedCosmetics`
+ * and the field still `expectedOld` (null for none), so a stale read can't
+ * duplicate or lose anything. Returns false if either changed.
+ */
+const wearCosmetic = async function (guildId, userId, field, expectedOld, value, expectedCosmetics, cosmetics) {
+    if (!isConfigured()) return false;
+
+    const names = { '#field': field, '#cos': 'cosmetics' };
+    const values = { ':value': value, ':cos': cosmetics, ':expected': expectedCosmetics };
+    let condition = '#cos = :expected';
+    if (expectedOld) {
+        values[':old'] = expectedOld;
+        condition += ' AND #field = :old';
+    } else {
+        condition += ' AND attribute_not_exists(#field)';
+    }
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: 'SET #field = :value, #cos = :cos',
+            ConditionExpression: condition,
+            ExpressionAttributeNames: names,
+            ExpressionAttributeValues: values,
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
 /* Record a /duel outcome: increments the winner's duelWins and the loser's
  * duelLosses (separate attributes on the same points-table item, so no
  * second table is needed). `winner`/`loser` are { userId, displayName }.
@@ -1801,6 +1851,7 @@ module.exports = {
     fenceWithPoints,
     getCharacter,
     setEquipment,
+    wearCosmetic,
     getPose,
     setPose,
     getChannelOverrides,
