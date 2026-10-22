@@ -5,8 +5,14 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-21
+
+- Shop: 20 new titles (`2260420`)
+- Keep titles, classes and races: swap them with /equip (`b0ad7e1`)
+
 ## 2026-10-18
 
+- Regenerate UPDATELOG.md (`d4e7da7`)
 - Recap: keep post links clickable when the post has custom emoji or mentions (`4074725`)
 
 ## 2026-10-17
