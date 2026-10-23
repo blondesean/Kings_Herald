@@ -45,7 +45,7 @@
  */
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, UpdateCommand, QueryCommand, GetCommand, PutCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, UpdateCommand, QueryCommand, GetCommand, PutCommand, DeleteCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
 const { recordPoints } = require('./historyLog');
 
 const TABLE_NAME = process.env.POINTS_TABLE_NAME;
@@ -995,6 +995,56 @@ const setPose = async function (guildId, userId, pose) {
     }));
 };
 
+/* Birthdays (see commands/passive/birthdays.js): one item per member, in its
+ * own partition, holding the birthdate as YYYY-MM-DD. Set by the admin
+ * /birthday_add, so the dates live here rather than in the public repo.
+ */
+const BIRTHDAY_PREFIX = 'BIRTHDAY#';
+
+// Every birthday saved for a guild: [{ userId, displayName, birthdate }].
+const getBirthdays = async function (guildId) {
+    if (!isConfigured()) return [];
+
+    const birthdays = [];
+    let startKey;
+    do {
+        const result = await getClient().send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: '#g = :g',
+            ExpressionAttributeNames: { '#g': 'guildId' },
+            ExpressionAttributeValues: { ':g': BIRTHDAY_PREFIX + guildId },
+            ExclusiveStartKey: startKey,
+        }));
+        for (const item of result.Items || []) {
+            if (item.birthdate) birthdays.push({ userId: item.userId, displayName: item.displayName || null, birthdate: item.birthdate });
+        }
+        startKey = result.LastEvaluatedKey;
+    } while (startKey);
+    return birthdays;
+};
+
+// Save (or replace) a member's birthdate, YYYY-MM-DD.
+const setBirthday = async function (guildId, userId, displayName, birthdate) {
+    if (!isConfigured()) return;
+
+    await getClient().send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { guildId: BIRTHDAY_PREFIX + guildId, userId, displayName, birthdate },
+    }));
+};
+
+// Remove a member's birthday. Returns the birthdate removed, or null if none was saved.
+const removeBirthday = async function (guildId, userId) {
+    if (!isConfigured()) return null;
+
+    const result = await getClient().send(new DeleteCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: BIRTHDAY_PREFIX + guildId, userId },
+        ReturnValues: 'ALL_OLD',
+    }));
+    return (result.Attributes && result.Attributes.birthdate) || null;
+};
+
 /* Encounter injuries (see commands/passive/encounter.js): the last Eastern
  * day (YYYY-MM-DD) a member is still recovering, so they can't join an
  * encounter until after it. Own partition, so recording an injury never
@@ -1852,6 +1902,9 @@ module.exports = {
     getCharacter,
     setEquipment,
     wearCosmetic,
+    getBirthdays,
+    setBirthday,
+    removeBirthday,
     getPose,
     setPose,
     getChannelOverrides,

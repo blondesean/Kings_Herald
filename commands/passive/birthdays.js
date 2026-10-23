@@ -1,10 +1,13 @@
 /* Passive behavior: the daily birthday blessing.
  *
- * Every day at 9 AM Eastern the Herald checks a private birthday list. Each
- * row names a member and their birthdate; when today (Eastern) is that
- * member's birthday, they earn one point per year of age, announced in
- * character. The list is a CSV file kept out of git and out of the Docker
- * image (see .gitignore and .dockerignore), so it isn't in the repo.
+ * Every day at 9 AM Eastern the Herald checks each server's birthdays. When
+ * today (Eastern) is a member's birthday, they earn one point per year of
+ * age, announced in character.
+ *
+ * Birthdays are saved in DynamoDB by the admin /birthday_add (and listed or
+ * removed with /birthday_list and /birthday_remove), so the dates never sit
+ * in the public repo. A local CSV file, kept out of git, is read as well, for
+ * running the bot on a PC.
  *
  * File format (header row optional), one member per line:
  *   name,birthdate
@@ -27,6 +30,7 @@
  *   scheduleBirthdays(client) - registers the daily cron job (call once, on ready)
  *   runBirthdays(client, opts) - runs one check; reused by the preview command
  *   parseBirthdays(text) - the CSV parser, exported for the tests
+ *   parseDate(text) - { year, month, day } from YYYY-MM-DD, or null
  *   ageOn(birthdate, today) - whole years between two { year, month, day } dates
  */
 
@@ -63,6 +67,16 @@ const ageOn = (birthdate, today) => {
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
+// { year, month, day } from YYYY-MM-DD, or null if it isn't a real date.
+const parseDate = (text) => {
+    const match = DATE_PATTERN.exec(String(text || '').trim());
+    if (!match) return null;
+    const [year, month, day] = match.slice(1).map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+    return { year, month, day };
+};
+
 // Parses the CSV text into [{ name, birthdate: { year, month, day } }].
 // Splits on the last comma so a name containing a comma still works.
 const parseBirthdays = (text, warn = console.log) => {
@@ -89,18 +103,21 @@ const parseBirthdays = (text, warn = console.log) => {
     return rows;
 };
 
+// The rows from the local CSV file, or none if there isn't one.
 const readBirthdays = () => {
     const file = process.env.BIRTHDAYS_FILE || DEFAULT_FILE;
     try {
         return parseBirthdays(fs.readFileSync(file, 'utf8'));
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            console.log(`Birthdays: no list at ${file}; nothing to celebrate.`);
-            return [];
-        }
+        if (error.code === 'ENOENT') return []; // normal in production, which uses the saved birthdays
         throw error;
     }
 };
+
+// A guild's saved birthdays as rows, named by user ID so they match exactly.
+const savedBirthdays = async (guildId) => (await pointsStore.getBirthdays(guildId))
+    .map((b) => ({ name: b.userId, birthdate: parseDate(b.birthdate) }))
+    .filter((row) => row.birthdate);
 
 // The member whose nickname, display name, username or global name matches
 // `name` (case-insensitively), or null. Bots never count.
@@ -124,7 +141,8 @@ const findMember = (members, name) => {
  *   targetChannel - where to post (default: each guild's announce channel)
  *   persist       - whether to award points and ping the member (default: false)
  *   today         - override today's date, { year, month, day } (for tests)
- *   rows          - override the birthday list (for tests)
+ *   rows          - override the birthday list (for tests); otherwise the
+ *                   file's rows plus each guild's saved birthdays
  *   runLabel      - tags CloudWatch log lines (default: "scheduled" if
  *                   persist, else "preview")
  */
@@ -134,19 +152,21 @@ const runBirthdays = async function (client, options = {}) {
         targetChannel,
         persist = false,
         today = easternToday(),
-        rows = readBirthdays(),
+        rows: rowsOverride,
         runLabel = persist ? 'scheduled' : 'preview',
     } = options;
     const guilds = guild ? [guild] : Array.from(client.guilds.cache.values());
-
-    const due = rows.filter((r) => r.birthdate.month === today.month && r.birthdate.day === today.day);
-    if (!due.length) {
-        console.log(`Birthdays [${runLabel}]: nobody's birthday today.`);
-        return;
-    }
+    const fileRows = rowsOverride || readBirthdays();
 
     for (const g of guilds) {
         try {
+            const rows = rowsOverride || [...fileRows, ...await savedBirthdays(g.id)];
+            const due = rows.filter((r) => r.birthdate.month === today.month && r.birthdate.day === today.day);
+            if (!due.length) {
+                console.log(`Birthdays (guild ${g.id}) [${runLabel}]: nobody's birthday today (${rows.length} on the list).`);
+                continue;
+            }
+
             const channel = targetChannel || await resolveChannel(g, 'birthdays', findAnnounceChannel);
             if (!channel) {
                 console.log(`Birthdays: no channel the herald can post in found in "${g.name}"; skipping.`);
@@ -225,4 +245,4 @@ const getScheduledFireTime = () => {
     return now < fireAt ? fireAt : null;
 };
 
-module.exports = { scheduleBirthdays, runBirthdays, parseBirthdays, ageOn, getScheduledFireTime };
+module.exports = { scheduleBirthdays, runBirthdays, parseBirthdays, parseDate, ageOn, easternToday, getScheduledFireTime };
