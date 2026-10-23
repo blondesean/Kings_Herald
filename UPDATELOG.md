@@ -5,8 +5,13 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-22
+
+- Birthdays: save them in DynamoDB with admin commands (`586e0b4`)
+
 ## 2026-10-21
 
+- Regenerate UPDATELOG.md (`f8d52ec`)
 - Shop: 20 new titles (`2260420`)
 - Keep titles, classes and races: swap them with /equip (`b0ad7e1`)
 
