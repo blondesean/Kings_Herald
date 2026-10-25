@@ -27,7 +27,7 @@ const CATEGORIES = [
 const ADMIN_HEADING = 'For the Stewards';
 
 const DAILY = [
-    '**Trivia**, a puzzle and a boss encounter, each at its own hour between 9 AM and 9 PM Eastern, and **the shop** from 9 AM to 9 PM Pacific',
+    '**Trivia** and a puzzle, each at its own hour between 9 AM and 9 PM Eastern, a **boss encounter** after 9 AM Pacific, and **the shop** from 9 AM to 9 PM Pacific',
     '**Voice** pays points for every hour spent together',
     '**Sunday at noon**, the weekly recap and its podiums',
     '**Wednesday at 9 PM**, WoW trivia',

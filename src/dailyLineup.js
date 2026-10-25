@@ -29,7 +29,8 @@
  *   scheduleDailyLineup(client) - registers the daily crons (call once, on ready)
  * The daily boss encounter (commands/passive/encounter.js) is placed the
  * same way, reserving ENCOUNTER_WINDOW_MS: an hour to form the party plus an
- * hour for need/greed/pass.
+ * hour for need/greed/pass, and never before 9 AM Pacific
+ * (ENCOUNTER_EARLIEST_SLOT).
  *
  *   getFireTime(game) - the Date 'trivia' | 'puzzle' | 'shop' | 'encounter' is armed to
  *                        fire today, or null; backs /harold_time
@@ -55,6 +56,10 @@ const SLOT_COUNT = (WINDOW_HOURS * 60) / SLOT_MINUTES;
 const SHOP_OPEN_CRON = '0 12 * * *';
 const SHOP_CLOSE_CRON = '0 0 * * *';
 const SHOP_SLOT = 12;
+
+// The encounter starts after 9 AM Pacific, so the west coast is up for it:
+// the slot after the shop's, 12:15 PM Eastern at the earliest.
+const ENCOUNTER_EARLIEST_SLOT = SHOP_SLOT + 1;
 
 // At least one empty slot between any two games' windows, so a wrap-up
 // message and the next game's opening post don't land in the same breath.
@@ -83,7 +88,8 @@ const hitsShop = (start, end) => start <= SHOP_SLOT && SHOP_SLOT <= end;
 
 /* Picks a non-overlapping start slot (in SLOT_MINUTES units, 0-based) for
  * each duration in `durationsMs`, within a SLOT_COUNT-slot window, at least
- * BUFFER_SLOTS apart and clear of SHOP_SLOT. Tries random placements first
+ * BUFFER_SLOTS apart, clear of SHOP_SLOT, and no earlier than its entry in
+ * `earliest` (a slot; missing means the window's start). Tries random placements first
  * (fast, and keeps every day's lineup differently shaped); if 500 random
  * tries all collide — very unlikely given how much slack the window has —
  * falls back to packing them back-to-back in a random order, stepping over
@@ -91,8 +97,9 @@ const hitsShop = (start, end) => start <= SHOP_SLOT && SHOP_SLOT <= end;
  * exceeds the window (logged, not thrown, since a slightly-overrun trivia
  * round is a far smaller problem than a crashed scheduler).
  */
-const placeSlots = (durationsMs, random = Math.random) => {
+const placeSlots = (durationsMs, random = Math.random, earliest = []) => {
     const lengths = durationsMs.map((ms) => Math.ceil(ms / SLOT_MS));
+    const firstSlot = (i) => earliest[i] || 0;
     const order = durationsMs.map((_, i) => i).sort(() => random() - 0.5);
 
     for (let attempt = 0; attempt < 500; attempt++) {
@@ -102,8 +109,8 @@ const placeSlots = (durationsMs, random = Math.random) => {
         for (const i of order) {
             const length = lengths[i];
             const latestStart = SLOT_COUNT - length;
-            if (latestStart < 0) { ok = false; break; }
-            const start = Math.floor(random() * (latestStart + 1));
+            if (latestStart < firstSlot(i)) { ok = false; break; }
+            const start = firstSlot(i) + Math.floor(random() * (latestStart - firstSlot(i) + 1));
             const end = start + length;
             if (hitsShop(start, end) || busy.some(([bs, be]) => start < be + BUFFER_SLOTS && bs < end + BUFFER_SLOTS)) {
                 ok = false;
@@ -132,6 +139,7 @@ const placeSlots = (durationsMs, random = Math.random) => {
     order.forEach((i, k) => {
         cursor += cuts[k] - previousCut;
         previousCut = cuts[k];
+        cursor = Math.max(cursor, firstSlot(i));
         if (hitsShop(cursor, cursor + lengths[i])) cursor = SHOP_SLOT + 1;
         starts[i] = cursor;
         cursor += lengths[i] + BUFFER_SLOTS;
@@ -163,7 +171,11 @@ const scheduleDailyLineup = function (client) {
                 : subjectiveKind === 'ranking' ? RANKING_WINDOW_MS : WYR_WINDOW_MS;
             const ladder = Math.random() < LADDER_CHANCE;
 
-            const [triviaSlot, puzzleSlot, encounterSlot] = placeSlots([triviaWindowMs, PUZZLE_WINDOW_MS, ENCOUNTER_WINDOW_MS]);
+            const [triviaSlot, puzzleSlot, encounterSlot] = placeSlots(
+                [triviaWindowMs, PUZZLE_WINDOW_MS, ENCOUNTER_WINDOW_MS],
+                Math.random,
+                [0, 0, ENCOUNTER_EARLIEST_SLOT]
+            );
             const windowOpenedAt = Date.now();
             const slotTime = (slot) => windowOpenedAt + slot * SLOT_MS;
 
@@ -224,4 +236,4 @@ const scheduleDailyLineup = function (client) {
     console.log(`Daily lineup scheduled: window opens "${WINDOW_CRON}" (${TIMEZONE}), trivia/puzzle/encounter placed without overlap across ${WINDOW_HOURS}h, clear of the shop, which opens "${SHOP_OPEN_CRON}" and closes "${SHOP_CLOSE_CRON}".`);
 };
 
-module.exports = { scheduleDailyLineup, getFireTime, placeSlots, SLOT_COUNT, SLOT_MINUTES, SHOP_SLOT };
+module.exports = { scheduleDailyLineup, getFireTime, placeSlots, SLOT_COUNT, SLOT_MINUTES, SHOP_SLOT, ENCOUNTER_EARLIEST_SLOT };
