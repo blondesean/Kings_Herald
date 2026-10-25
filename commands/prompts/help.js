@@ -22,6 +22,7 @@ const CATEGORIES = [
     ['GLORY', 'Points and Glory'],
     ['DUELS', 'Duels'],
     ['SUMMONS', 'Summons'],
+    ['WOW', 'World of Warcraft'],
     ['UTILITY', 'Utility'],
 ];
 const ADMIN_HEADING = 'For the Stewards';

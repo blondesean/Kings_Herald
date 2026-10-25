@@ -1045,6 +1045,44 @@ const removeBirthday = async function (guildId, userId) {
     return (result.Attributes && result.Attributes.birthdate) || null;
 };
 
+/* WoW characters (see /implaying and src/wowCharacters.js): one item per
+ * member, in its own partition, holding their list of characters as
+ * [{ realm, faction, race, cls }].
+ */
+const WOWCHAR_PREFIX = 'WOWCHAR#';
+
+// Every member's characters: [{ userId, displayName, characters }].
+const getWowCharacters = async function (guildId) {
+    if (!isConfigured()) return [];
+
+    const members = [];
+    let startKey;
+    do {
+        const result = await getClient().send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: '#g = :g',
+            ExpressionAttributeNames: { '#g': 'guildId' },
+            ExpressionAttributeValues: { ':g': WOWCHAR_PREFIX + guildId },
+            ExclusiveStartKey: startKey,
+        }));
+        for (const item of result.Items || []) {
+            if ((item.characters || []).length) members.push({ userId: item.userId, displayName: item.displayName || null, characters: item.characters });
+        }
+        startKey = result.LastEvaluatedKey;
+    } while (startKey);
+    return members;
+};
+
+// Replace a member's characters; an empty list removes their item.
+const setWowCharacters = async function (guildId, userId, displayName, characters) {
+    if (!isConfigured()) return;
+
+    const key = { guildId: WOWCHAR_PREFIX + guildId, userId };
+    await getClient().send(characters.length
+        ? new PutCommand({ TableName: TABLE_NAME, Item: { ...key, displayName, characters } })
+        : new DeleteCommand({ TableName: TABLE_NAME, Key: key }));
+};
+
 /* Encounter injuries (see commands/passive/encounter.js): the last Eastern
  * day (YYYY-MM-DD) a member is still recovering, so they can't join an
  * encounter until after it. Own partition, so recording an injury never
@@ -1905,6 +1943,8 @@ module.exports = {
     getBirthdays,
     setBirthday,
     removeBirthday,
+    getWowCharacters,
+    setWowCharacters,
     getPose,
     setPose,
     getChannelOverrides,
