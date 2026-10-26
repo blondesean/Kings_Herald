@@ -3,7 +3,8 @@
  * Once a day at noon Eastern, 9 AM Pacific (src/dailyLineup.js keeps the
  * day's games clear of that slot), the Herald opens the shop and posts its stock:
  *   - 5 gear pieces, drawn at random from the catalog
- *   - 1 title, 1 class and 1 race
+ *   - 1 title, 1 class and 1 race. The title is one no member owns yet,
+ *     so each title has one bearer; with every title owned, none is stocked
  * Gear and titles have 2 copies (titles: 1) shared by the whole server. Once
  * they're gone, that item is sold out until the next day. Callings and kindreds
  * never run out. The shop stays open until midnight Eastern, 9 PM Pacific,
@@ -24,7 +25,7 @@
  * Exposes:
  *   openShopNow(client, opts) - opens the shop immediately; called by
  *                            src/dailyLineup.js and the /shop_test preview command
- *   pickDailyStock(random) - the day's item ids, exported for the tests
+ *   pickDailyStock(random, ownedTitles) - the day's item ids, exported for the tests
  *   easternDay(date) - YYYY-MM-DD in Eastern time, exported for the tests
  */
 
@@ -72,8 +73,9 @@ const pickOne = (list, random) => list[Math.floor(random() * list.length)];
 
 // Draws the day's stock: GEAR_PER_DAY distinct gear pieces, then one title,
 // one class (never the default peasant) and one race. Repeats across days
-// are fine by design.
-const pickDailyStock = (random = Math.random) => {
+// are fine by design, except for titles: one already owned by a member,
+// worn or stored, is never drawn. If every title is owned, there is none today.
+const pickDailyStock = (random = Math.random, ownedTitles = new Set()) => {
     // Only gear with a real slot can be drawn; a slot-less item would be unequippable.
     const gearPool = catalog.GEAR.filter((e) => catalog.GEAR_SLOTS.includes(e.slot));
     const gear = [];
@@ -81,12 +83,20 @@ const pickDailyStock = (random = Math.random) => {
         const [picked] = gearPool.splice(Math.floor(random() * gearPool.length), 1);
         gear.push(picked.id);
     }
+    const titlePool = catalog.TITLES.filter((t) => !ownedTitles.has(t.id));
     return [
         ...gear,
-        pickOne(catalog.TITLES, random).id,
+        ...(titlePool.length ? [pickOne(titlePool, random).id] : []),
         pickOne(catalog.CLASSES, random).id,
         pickOne(catalog.RACES, random).id,
     ];
+};
+
+// The ids of every title a member of the guild owns, worn or in their cosmetics.
+const ownedTitlesIn = async (guildId) => {
+    const members = await pointsStore.getMembers(guildId);
+    const isTitle = (id) => catalog.TITLES.some((t) => t.id === id);
+    return new Set(members.flatMap((m) => [m.title, ...(m.cosmetics || [])]).filter(isTitle));
 };
 
 // Classes and races have no stock limit, so they get no stock entry.
@@ -95,8 +105,8 @@ const isLimited = (id) => {
     return Boolean(entry) && kindOf(entry) !== 'class' && kindOf(entry) !== 'race';
 };
 
-const stockRecord = (now = Date.now(), random = Math.random) => {
-    const items = pickDailyStock(random);
+const stockRecord = (now = Date.now(), random = Math.random, ownedTitles = new Set()) => {
+    const items = pickDailyStock(random, ownedTitles);
     return {
         day: easternDay(new Date(now)),
         items,
@@ -225,7 +235,7 @@ const openShopNow = async function (client, options = {}) {
                 continue;
             }
 
-            const record = stockRecord();
+            const record = stockRecord(Date.now(), Math.random, await ownedTitlesIn(g.id));
             if (persist) await pointsStore.openShop(g.id, record);
             // Whatever is left unsold is paid out by closeShopNow at midnight.
             const discounts = await stockDiscounts(g.id, record, persist);
