@@ -28,8 +28,8 @@
  * Exposes:
  *   scheduleDailyLineup(client) - registers the daily crons (call once, on ready)
  * The daily boss encounter (commands/passive/encounter.js) is placed the
- * same way, reserving ENCOUNTER_WINDOW_MS: an hour to form the party plus an
- * hour for need/greed/pass, and never before 9 AM Pacific
+ * same way, reserving ENCOUNTER_WINDOW_MS: an hour to form the party plus a
+ * quarter hour for the battle and loot rolls, and never before 9 AM Pacific
  * (ENCOUNTER_EARLIEST_SLOT).
  *
  *   getFireTime(game) - the Date 'trivia' | 'puzzle' | 'shop' | 'encounter' is armed to
@@ -41,7 +41,7 @@ const { runTrivia, rollToday } = require('../commands/passive/trivia');
 const { runConnectionsPuzzle } = require('../commands/puzzles/connections');
 const { runWordLadder } = require('../commands/puzzles/wordLadder');
 const { openShopNow, closeShopNow } = require('../commands/passive/shop');
-const { runEncounter, JOIN_WINDOW_MS, LOOT_WINDOW_MS } = require('../commands/passive/encounter');
+const { runEncounter, JOIN_WINDOW_MS, LOOT_RESOLVE_MS } = require('../commands/passive/encounter');
 
 // The shared window: 9 AM to 9 PM Eastern, 48 fifteen-minute slots.
 const WINDOW_CRON = '0 9 * * *';
@@ -74,7 +74,7 @@ const TRIVIA_WINDOW_MS = 30 * 60 * 1000;
 const WYR_WINDOW_MS = 3 * 60 * 60 * 1000;
 const RANKING_WINDOW_MS = 30 * 60 * 1000;
 const PUZZLE_WINDOW_MS = 60 * 60 * 1000;
-const ENCOUNTER_WINDOW_MS = JOIN_WINDOW_MS + LOOT_WINDOW_MS;
+const ENCOUNTER_WINDOW_MS = JOIN_WINDOW_MS + LOOT_RESOLVE_MS;
 
 // The Date each game is armed to fire today, or null once it has fired (or
 // before the window has opened). In memory only, like the old per-game

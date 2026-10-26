@@ -197,11 +197,11 @@ const encounterTooWeakLines = (fit, difficulty) => [
 
 // The loot post. `item` is the label "[Rarity] Name".
 const encounterLootLines = (item) => [
-    `From the fallen foe, the party recovers **${item}**! Need, greed or pass.`,
-    `Among the loot lies **${item}**. Who claims it? Need, greed or pass.`,
-    `Something glints in the wreckage: **${item}**! Need, greed or pass.`,
-    `The victors search the lair and find **${item}**. Need, greed or pass.`,
-    `A prize worthy of the fight: **${item}**! Need, greed or pass.`,
+    `From the fallen foe, the party recovers **${item}**!`,
+    `Among the loot lies **${item}**. Who claims it?`,
+    `Something glints in the wreckage: **${item}**!`,
+    `The victors search the lair and find **${item}**.`,
+    `A prize worthy of the fight: **${item}**!`,
 ];
 
 const encounterLootWonLines = (winner, item) => [

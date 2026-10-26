@@ -18,7 +18,7 @@
  *   encounter - every boss fight: boss, difficulty, odds, outcome, killer, and
  *              per member their vote, stance, fit, power, gear, suitedUp and injury
  *              (commands/passive/encounter.js)
- *   loot     - every loot roll: item, each member's need/greed/pass, the
+ *   loot     - every loot roll: item, each member's need or greed, the
  *              rolls and the winner, linked to its fight by encounterId
  *
  * The records also stream to S3 for good, queryable with Athena (see

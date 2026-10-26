@@ -32,11 +32,11 @@
  * On a win, one member lands the killing blow — weighted by each member's
  * effective (stance-adjusted) fit — and the boss drops one piece per
  * ADVENTURERS_PER_DROP (2.5) members, rounded down (2 for a party of 5),
- * different random pieces of gear of the tier's rarity. For each piece, party
- * members choose Need, Greed or Pass within LOOT_WINDOW_MS (or until all have
- * chosen): if anyone needs, only the
- * needers roll 1-100; otherwise the greeders do; passes never roll; ties at
- * the top re-roll. The winner gets the item the same way as a /buy — into an
+ * different random pieces of gear of the tier's rarity. For each piece the
+ * herald rolls for the whole party, asking no one (lootChoices): Need for
+ * each member it would upgrade, finer than anything they own for the slot,
+ * worn or bagged, and Greed for the rest. If anyone needs, only the needers
+ * roll 1-100; otherwise everyone greeds; ties at the top re-roll. The winner gets the item the same way as a /buy — into an
  * empty slot, else the bag. Besides, each Plunder member makes off with a
  * random piece of the tier's rarity that isn't among the boss's drops,
  * granted the same way and announced publicly (which reveals their stance).
@@ -81,7 +81,10 @@ const { DIFFICULTIES, BOSSES } = require('./encounterBosses');
 const flavor = require('../../flavor_text');
 
 const JOIN_WINDOW_MS = 60 * 60 * 1000;
-const LOOT_WINDOW_MS = 60 * 60 * 1000;
+// The herald rolls the loot himself, with no window to wait on; this is the
+// time the daily lineup sets aside after the join window for the battle and
+// the roll posts.
+const LOOT_RESOLVE_MS = 15 * 60 * 1000;
 // Party size: at least MIN_PARTY to fight, at most MAX_PARTY. Boss fit scales
 // with the party, so every size faces the same odds for the same average fit.
 const MIN_PARTY = 3;
@@ -218,8 +221,8 @@ const pickKiller = (members, random = Math.random) => {
     return members[members.length - 1];
 };
 
-/* Need/greed/pass. `choices` is [{ userId, displayName, choice }] where choice
- * is 'need', 'greed' or 'pass' (missing choices should already be 'pass').
+/* Need/greed. `choices` is [{ userId, displayName, choice }] where choice
+ * is 'need' or 'greed' (from lootChoices; 'pass' never rolls).
  * Returns { rounds: [[{ userId, displayName, choice, roll }]], winner } —
  * each round is one set of rolls; ties at the top re-roll among the tied —
  * or winner null if everyone passed.
@@ -342,18 +345,6 @@ const buildPrompt = (prefix, member, tier) => {
 // On the herald's roster warning: anyone in the party may withdraw.
 const leaveRow = (prefix, disabled) => new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`${prefix}leave`).setLabel('Leave the party').setStyle(ButtonStyle.Secondary).setDisabled(disabled)
-);
-
-// The public loot message carries one button; Need/Greed/Pass open privately
-// for each party member, so no one else sees the choices.
-const lootRow = (prefix, disabled) => new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`${prefix}open`).setLabel('Roll for this loot').setStyle(ButtonStyle.Success).setDisabled(disabled)
-);
-
-const lootChoiceRow = (prefix, current) => new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`${prefix}need`).setLabel(`Need${current === 'need' ? ' - chosen' : ''}`).setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`${prefix}greed`).setLabel(`Greed${current === 'greed' ? ' - chosen' : ''}`).setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`${prefix}pass`).setLabel(`Pass${current === 'pass' ? ' - chosen' : ''}`).setStyle(ButtonStyle.Danger),
 );
 
 // ---- phases ---------------------------------------------------------------------
@@ -483,60 +474,24 @@ const gatherParty = (g, channel, message, prefix, opts) =>
         });
     });
 
-// Need/greed/pass on the dropped item. Resolves with the choices.
-// Need is only allowed for an upgrade: if the member already owns something,
-// worn or bagged, in the item's slot worth as much fit or more, a Need click is entered as
-// Greed instead, and they're told why. Gear is read at click time, so it
-// reflects anything they equipped during the loot window.
-// The public button opens a private prompt; its Need/Greed/Pass clicks come
-// from that private message, so the collector listens on the channel by prefix.
-const collectLoot = (channel, members, lootWindowMs, prefix, item, guildId) =>
-    new Promise((resolve) => {
-        const choices = new Map();
-        const memberIds = new Set(members.map((m) => m.userId));
-        const collector = channel.createMessageComponentCollector({
-            componentType: ComponentType.Button,
-            filter: (i) => i.customId.startsWith(prefix),
-            time: lootWindowMs,
-        });
-        const choiceText = (choice) => (choice
-            ? `Thou hast chosen **${choice}**. Thou mayest change it until the rolls.`
-            : 'Need, greed or pass on this piece? Thy choice is seen by none but thee.');
-
-        collector.on('collect', async (interaction) => {
-            if (!memberIds.has(interaction.user.id)) {
-                await interaction.reply({ content: 'This loot belongs to the party that won it.', flags: MessageFlags.Ephemeral }).catch(() => {});
-                return;
-            }
-            let choice = interaction.customId.slice(prefix.length);
-            if (choice === 'open') {
-                const current = choices.get(interaction.user.id);
-                await interaction.reply({ content: choiceText(current), components: [lootChoiceRow(prefix, current)], flags: MessageFlags.Ephemeral }).catch(() => {});
-                return;
-            }
-            let note = '';
-            if (choice === 'need') {
-                // Measured against the finest piece they own for the slot, worn
-                // or bagged, so dressing down for show doesn't earn a Need.
-                const character = await pointsStore.getCharacter(guildId, interaction.user.id).catch(() => ({ gear: {} }));
-                const owned = catalog.findEntry(bestKit(character)[item.slot]);
-                if (owned && owned.price >= item.price) {
-                    choice = 'greed';
-                    note = `Thou already ownest **${itemLabel(owned)}**, as fine as this ${item.slot} or finer, so thou canst not need it. Thou art entered for the **greed** roll instead.`;
-                }
-            }
-            choices.set(interaction.user.id, choice);
-            await interaction.update({ content: note || choiceText(choice), components: [lootChoiceRow(prefix, choice)] }).catch(() => {});
-            if (choices.size === memberIds.size) collector.stop('all');
-        });
-
-        collector.on('end', () => resolve(members.map((m) => ({ userId: m.userId, displayName: m.displayName, choice: choices.get(m.userId) || 'pass' }))));
-    });
+/* Need or greed on the dropped item, decided by the herald for each member:
+ * Need if it would be an upgrade, Greed otherwise. An upgrade means finer
+ * than anything they own for the slot, worn or bagged, so dressing down for
+ * show doesn't earn a Need, and an empty slot is always an upgrade. Gear is
+ * read when the piece is rolled, after any earlier piece was granted. If a
+ * member's gear can't be read, they greed.
+ */
+const lootChoices = (guildId, members, item) => Promise.all(members.map(async (m) => {
+    const character = await pointsStore.getCharacter(guildId, m.userId).catch(() => null);
+    const owned = character ? catalog.findEntry(bestKit(character)[item.slot]) : null;
+    const upgrade = Boolean(character) && (!owned || owned.price < item.price);
+    return { userId: m.userId, displayName: m.displayName, choice: upgrade ? 'need' : 'greed' };
+}));
 
 // ---- one encounter ------------------------------------------------------------
 
 const runEncounterIn = async (g, channel, opts) => {
-    const { maxParty, minParty, joinWindowMs, lootWindowMs, rollDelayMs, persist, runLabel } = opts;
+    const { maxParty, minParty, joinWindowMs, rollDelayMs, persist, runLabel } = opts;
     const tag = `Encounter (${runLabel}) (guild ${g.id})`;
     const roundId = crypto.randomBytes(4).toString('hex');
     const prefix = `enc_${roundId}_`;
@@ -788,24 +743,18 @@ const runEncounterIn = async (g, channel, opts) => {
         });
     }
 
-    const drops = await Promise.all(items.map(async (item, k) => {
-        const lootPrefix = `encloot_${roundId}_${k}_`;
-        const lootEmbed = new EmbedBuilder()
+    // Dropped, decided and granted one piece at a time, so a member who wins
+    // the first is checked against it for the second. The herald needs or
+    // greeds for everyone (lootChoices); no one is asked. Each roll gets its
+    // own post, a beat apart, for a little suspense; then the result lands in
+    // an embed styled like the loot post.
+    for (const [k, item] of items.entries()) {
+        await channel.send({ embeds: [new EmbedBuilder()
             .setColor(EMBED_COLOR)
             .setTitle(`Loot dropped from ${boss.name}, ${k + 1} of ${items.length}`)
-            .setDescription(`${pick(flavor.encounterLootLines(itemLabel(item)))}\n\nSlot: ${item.slot}. Party members have ${minutesLabel(lootWindowMs)}: if anyone needs, only needers roll; otherwise greeders roll. Passes never roll. Need is only for an upgrade: if thou already ownest something as fine for this slot, worn or in thy bags, thy Need becomes a Greed.`)
-            .setTimestamp();
-        const lootMessage = await channel.send({ embeds: [lootEmbed], components: [lootRow(lootPrefix, false)] });
-        const choices = await collectLoot(channel, ready, lootWindowMs, lootPrefix, item, g.id);
-        await lootMessage.edit({ components: [lootRow(lootPrefix, true)] }).catch(() => {});
-        return { item, choices };
-    }));
-
-    // Resolved and granted one at a time, so a member who wins both pieces
-    // gets the second checked against their gear after the first is in.
-    // Each roll gets its own post, a beat apart, for a little suspense; then
-    // the result lands in an embed styled like the loot post.
-    for (const { item, choices } of drops) {
+            .setDescription(`${pick(flavor.encounterLootLines(itemLabel(item)))}\n\nSlot: ${item.slot}. The herald rolls for the whole party: **Need** for each member it would be an upgrade for, finer than anything they own for the slot, worn or in their bags, and **Greed** for the rest. If anyone needs, only the needers roll.`)
+            .setTimestamp()] });
+        const choices = await lootChoices(g.id, ready, item);
         const { rounds, winner } = rollLoot(choices);
         const recordLoot = (result) => recordHistory('loot', {
             guildId: g.id,
@@ -835,8 +784,8 @@ const runEncounterIn = async (g, channel, opts) => {
             await delay(rollDelayMs);
         }
 
-        // Who chose what, needs first, skipping empty groups.
-        const footnotes = [['need', 'Need'], ['greed', 'Greed'], ['pass', 'Pass']]
+        // Who rolled what, needs first, skipping an empty group.
+        const footnotes = [['need', 'Need'], ['greed', 'Greed']]
             .map(([key, label]) => [label, choices.filter((c) => c.choice === key).map((c) => c.displayName)])
             .filter(([, names]) => names.length)
             .map(([label, names]) => `**${label}:** ${names.join(', ')}`);
@@ -886,7 +835,6 @@ const runEncounterIn = async (g, channel, opts) => {
  *   minParty     - fewest who can fight (default MIN_PARTY, 3)
  *   joinWindowMs - how long the party can form (default 1 hour)
  *   checkIntervalMs - how often the forming party's odds are checked (default 15 minutes)
- *   lootWindowMs - how long need/greed/pass stays open (default 1 hour)
  *   rollDelayMs  - pause between loot roll posts (default 2 seconds)
  *   runLabel     - tags log lines (default: "scheduled" if persist, else "preview")
  */
@@ -900,7 +848,6 @@ const runEncounter = async function (client, options = {}) {
         minParty = MIN_PARTY,
         joinWindowMs = JOIN_WINDOW_MS,
         checkIntervalMs = CHECK_INTERVAL_MS,
-        lootWindowMs = LOOT_WINDOW_MS,
         rollDelayMs = ROLL_DELAY_MS,
         runLabel = persist ? 'scheduled' : 'preview',
     } = options;
@@ -913,7 +860,7 @@ const runEncounter = async function (client, options = {}) {
                 console.log(`Encounter: no channel the herald can post in found in "${g.name}"; skipping.`);
                 return;
             }
-            await runEncounterIn(g, channel, { tier, maxParty, minParty, joinWindowMs, checkIntervalMs, lootWindowMs, rollDelayMs, persist, runLabel });
+            await runEncounterIn(g, channel, { tier, maxParty, minParty, joinWindowMs, checkIntervalMs, rollDelayMs, persist, runLabel });
         } catch (error) {
             console.error(`Encounter failed for guild "${g.name}":`, error);
         }
@@ -937,10 +884,11 @@ module.exports = {
     INJURED_PER_LOSS,
     pickKiller,
     rollLoot,
+    lootChoices,
     addDays,
     STANCES,
     JOIN_WINDOW_MS,
-    LOOT_WINDOW_MS,
+    LOOT_RESOLVE_MS,
     MIN_PARTY,
     MAX_PARTY,
     FULL_PARTY,
