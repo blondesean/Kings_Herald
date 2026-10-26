@@ -69,7 +69,14 @@ const tradeAwaitLines = () => [
     'Thy offer stands. Await their answer.',
 ];
 
+// A relic won in a trial is bound to its Echo.
+const tradeUniqueLines = (name) => [
+    `**${name}** chose thee, and will not be handed on. A relic stays with its Echo.`,
+    `Thou mayest not trade **${name}**. It answered thy call, not another's.`,
+];
+
 module.exports = {
+    tradeUniqueLines,
     tradeOfferLines,
     tradeSealedLines,
     tradePlacedLine,

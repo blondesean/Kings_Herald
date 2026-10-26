@@ -8,20 +8,22 @@
  *   3. The Guardian - a fight against the relic's mythic owner or keeper.
  *
  * `age` names the chapter of The Ages of Arms (docs/the-ages-of-arms.md) the
- * relic belongs to. `legend` is its full story, shown to the one who wins it,
- * and links it to the other relics of its age where the myths cross.
+ * relic belongs to. AGES maps each chapter to the lore drops' five ages
+ * (flavor_text/loreDrops.js), shown in the footer of a claim. `legend` is its
+ * full story, shown to the one who wins it, and links it to the other relics
+ * of its age where the myths cross.
  *
  * No parentheses in any of this text: it is read as herald dialogue.
  */
 
 const AGES = {
-    wheel: 'The Wheel and the First Fire',
-    covenant: 'The Covenant and the Iron',
-    labors: 'The Age of Labors',
-    storm: 'Iron and Storm',
-    tides: 'The Eastern Tides',
-    oaths: 'Oaths and Hoards',
-    hearth: 'The Hearth',
+    wheel: 'The Age of Gods',
+    tides: 'The Age of Gods',
+    covenant: 'The Age of Prophets',
+    labors: 'The Age of Heroes',
+    storm: 'The Age of Kings',
+    oaths: 'The Age of Kings',
+    hearth: 'The Age of the Hearth',
 };
 
 const uniqueTrials = {

@@ -1720,7 +1720,7 @@ const clearChannelOverride = async function (guildId, scope) {
 
 /* The server's campaign (see src/campaign.js): one item per guild under
  * CAMPAIGN#<guildId>, holding when each milestone first happened, e.g.
- * hardClearedAt, and the day the lore drops began. Each milestone is written
+ * extremeClearedAt, and the day the lore drops began. Each milestone is written
  * once, conditionally, so only the first clear counts.
  */
 const CAMPAIGN_PREFIX = 'CAMPAIGN#';
@@ -1756,6 +1756,130 @@ const setCampaignOnce = async function (guildId, field, value) {
         if (error.name === 'ConditionalCheckFailedException') return false;
         throw error;
     }
+};
+
+// Sets campaign fields that can change, such as the Herald's duel date
+// (src/heraldBattle.js): each key of `fields` is written, overwriting it, and
+// a value of null removes that field.
+const setCampaignFields = async function (guildId, fields) {
+    if (!isConfigured()) return;
+
+    const names = {};
+    const values = {};
+    const sets = [];
+    const removes = [];
+    Object.entries(fields).forEach(([field, value], i) => {
+        names[`#f${i}`] = field;
+        if (value === null) {
+            removes.push(`#f${i}`);
+        } else {
+            values[`:v${i}`] = value;
+            sets.push(`#f${i} = :v${i}`);
+        }
+    });
+    if (!sets.length && !removes.length) return;
+    await getClient().send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: CAMPAIGN_PREFIX + guildId, userId: CAMPAIGN_SORT_KEY },
+        UpdateExpression: [sets.length ? `SET ${sets.join(', ')}` : '', removes.length ? `REMOVE ${removes.join(', ')}` : ''].filter(Boolean).join(' '),
+        ExpressionAttributeNames: names,
+        ...(sets.length ? { ExpressionAttributeValues: values } : {}),
+    }));
+};
+
+/* Relics: the uniques won in /trial (see src/trial.js). Own partition,
+ * RELIC#<guildId>, with one item per claimed relic, keyed by its id, holding
+ * { ownerId, displayName, claimedAt }, and one per holder, keyed
+ * HOLDER#<userId>, holding { relicId }. A claim writes both at once, each
+ * only if it doesn't exist yet, so each relic has one owner and each member
+ * wins one relic, however many trials finish at the same moment.
+ */
+const RELIC_PREFIX = 'RELIC#';
+const RELIC_HOLDER_PREFIX = 'HOLDER#';
+
+const getRelics = async function (guildId) {
+    const relics = { claimed: new Map(), holders: new Map() };
+    if (!isConfigured()) return relics;
+
+    let startKey;
+    do {
+        const result = await getClient().send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: '#g = :g',
+            ExpressionAttributeNames: { '#g': 'guildId' },
+            ExpressionAttributeValues: { ':g': RELIC_PREFIX + guildId },
+            ExclusiveStartKey: startKey,
+        }));
+        for (const item of result.Items || []) {
+            if (item.userId.startsWith(RELIC_HOLDER_PREFIX)) {
+                relics.holders.set(item.userId.slice(RELIC_HOLDER_PREFIX.length), item.relicId);
+            } else {
+                relics.claimed.set(item.userId, { ownerId: item.ownerId, displayName: item.displayName, claimedAt: item.claimedAt });
+            }
+        }
+        startKey = result.LastEvaluatedKey;
+    } while (startKey);
+    return relics;
+};
+
+// Returns true if this member now holds the relic; false if it was already
+// claimed, or they already hold one.
+const claimRelic = async function (guildId, relicId, userId, displayName, now = new Date()) {
+    if (!isConfigured()) return false;
+
+    const put = (key, item) => ({
+        Put: {
+            TableName: TABLE_NAME,
+            Item: { guildId: RELIC_PREFIX + guildId, userId: key, ...item },
+            ConditionExpression: 'attribute_not_exists(userId)',
+        },
+    });
+    try {
+        await getClient().send(new TransactWriteCommand({
+            TransactItems: [
+                put(relicId, { ownerId: userId, displayName, claimedAt: now.toISOString() }),
+                put(RELIC_HOLDER_PREFIX + userId, { relicId }),
+            ],
+        }));
+        return true;
+    } catch (error) {
+        if (cancelledBy(error)) return false;
+        throw error;
+    }
+};
+
+/* One /trial a day per member: TRIAL#<guildId>, keyed by userId, holding the
+ * Eastern day of their last attempt. Returns true if this call took today's
+ * attempt, false if it was already taken.
+ */
+const TRIAL_PREFIX = 'TRIAL#';
+
+const takeTrialAttempt = async function (guildId, userId, day) {
+    if (!isConfigured()) return true;
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId: TRIAL_PREFIX + guildId, userId },
+            UpdateExpression: 'SET lastDay = :d',
+            ConditionExpression: 'attribute_not_exists(lastDay) OR lastDay <> :d',
+            ExpressionAttributeValues: { ':d': day },
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
+const getTrialDay = async function (guildId, userId) {
+    if (!isConfigured()) return null;
+
+    const result = await getClient().send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { guildId: TRIAL_PREFIX + guildId, userId },
+    }));
+    return (result.Item && result.Item.lastDay) || null;
 };
 
 /* Tips to the herald (see commands/prompts/tip.js). Own partition, so the
@@ -2118,6 +2242,11 @@ module.exports = {
     getHeraldTips,
     getCampaign,
     setCampaignOnce,
+    setCampaignFields,
+    getRelics,
+    claimRelic,
+    takeTrialAttempt,
+    getTrialDay,
     getAchievements,
     getAllAchievements,
     bumpCounters,

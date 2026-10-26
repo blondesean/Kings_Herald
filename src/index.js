@@ -44,6 +44,7 @@ const { schedulePetCalls } = require('./../commands/passive/petCalls');
 const { scheduleHalloweenTreat } = require('./../commands/passive/halloweenTreat');
 const { scheduleAchievements } = require('./achievements');
 const { scheduleLoreDrops } = require('./campaign'); // the lore drops after the first Max win
+const { scheduleHeraldChallenge } = require('./heraldBattle'); // the named day of the last challenge
 const { scheduleSnapshots } = require('./snapshots'); // daily standings for the history log
 const { recordHistory } = require('./historyLog');
 
@@ -139,6 +140,7 @@ client.on('ready', (c) => {
     startVoiceTracking(client);
     scheduleAchievements(client);
     scheduleLoreDrops(client);
+    scheduleHeraldChallenge(client);
     scheduleSnapshots(client);
 });
 

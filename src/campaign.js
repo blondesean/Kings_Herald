@@ -1,21 +1,29 @@
 /* The server's campaign: the climb through the encounter tiers to the lore
  * drops and the trials (see docs/the-last-proclamation.md).
  *
- *   - Easy, Medium and Hard are always open. The first Hard win opens
- *     Extreme, and the first Extreme win opens Max (see openTiers/recordWin).
+ *   - Easy, Medium, Hard and Extreme are always open, a quarter each. The
+ *     first Extreme win opens Max (see openTiers/recordWin).
  *   - The first Max win starts the lore drops: one each morning at 9 AM
  *     Eastern for seven days, from the next morning (flavor_text/loreDrops.js).
  *     The seventh opens the trials.
+ *   - The REVEAL_AFTER-th relic claimed starts the Herald's reveal: the trial
+ *     hails the five at once, and the three reveal mornings post at 9 AM on
+ *     the next three days (flavor_text/revealMornings.js). After the third,
+ *     /herald_challenge may name the day of the last battle.
  *
  * Milestones live on one item per guild (pointsStore.getCampaign), each
  * written once, so only the first clear counts and a restart can't post a
- * drop twice. A guild that beat Hard or Extreme before the campaign existed is
+ * drop twice. A guild that beat Extreme before the campaign existed is
  * backfilled from its members' win counters the first time it is read.
  *
  * Exposes:
  *   openTiers(guildId) - the tiers the daily encounter may roll
  *   recordWin(guildId, tier, now) - after a win: { opened } when it opened a
  *     tier, { loreBegins } when it was the first Max win, else null
+ *   trialsOpen(guildId) - whether the seventh drop has opened the trials
+ *   beginReveal(guildId, echoes, now) - after a claim: true when this claim,
+ *     the REVEAL_AFTER-th, started the reveal
+ *   revealDone(guildId) - whether the last reveal morning has posted
  *   postLoreDrops(client, now) / scheduleLoreDrops(client)
  *   loreDayIndex(startDay, today), addDays(day, n) - pure, for the tests
  */
@@ -27,19 +35,20 @@ const { resolveChannel } = require('./resolveChannel');
 const { findAnnounceChannel } = require('./findAnnounceChannel');
 const { easternDay } = require('../commands/passive/shop');
 const loreDrops = require('../flavor_text/loreDrops');
+const { REVEAL_MORNINGS } = require('../flavor_text/revealMornings');
 
 const TIMEZONE = 'America/New_York';
 const LORE_CRON = '0 9 * * *';
 const LORE_HOUR = 9;
 const EMBED_COLOR = 0xd4af37; // heraldic gold
+// How many relics must be claimed before the Herald reveals himself.
+const REVEAL_AFTER = 5;
 
-const BASE_TIERS = [0, 1, 2];
-const HARD = 2;
+const BASE_TIERS = [0, 1, 2, 3];
 const EXTREME = 3;
 const MAX = 4;
 // What each tier's first win records, and the tier it opens.
 const MILESTONES = {
-    [HARD]: { field: 'hardClearedAt', opens: EXTREME, counter: 'win_hard' },
     [EXTREME]: { field: 'extremeClearedAt', opens: MAX, counter: 'win_extreme' },
     [MAX]: { field: 'maxClearedAt' },
 };
@@ -51,25 +60,25 @@ const addDays = (day, n) => {
     return date.toISOString().slice(0, 10);
 };
 
-// Which lore drop is due today, 0-based, or -1 if none.
-const loreDayIndex = (startDay, today) => {
+// Which of `count` daily posts begun on `startDay` is due today, 0-based,
+// or -1 if none: the lore drops by default.
+const loreDayIndex = (startDay, today, count = loreDrops.length) => {
     if (!startDay) return -1;
     const index = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${startDay}T00:00:00Z`)) / 86400000);
-    return index >= 0 && index < loreDrops.length ? index : -1;
+    return index >= 0 && index < count ? index : -1;
 };
 
 const tiersFrom = (campaign) => [
     ...BASE_TIERS,
-    ...(campaign.hardClearedAt ? [EXTREME] : []),
     ...(campaign.extremeClearedAt ? [MAX] : []),
 ];
 
-// A guild that cleared Hard or Extreme before the campaign existed: any
-// member with a win at that tier counts. Runs once per guild.
+// A guild that cleared Extreme before the campaign existed: any member with
+// an Extreme win counts. Runs once per guild.
 const backfill = async (guildId, campaign) => {
     const all = await pointsStore.getAllAchievements(guildId);
     const anyWin = (counter) => [...all.values()].some((state) => (state.counters[counter] || 0) > 0);
-    for (const tier of [HARD, EXTREME]) {
+    for (const tier of [EXTREME]) {
         const { field, counter } = MILESTONES[tier];
         if (!campaign[field] && anyWin(counter) && await pointsStore.setCampaignOnce(guildId, field, 'backfilled')) {
             campaign[field] = 'backfilled';
@@ -97,31 +106,53 @@ const recordWin = async function (guildId, tier, now = new Date()) {
     return { opened: milestone.opens };
 };
 
-/* Posts today's lore drop in every guild that has one due and hasn't had it
- * yet. Each drop is marked as posted before it goes out, so it can only ever
- * go out once.
+// The trials open with the last lore drop: once it has been posted.
+const TRIALS_FIELD = `loreDrop${loreDrops.length}At`;
+const trialsOpen = async function (guildId) {
+    return Boolean((await pointsStore.getCampaign(guildId))[TRIALS_FIELD]);
+};
+
+// The Herald's reveal begins when the REVEAL_AFTER-th relic is claimed:
+// its mornings start the next day. True only for the claim that began it.
+const beginReveal = async function (guildId, echoes, now = new Date()) {
+    if (echoes < REVEAL_AFTER) return false;
+    return pointsStore.setCampaignOnce(guildId, 'revealStartDay', addDays(easternDay(now), 1));
+};
+
+const REVEAL_DONE_FIELD = `revealMorning${REVEAL_MORNINGS.length}At`;
+const revealDone = async function (guildId) {
+    return Boolean((await pointsStore.getCampaign(guildId))[REVEAL_DONE_FIELD]);
+};
+
+// The morning series: the lore drops, then the reveal. Each is marked as
+// posted before it goes out, so it can only ever go out once.
+const SERIES = [
+    { name: 'Lore', startField: 'loreStartDay', postedField: 'loreDrop', posts: loreDrops, title: (i, post) => `The Long Memory, day ${i + 1} of ${loreDrops.length}: ${post.title}` },
+    { name: 'Reveal', startField: 'revealStartDay', postedField: 'revealMorning', posts: REVEAL_MORNINGS, title: (i, post) => `The Herald, morning ${i + 1} of ${REVEAL_MORNINGS.length}: ${post.title}` },
+];
+
+/* Posts this morning's lore drop or reveal morning in every guild that has
+ * one due and hasn't had it yet.
  */
 const postLoreDrops = async function (client, now = new Date()) {
     const today = easternDay(now);
     for (const g of client.guilds.cache.values()) {
         try {
             const campaign = await pointsStore.getCampaign(g.id);
-            const index = loreDayIndex(campaign.loreStartDay, today);
-            if (index < 0) continue;
-            if (!await pointsStore.setCampaignOnce(g.id, `loreDrop${index + 1}At`, now.toISOString())) continue;
+            for (const series of SERIES) {
+                const index = loreDayIndex(campaign[series.startField], today, series.posts.length);
+                if (index < 0) continue;
+                if (!await pointsStore.setCampaignOnce(g.id, `${series.postedField}${index + 1}At`, now.toISOString())) continue;
 
-            const channel = await resolveChannel(g, 'lore', findAnnounceChannel);
-            if (!channel) {
-                console.log(`Lore (guild ${g.id}): no channel to post day ${index + 1} in; skipped.`);
-                continue;
+                const channel = await resolveChannel(g, 'lore', findAnnounceChannel);
+                if (!channel) {
+                    console.log(`${series.name} (guild ${g.id}): no channel to post day ${index + 1} in; skipped.`);
+                    continue;
+                }
+                const post = series.posts[index];
+                await channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle(series.title(index, post)).setDescription(post.text)] });
+                console.log(`${series.name} (guild ${g.id}): posted day ${index + 1}, "${post.title}".`);
             }
-            const drop = loreDrops[index];
-            const embed = new EmbedBuilder()
-                .setColor(EMBED_COLOR)
-                .setTitle(`The Long Memory, day ${index + 1} of ${loreDrops.length}: ${drop.title}`)
-                .setDescription(drop.text);
-            await channel.send({ embeds: [embed] });
-            console.log(`Lore (guild ${g.id}): posted day ${index + 1}, "${drop.title}".`);
         } catch (error) {
             console.error(`Lore drop failed for guild "${g.name}":`, error);
         }
@@ -146,4 +177,4 @@ const scheduleLoreDrops = function (client) {
     console.log(`Lore drops scheduled: "${LORE_CRON}" (${TIMEZONE}), with a catch-up after startup.`);
 };
 
-module.exports = { openTiers, recordWin, postLoreDrops, scheduleLoreDrops, loreDayIndex, addDays, tiersFrom, MILESTONES };
+module.exports = { openTiers, recordWin, trialsOpen, beginReveal, revealDone, REVEAL_AFTER, postLoreDrops, scheduleLoreDrops, loreDayIndex, addDays, tiersFrom, MILESTONES };

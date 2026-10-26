@@ -3,8 +3,8 @@
  * Once a day (placed by src/dailyLineup.js so it never overlaps the trivia,
  * puzzle or shop), the Herald announces that an unnamed threat stirs. Members
  * The difficulty is rolled when the threat is posted, equally likely among
- * the tiers the server has opened: Easy, Medium and Hard to begin with, then
- * Extreme after its first Hard win and Max after its first Extreme win (see
+ * the tiers the server has opened: Easy, Medium, Hard and Extreme to begin
+ * with, then Max after its first Extreme win (see
  * src/campaign.js, which also starts the lore drops on the first Max win),
  * and announced up front so members
  * can decide whether to answer. They click "Join the party" (up to
@@ -19,10 +19,12 @@
  *   - A random boss from the rolled tier (encounterBosses.js) is revealed.
  *   - Boss fit = (the cheapest gear price of that tier's rarity in each slot,
  *     summed over all slots) x that tier's assumed kit coverage x party
- *     size. Coverage is 1/2 for Easy (half the slots in Common), 3/4 for
- *     Medium, and a full kit from Hard up (see TIER_COVERAGE), since players
- *     fill slots gradually. Max is the exception: halfway between Extreme and
- *     a full Legendary kit, so Legendary gear has the edge on it.
+ *     size. Coverage is 3/4 for Easy (three-quarters of the slots in Common),
+ *     7/8 for Medium, a full kit for Hard and 85% of an Epic kit for Extreme
+ *     (see TIER_COVERAGE), since players fill slots gradually. Max is the
+ *     exception: a tenth of the way from a full Epic kit to a full Legendary
+ *     one, so a party mostly in Epic gear has a fair shot and Legendary gear
+ *     has the edge.
  *   - Party fit = each member's equipped fit (read at battle time) x their
  *     stance multiplier, summed. A member whose bags hold finer gear than
  *     they wear is offered "Suit up in my best" in their prompt; if chosen,
@@ -135,9 +137,10 @@ const pick = (lines, random = Math.random) => lines[Math.floor(random() * lines.
 // item), scaled by how much of a kit a party at that tier is assumed to
 // have. Players build up gear slot by slot, so the low tiers are a little
 // lenient: Easy assumes three-quarters of the slots filled with Common,
-// Medium seven-eighths with Uncommon, and from Hard up a full kit.
+// Medium seven-eighths with Uncommon, Hard a full kit, and Extreme 85% of
+// an Epic kit, since Epic gear is slow to gather.
 const TIER_FLOOR = [10, 15, 25, 35, 50];
-const TIER_COVERAGE = [0.75, 0.875, 1, 1, 1];
+const TIER_COVERAGE = [0.75, 0.875, 1, 0.85, 1];
 
 // The chance a party always loses at each tier, however overgeared. Easy and
 // Medium have none, so a strong enough party is sure of the win; from Hard up
@@ -145,21 +148,22 @@ const TIER_COVERAGE = [0.75, 0.875, 1, 1, 1];
 const TIER_LOSS_FLOOR = [0, 0, 0.01, 0.03, 0.05];
 const EXTREME_TIER = 3;
 const MAX_TIER = 4;
-const kitFitFor = (tier) => {
+const fullKitFor = (tier) => {
     const rarity = catalog.RARITIES[tier];
-    const fullKit = catalog.GEAR_SLOTS.reduce((sum, slot) => {
+    return catalog.GEAR_SLOTS.reduce((sum, slot) => {
         const prices = catalog.GEAR.filter((e) => e.slot === slot && catalog.rarityFor(e.price) === rarity).map((e) => e.price);
         return sum + (prices.length ? Math.min(...prices) : TIER_FLOOR[tier]);
     }, 0);
-    return Math.round(fullKit * TIER_COVERAGE[tier]);
 };
-// Max sits halfway between Extreme and a full Legendary kit, so a party in
-// Legendary gear goes in with the edge. A full Legendary kit is kept for the
-// Herald himself (HERALD_FIT_PER_ENTRANT), the one foe meant to be an even match.
-const bossFitPerEntrant = (tier) => (tier === MAX_TIER
-    ? Math.round((kitFitFor(EXTREME_TIER) + kitFitFor(MAX_TIER)) / 2)
-    : kitFitFor(tier));
-const HERALD_FIT_PER_ENTRANT = kitFitFor(MAX_TIER);
+const kitFitFor = (tier) => Math.round(fullKitFor(tier) * TIER_COVERAGE[tier]);
+// A fit `share` of the way from a full Epic kit to a full Legendary one.
+const epicToLegendary = (share) => Math.round(fullKitFor(EXTREME_TIER) + share * (fullKitFor(MAX_TIER) - fullKitFor(EXTREME_TIER)));
+// Max sits a tenth of the way from a full Epic kit to a full Legendary one,
+// so a party mostly in Epic gear has a fair shot and Legendary gear has the
+// edge. The Herald himself (HERALD_FIT_PER_ENTRANT) sits higher, at three
+// tenths, so he is harder on paper than any Guardian.
+const bossFitPerEntrant = (tier) => (tier === MAX_TIER ? epicToLegendary(0.1) : kitFitFor(tier));
+const HERALD_FIT_PER_ENTRANT = epicToLegendary(0.3);
 
 // Chance (0-1) of a win, from party fit / boss fit, capped by the tier's
 // loss floor. Without a tier, the uncapped curve (reaching 100% at 140%).
@@ -168,10 +172,10 @@ const winChance = (ratio, tier = null) => {
     return tier === null ? raw : Math.min(raw, 1 - TIER_LOSS_FLOOR[tier]);
 };
 
-// The tiers every server can roll, each equally likely: Easy, Medium and Hard.
-// The first Hard win opens Extreme, and the first Extreme win opens Max (see
-// src/campaign.js); the real encounter rolls from the server's open tiers.
-const OPEN_TIERS = [0, 1, 2];
+// The tiers every server can roll, each equally likely: Easy, Medium, Hard
+// and Extreme. The first Extreme win opens Max (see src/campaign.js); the
+// real encounter rolls from the server's open tiers.
+const OPEN_TIERS = [0, 1, 2, 3];
 const rollTier = (random = Math.random, tiers = OPEN_TIERS) => tiers[Math.floor(random() * tiers.length)];
 
 // The party's win chance at `tier` from each member's { fit, stance } (no
@@ -504,6 +508,94 @@ const lootChoices = (guildId, members, item) => Promise.all(members.map(async (m
     return { userId: m.userId, displayName: m.displayName, choice: upgrade ? 'need' : 'greed' };
 }));
 
+/* Drops each of `items` for the party and rolls for it, the herald needing
+ * or greeding for everyone (lootChoices), then grants it, one piece at a
+ * time, so a member who wins the first is checked against it for the
+ * second. Shared by the encounter and the Herald's battle
+ * (src/heraldBattle.js). `members` is [{ userId, displayName }];
+ * `sourceName` names who dropped it, as in "Loot dropped from <sourceName>".
+ * Each roll gets its own post, a beat apart, for a little suspense; then the
+ * result lands in an embed styled like the loot post.
+ */
+const rollForLoot = async (g, channel, { members, items, sourceName, roundId, persist, rollDelayMs = ROLL_DELAY_MS, tag }) => {
+    for (const [k, item] of items.entries()) {
+        await channel.send({ embeds: [new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle(`Loot dropped from ${sourceName}, ${k + 1} of ${items.length}`)
+            .setDescription(`${pick(flavor.encounterLootLines(itemLabel(item)))}\n\nSlot: ${item.slot}. The herald rolls for the whole party: **Need** for each member it would be an upgrade for, finer than anything they own for the slot, worn or in their bags, and **Greed** for the rest. If anyone needs, only the needers roll.`)
+            .setTimestamp()] });
+        const choices = await lootChoices(g.id, members, item);
+        const { rounds, winner } = rollLoot(choices);
+        const recordLoot = (result) => recordHistory('loot', {
+            guildId: g.id,
+            encounterId: roundId,
+            rehearsal: !persist,
+            item: item.id,
+            slot: item.slot,
+            price: item.price,
+            choices: choices.map((c) => ({ userId: c.userId, name: c.displayName, choice: c.choice })),
+            rolls: JSON.stringify(rounds),
+            winnerId: winner ? winner.userId : null,
+            result,
+        });
+
+        if (rounds.length) {
+            await channel.send(`The dice are cast for **${itemLabel(item)}**...`);
+            for (let i = 0; i < rounds.length; i++) {
+                if (i) {
+                    await delay(rollDelayMs);
+                    await channel.send(`A tie at the top! **Re-roll** between ${rounds[i].map((r) => r.displayName).join(' and ')}...`);
+                }
+                for (const r of rounds[i]) {
+                    await delay(rollDelayMs);
+                    await channel.send(`${r.displayName} rolls **${r.roll}** for ${r.choice === 'need' ? 'Need' : 'Greed'}.`);
+                }
+            }
+            await delay(rollDelayMs);
+        }
+
+        // Who rolled what, needs first, skipping an empty group.
+        const footnotes = [['need', 'Need'], ['greed', 'Greed']]
+            .map(([key, label]) => [label, choices.filter((c) => c.choice === key).map((c) => c.displayName)])
+            .filter(([, names]) => names.length)
+            .map(([label, names]) => `**${label}:** ${names.join(', ')}`);
+        if (footnotes.length) footnotes.unshift('');
+
+        const resultEmbed = new EmbedBuilder().setColor(EMBED_COLOR).setTimestamp();
+
+        if (!winner) {
+            console.log(`${tag}: everyone passed on ${item.name}.`);
+            recordLoot('passed');
+            resultEmbed
+                .setTitle(`Loot left behind: ${itemLabel(item)}`)
+                .setDescription([pick(flavor.encounterLootAllPassedLines(itemLabel(item))), ...footnotes].join('\n'));
+            await channel.send({ embeds: [resultEmbed] });
+            continue;
+        }
+
+        let result = 'skipped';
+        if (persist) {
+            result = await pointsStore.grantGear(g.id, winner.userId, winner.displayName, item.id, item.slot).catch((error) => {
+                console.error(`${tag}: failed to grant loot:`, error.message);
+                return 'failed';
+            });
+        }
+        console.log(`${tag}: ${winner.displayName} (${winner.userId}) won ${item.name} (${result}).`);
+        const granted = result === 'equipped' || result === 'bagged';
+        recordLoot(result);
+        const note = !persist ? '*A rehearsal: the loot was not truly granted.*' : result === 'equipped' ? 'It is equipped at once.' : 'It goes to their bag.';
+        resultEmbed
+            .setTitle(`Loot awarded: ${itemLabel(item)}`)
+            .setDescription([`${pick(flavor.encounterLootWonLines(winner.displayName, itemLabel(item)))} ${note}`, ...footnotes].join('\n'));
+        await channel.send({ embeds: [resultEmbed] });
+        if (granted) {
+            const member = { userId: winner.userId, displayName: winner.displayName };
+            await achievements.record(g.id, [{ ...member, counts: { loot: 1 } }], channel);
+            await achievements.checkStats(g.id, [member], channel);
+        }
+    }
+};
+
 // ---- one encounter ------------------------------------------------------------
 
 const runEncounterIn = async (g, channel, opts) => {
@@ -712,8 +804,8 @@ const runEncounterIn = async (g, channel, opts) => {
             counts: { ...shared, ...(m === killer ? { heroics: 1 } : {}) },
         })), channel);
 
-        // The server's first win at Hard opens Extreme, at Extreme opens Max,
-        // and at Max starts the lore drops (src/campaign.js).
+        // The server's first Extreme win opens Max, and its first Max win
+        // starts the lore drops (src/campaign.js).
         const milestone = await campaign.recordWin(g.id, tier).catch((error) => {
             console.error(`${tag}: failed to record the campaign milestone:`, error.message);
             return null;
@@ -779,87 +871,7 @@ const runEncounterIn = async (g, channel, opts) => {
         });
     }
 
-    // Dropped, decided and granted one piece at a time, so a member who wins
-    // the first is checked against it for the second. The herald needs or
-    // greeds for everyone (lootChoices); no one is asked. Each roll gets its
-    // own post, a beat apart, for a little suspense; then the result lands in
-    // an embed styled like the loot post.
-    for (const [k, item] of items.entries()) {
-        await channel.send({ embeds: [new EmbedBuilder()
-            .setColor(EMBED_COLOR)
-            .setTitle(`Loot dropped from ${boss.name}, ${k + 1} of ${items.length}`)
-            .setDescription(`${pick(flavor.encounterLootLines(itemLabel(item)))}\n\nSlot: ${item.slot}. The herald rolls for the whole party: **Need** for each member it would be an upgrade for, finer than anything they own for the slot, worn or in their bags, and **Greed** for the rest. If anyone needs, only the needers roll.`)
-            .setTimestamp()] });
-        const choices = await lootChoices(g.id, ready, item);
-        const { rounds, winner } = rollLoot(choices);
-        const recordLoot = (result) => recordHistory('loot', {
-            guildId: g.id,
-            encounterId: roundId,
-            rehearsal: !persist,
-            item: item.id,
-            slot: item.slot,
-            price: item.price,
-            choices: choices.map((c) => ({ userId: c.userId, name: c.displayName, choice: c.choice })),
-            rolls: JSON.stringify(rounds),
-            winnerId: winner ? winner.userId : null,
-            result,
-        });
-
-        if (rounds.length) {
-            await channel.send(`The dice are cast for **${itemLabel(item)}**...`);
-            for (let i = 0; i < rounds.length; i++) {
-                if (i) {
-                    await delay(rollDelayMs);
-                    await channel.send(`A tie at the top! **Re-roll** between ${rounds[i].map((r) => r.displayName).join(' and ')}...`);
-                }
-                for (const r of rounds[i]) {
-                    await delay(rollDelayMs);
-                    await channel.send(`${r.displayName} rolls **${r.roll}** for ${r.choice === 'need' ? 'Need' : 'Greed'}.`);
-                }
-            }
-            await delay(rollDelayMs);
-        }
-
-        // Who rolled what, needs first, skipping an empty group.
-        const footnotes = [['need', 'Need'], ['greed', 'Greed']]
-            .map(([key, label]) => [label, choices.filter((c) => c.choice === key).map((c) => c.displayName)])
-            .filter(([, names]) => names.length)
-            .map(([label, names]) => `**${label}:** ${names.join(', ')}`);
-        if (footnotes.length) footnotes.unshift('');
-
-        const resultEmbed = new EmbedBuilder().setColor(EMBED_COLOR).setTimestamp();
-
-        if (!winner) {
-            console.log(`${tag}: everyone passed on ${item.name}.`);
-            recordLoot('passed');
-            resultEmbed
-                .setTitle(`Loot left behind: ${itemLabel(item)}`)
-                .setDescription([pick(flavor.encounterLootAllPassedLines(itemLabel(item))), ...footnotes].join('\n'));
-            await channel.send({ embeds: [resultEmbed] });
-            continue;
-        }
-
-        let result = 'skipped';
-        if (persist) {
-            result = await pointsStore.grantGear(g.id, winner.userId, winner.displayName, item.id, item.slot).catch((error) => {
-                console.error(`${tag}: failed to grant loot:`, error.message);
-                return 'failed';
-            });
-        }
-        console.log(`${tag}: ${winner.displayName} (${winner.userId}) won ${item.name} (${result}).`);
-        const granted = result === 'equipped' || result === 'bagged';
-        recordLoot(result);
-        const note = !persist ? '*A rehearsal: the loot was not truly granted.*' : result === 'equipped' ? 'It is equipped at once.' : 'It goes to their bag.';
-        resultEmbed
-            .setTitle(`Loot awarded: ${itemLabel(item)}`)
-            .setDescription([`${pick(flavor.encounterLootWonLines(winner.displayName, itemLabel(item)))} ${note}`, ...footnotes].join('\n'));
-        await channel.send({ embeds: [resultEmbed] });
-        if (granted) {
-            const member = { userId: winner.userId, displayName: winner.displayName };
-            await achievements.record(g.id, [{ ...member, counts: { loot: 1 } }], channel);
-            await achievements.checkStats(g.id, [member], channel);
-        }
-    }
+    await rollForLoot(g, channel, { members: ready, items, sourceName: boss.name, roundId, persist, rollDelayMs, tag });
 };
 
 /* Run one encounter.
@@ -905,6 +917,14 @@ const runEncounter = async function (client, options = {}) {
 
 module.exports = {
     runEncounter,
+    rollForLoot,
+    kitsOf,
+    fieldValue,
+    itemLabel,
+    minutesLabel,
+    delay,
+    MAX_TIER,
+    ROLL_DELAY_MS,
     bossFitPerEntrant,
     HERALD_FIT_PER_ENTRANT,
     winChance,

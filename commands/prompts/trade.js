@@ -188,6 +188,12 @@ const trade = async function (interaction) {
             return;
         }
 
+        // A relic chose its Echo, and stays with them, either way round.
+        if (give.entry && give.entry.unique) {
+            await interaction.editReply(pick(flavor.tradeUniqueLines(give.name)));
+            return;
+        }
+
         // The offer is a whole number of points, or the name of a piece of
         // gear or a pet the other member owns.
         const receiverChar = await pointsStore.getCharacter(guildId, receiver.id);
@@ -196,6 +202,10 @@ const trade = async function (interaction) {
         if (points === null) {
             const gear = matchEntry(GEAR, typedOffer);
             want = gear ? { name: gear.name, entry: gear } : goodsIn(receiverChar, typedOffer);
+        }
+        if (want && want.entry && want.entry.unique) {
+            await interaction.editReply(pick(flavor.tradeUniqueLines(want.name)));
+            return;
         }
         if (points === 0 || (points === null && !want)) {
             await interaction.editReply(pick(flavor.tradeBadOfferLines(typedOffer)));
