@@ -5,8 +5,13 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-26
+
+- Shop never stocks a title someone already owns (`db06bcb`)
+
 ## 2026-10-25
 
+- Regenerate UPDATELOG.md (`5992996`)
 - WoW roster: /implaying and /wowplayers (`be3aec6`)
 - Encounter loot: the herald needs or greeds for everyone (`8bf5031`)
 - Encounters start after 9 AM Pacific (`b7f8e60`)
