@@ -5,8 +5,15 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-25
+
+- WoW roster: /implaying and /wowplayers (`be3aec6`)
+- Encounter loot: the herald needs or greeds for everyone (`8bf5031`)
+- Encounters start after 9 AM Pacific (`b7f8e60`)
+
 ## 2026-10-22
 
+- Regenerate UPDATELOG.md (`84bc1e2`)
 - Birthdays: save them in DynamoDB with admin commands (`586e0b4`)
 
 ## 2026-10-21
