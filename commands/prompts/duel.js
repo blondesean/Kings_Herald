@@ -36,6 +36,7 @@ const {
 const pointsStore = require('../../src/pointsStore');
 const achievements = require('../../src/achievements');
 const { fitScore, bestKit } = require('../../src/character');
+const { POSES, DEFAULT_POSE, findPose } = require('../../src/poses');
 const flavor = require('../../flavor_text');
 
 // Comma-separated guild IDs where self-dueling is permitted (for testing).
@@ -50,6 +51,7 @@ const RPS_CHOICE_WINDOW_MS = 30 * 1000;
 const SUIT_UP_WINDOW_MS = 30 * 1000;
 const DEATH_ROLL_START = 10000;
 const DEATH_ROLL_DELAY_MS = 5 * 1000;
+const FIT_DUEL_BEAT_MS = 5 * 1000;
 
 // Death Roll commentary thresholds (see rollCommentary below).
 const DEATH_ROLL_LOW_ROLL = 5; // a roll under this is "a hair's breadth from oblivion"
@@ -263,10 +265,28 @@ const promptSuitUp = async (repliable, character = {}) => {
     }
 };
 
-// Settles a Fit Duel. The fits are read fresh, so gear changed during the
-// accept window counts. Returns [winner, loser].
-const resolveFitDuel = async (channel, challenger, target, challengerFit, targetFit) => {
+// The victor's /pose figure as a code block, with the line naming it.
+// Falls back to standing if their pose can't be read.
+const victorPose = async (guildId, winner) => {
+    let pose = null;
+    try {
+        pose = findPose(await pointsStore.getPose(guildId, winner.id));
+    } catch (error) {
+        console.error('duel: could not read the victor\'s pose:', error);
+    }
+    pose = pose || POSES[DEFAULT_POSE - 1];
+    return `${flavor.fitDuelVictorPoseLine(displayNameOf(winner), pose.name)}\n\`\`\`\n${pose.lines.join('\n')}\n\`\`\``;
+};
+
+// Settles a Fit Duel: the opening, a build-up of FIT_DUEL_BEAT_MS-spaced
+// posts, then the victor in their /pose with the result. The fits are read
+// fresh, so gear changed during the accept window counts. Returns [winner, loser].
+const resolveFitDuel = async (channel, guildId, challenger, target, challengerFit, targetFit) => {
     await channel.send(pick(flavor.fitDuelOpenLines(displayNameOf(challenger), displayNameOf(target))));
+    for (const beat of flavor.fitDuelBuildupBeats(displayNameOf(challenger), displayNameOf(target), challengerFit, targetFit)) {
+        await delay(FIT_DUEL_BEAT_MS);
+        await channel.send(pick(beat));
+    }
 
     const challengerWins = Math.random() < fitWinChance(challengerFit, targetFit);
     const [winner, loser] = challengerWins ? [challenger, target] : [target, challenger];
@@ -280,7 +300,9 @@ const resolveFitDuel = async (channel, challenger, target, challengerFit, target
     else if (winnerFit > loserFit) line = pick(flavor.fitDuelFavoredLines(winnerName, loserName, winnerFit, loserFit));
     else if (winnerFit < loserFit) line = pick(flavor.fitDuelUpsetLines(winnerName, loserName, winnerFit, loserFit));
     else line = pick(flavor.fitDuelEvenLines(winnerName, loserName));
-    await channel.send(line);
+    const figure = await victorPose(guildId, winner);
+    await delay(FIT_DUEL_BEAT_MS);
+    await channel.send(`${figure}\n${line}`);
 
     return [winner, loser];
 };
@@ -467,7 +489,7 @@ const duel = async function (interaction) {
             ]);
             const suited = [[challengerMember, challengerKit], [targetMember, targetKit]].filter(([, k]) => k.suitedUp).map(([m]) => displayNameOf(m));
             if (suited.length) logDuel(guild.id, `Fit Duel: suited up in their best: ${suited.join(', ')}.`);
-            [winner, loser] = await resolveFitDuel(channel, challengerMember, targetMember, challengerKit.fit, targetKit.fit);
+            [winner, loser] = await resolveFitDuel(channel, guild.id, challengerMember, targetMember, challengerKit.fit, targetKit.fit);
         } else {
             [winner, loser] = await resolveDeathRoll(channel, challengerMember, targetMember);
         }
@@ -574,4 +596,5 @@ module.exports = {
     ],
     run: duel,
     fitWinChance,
+    resolveFitDuel,
 };

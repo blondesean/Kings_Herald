@@ -23,7 +23,9 @@ const achievements = require('../../src/achievements');
 const catalog = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
 
-const TRADE_WINDOW_MS = 5 * 60 * 1000;
+// Longer than the 15 minutes an interaction token lives, so once the offer is
+// posted, the herald answers through the offer message and the clicks, not the command.
+const TRADE_WINDOW_MS = 30 * 60 * 1000;
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 
@@ -170,7 +172,7 @@ const trade = async function (interaction) {
         await message.edit({ components: [buttons(true)] }).catch(() => {});
 
         if (!answer) {
-            await interaction.followUp(pick(flavor.tradeExpiredLines(receiver.displayName)));
+            await message.reply({ content: pick(flavor.tradeExpiredLines(receiver.displayName)), allowedMentions: { repliedUser: false } });
             return;
         }
         if (answer.customId === 'trade_decline') {
@@ -179,7 +181,7 @@ const trade = async function (interaction) {
             return;
         }
 
-        // Both sides may have changed in five minutes, so check again.
+        // Both sides may have changed while the offer waited, so check again.
         await answer.deferReply();
         const plan = await readPlan(guildId, offer);
         if (plan.error) {
