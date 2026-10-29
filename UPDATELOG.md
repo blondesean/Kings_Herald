@@ -5,8 +5,14 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-28
+
+- Word ladder: 328 puzzles, themed ladders, spare steps and a cleaner dictionary (`4a48558`)
+- Trades wait 30 minutes; Fit Duels build up and show the victor's pose (`3791eda`)
+
 ## 2026-10-26
 
+- Regenerate UPDATELOG.md (`ae8014d`)
 - Shop never stocks a title someone already owns (`db06bcb`)
 
 ## 2026-10-25
