@@ -3,8 +3,13 @@
  * The dictionary is wordLadderWords.txt in this directory: every word of 3-7
  * letters from ENABLE ("Enhanced North American Benchmark Lexicon", the
  * public-domain Scrabble-style word list), lowercase, one per line, no proper
- * nouns or abbreviations. It is read once on first use and indexed by length,
- * since a ladder never changes a word's length.
+ * nouns or abbreviations. Two lists beside it adjust it:
+ *   wordLadderAdded.txt   - everyday words ENABLE lacks, like "email"
+ *   wordLadderBlocked.txt - slurs and obscene words the game refuses, so the
+ *                           herald never announces one. Stored ROT13, so the
+ *                           file doesn't read as a wall of slurs
+ * Lines starting with # are comments. It is all read once on first use and
+ * indexed by length, since a ladder never changes a word's length.
  *
  * Exposes:
  *   isWord(word)                          - is it in the dictionary
@@ -23,15 +28,25 @@ const fs = require('fs');
 const path = require('path');
 
 const WORDS_FILE = path.join(__dirname, 'wordLadderWords.txt');
+const ADDED_FILE = path.join(__dirname, 'wordLadderAdded.txt');
+const BLOCKED_FILE = path.join(__dirname, 'wordLadderBlocked.txt');
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
+
+const rot13 = (word) => word.replace(/[a-z]/g, (c) => String.fromCharCode((c.charCodeAt(0) - 97 + 13) % 26 + 97));
+
+const readWords = (file) => fs.readFileSync(file, 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
 
 let wordsByLength = null;
 
 const load = () => {
     if (wordsByLength) return wordsByLength;
+    const blocked = new Set(readWords(BLOCKED_FILE).map(rot13));
     wordsByLength = new Map();
-    for (const word of fs.readFileSync(WORDS_FILE, 'utf8').split(/\r?\n/)) {
-        if (!word) continue;
+    for (const word of [...readWords(WORDS_FILE), ...readWords(ADDED_FILE)]) {
+        if (blocked.has(word)) continue;
         if (!wordsByLength.has(word.length)) wordsByLength.set(word.length, new Set());
         wordsByLength.get(word.length).add(word);
     }
