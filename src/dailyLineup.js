@@ -28,7 +28,7 @@
  * Exposes:
  *   scheduleDailyLineup(client) - registers the daily crons (call once, on ready)
  * The daily boss encounter (commands/passive/encounter.js) is placed the
- * same way, reserving ENCOUNTER_WINDOW_MS: an hour to form the party plus a
+ * same way, reserving ENCOUNTER_WINDOW_MS: three hours to form the party plus a
  * quarter hour for the battle and loot rolls, and never before 9 AM Pacific
  * (ENCOUNTER_EARLIEST_SLOT).
  *

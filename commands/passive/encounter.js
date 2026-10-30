@@ -80,7 +80,7 @@ const { easternDay } = require('./shop');
 const { DIFFICULTIES, BOSSES } = require('./encounterBosses');
 const flavor = require('../../flavor_text');
 
-const JOIN_WINDOW_MS = 60 * 60 * 1000;
+const JOIN_WINDOW_MS = 3 * 60 * 60 * 1000;
 // The herald rolls the loot himself, with no window to wait on; this is the
 // time the daily lineup sets aside after the join window for the battle and
 // the roll posts.
@@ -833,7 +833,7 @@ const runEncounterIn = async (g, channel, opts) => {
  *   tier         - the difficulty, 0 (Easy) to 4 (Max) (default: rolled from OPEN_TIERS)
  *   maxParty     - most members who can join (default MAX_PARTY, 20)
  *   minParty     - fewest who can fight (default MIN_PARTY, 3)
- *   joinWindowMs - how long the party can form (default 1 hour)
+ *   joinWindowMs - how long the party can form (default 3 hours)
  *   checkIntervalMs - how often the forming party's odds are checked (default 15 minutes)
  *   rollDelayMs  - pause between loot roll posts (default 2 seconds)
  *   runLabel     - tags log lines (default: "scheduled" if persist, else "preview")

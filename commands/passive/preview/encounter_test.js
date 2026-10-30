@@ -7,7 +7,7 @@
  * secret choices, battle, loot rolls — but as a rehearsal: no injuries are
  * recorded, injuries don't block joining, and loot isn't granted (the herald
  * still decides each Need or Greed from the testers' real gear). `minutes`
- * shortens the join window (default 2) so a test doesn't take an hour, and
+ * shortens the join window (default 1) so a test doesn't take three hours, and
  * the roster checks come every quarter
  * of it; `party` changes the size cap (default
  * MAX_PARTY), and a full, ready party marches early; `min` is the fewest who
@@ -20,7 +20,7 @@ const { runEncounter, MAX_PARTY, MIN_PARTY } = require('../encounter');
 const { DIFFICULTIES } = require('../encounterBosses');
 
 const encounterTest = async function (interaction) {
-    const minutes = interaction.options.getInteger('minutes') ?? 2;
+    const minutes = interaction.options.getInteger('minutes') ?? 1;
     const maxParty = interaction.options.getInteger('party') ?? MAX_PARTY;
     const minParty = Math.min(interaction.options.getInteger('min') ?? 1, maxParty);
     const tier = interaction.options.getInteger('difficulty');
@@ -36,7 +36,7 @@ const encounterTest = async function (interaction) {
             maxParty,
             minParty,
             joinWindowMs: minutes * 60 * 1000,
-            // Four roster checks an hour in the real one; a quarter of the window here.
+            // Every 15 minutes in the real one; a quarter of the window here.
             checkIntervalMs: minutes * 15 * 1000,
         });
     } catch (error) {
@@ -53,7 +53,7 @@ module.exports = {
     options: [
         {
             name: 'minutes',
-            description: 'Length of the join window (default 2)',
+            description: 'Length of the join window in minutes (default 1)',
             type: ApplicationCommandOptionType.Integer,
             required: false,
             minValue: 1,

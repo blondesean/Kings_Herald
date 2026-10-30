@@ -25,7 +25,7 @@ const helpGuides = {
             '',
             '**Fit and power.** Thy fit is the worth of the gear thou wearest. Dressed for show with finer arms in thy bags? Thy prompt offers **Suit up in my best**, and thou fightest in thy finest pieces for that battle alone. Thy wardrobe is never touched. Power is fit after thy stance. The party\'s power against the foe\'s, which is never told, sets the odds. Better gear means better odds, but victory is never quite certain.',
             '',
-            '**The march.** The party marches when 20 are ready, or an hour after the threat stirs. Fewer than 3, and no one marches. If thou choosest no stance, thou fightest Balanced.',
+            '**The march.** The party marches when 20 are ready, or three hours after the threat stirs. Fewer than 3, and no one marches. If thou choosest no stance, thou fightest Balanced.',
             '',
             '**Victory.** One hero lands the killing blow, and loot drops, one piece for every 2.5 in the party, rounded down: Common for Easy up to Legendary for Max. The herald rolls for thee: **Need** if the piece is finer than anything thou ownest for its slot, worn or in thy bags, **Greed** otherwise. Needers roll first.',
             '',
