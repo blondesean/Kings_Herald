@@ -27,6 +27,12 @@
  * puzzles with zero within-puzzle word collisions; 2 groups ("Types of
  * Bread" and "Keyboard Keys") didn't fit anywhere without colliding and
  * were left unused rather than forcing an awkward puzzle around them.
+ *
+ * The 23 puzzles after the revamp marker were written fresh, one difficulty
+ * color at a time, to widen the bank beyond "___ WORD" blanks and anagrams.
+ * They were packed so every board has at least one group of each color, no
+ * word appears twice on a board, and closely related categories, such as
+ * Norse gods and the gods behind the weekday names, never share one.
  */
 const connectionsPuzzles = () => [
     {
@@ -237,6 +243,237 @@ const connectionsPuzzles = () => [
             { category: "TYPES OF PEPPER", difficulty: 'yellow', words: ["JALAPENO", "HABANERO", "CAYENNE", "POBLANO"] },
             { category: "___ LINE", difficulty: 'blue', words: ["HEAD", "DEAD", "BASE", "HAIR"] },
             { category: "___ ROOM", difficulty: 'blue', words: ["BATH", "BED", "CLASS", "LOCKER"] },
+        ],
+    },
+    // The revamp: see the header comment.
+    {
+        groups: [
+            { category: "CAPITAL CITIES", difficulty: 'yellow', words: ["PARIS", "LONDON", "TOKYO", "ROME"] },
+            { category: "GEMSTONES", difficulty: 'yellow', words: ["RUBY", "EMERALD", "SAPPHIRE", "TOPAZ"] },
+            { category: "FRENCH SAUCES", difficulty: 'green', words: ["BECHAMEL", "HOLLANDAISE", "BEARNAISE", "VELOUTE"] },
+            { category: "MOONS IN THE SOLAR SYSTEM", difficulty: 'green', words: ["TITAN", "EUROPA", "IO", "GANYMEDE"] },
+            { category: "___ BREAKER", difficulty: 'blue', words: ["ICE", "TIE", "JAW", "HEART"] },
+            { category: "ADD A LETTER TO THE FRONT TO MAKE A WEAPON", difficulty: 'purple', words: ["WORD", "PEAR", "ACE", "HIP"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "SCHOOL SUPPLIES", difficulty: 'yellow', words: ["PENCIL", "ERASER", "RULER", "BACKPACK"] },
+            { category: "HOSPITAL JOBS", difficulty: 'yellow', words: ["NURSE", "SURGEON", "PARAMEDIC", "PHARMACIST"] },
+            { category: "US STATE CAPITALS", difficulty: 'green', words: ["BOISE", "ALBANY", "AUSTIN", "DENVER"] },
+            { category: "LANDLOCKED COUNTRIES", difficulty: 'blue', words: ["CHAD", "NEPAL", "BOLIVIA", "LAOS"] },
+            { category: "HIDE A GREEK GOD", difficulty: 'purple', words: ["THERAPY", "SHADES", "SQUARES", "GENEROSITY"] },
+            { category: "PALINDROMES", difficulty: 'purple', words: ["LEVEL", "REFER", "TENET", "STATS"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "AUSTRALIAN ANIMALS", difficulty: 'yellow', words: ["KANGAROO", "KOALA", "WOMBAT", "PLATYPUS"] },
+            { category: "CARD SUITS", difficulty: 'yellow', words: ["HEARTS", "DIAMONDS", "CLUBS", "SPADES"] },
+            { category: "NOBLE GASES", difficulty: 'green', words: ["NEON", "ARGON", "XENON", "KRYPTON"] },
+            { category: "PIECES OF ARMOR", difficulty: 'green', words: ["GAUNTLET", "VISOR", "GREAVES", "BREASTPLATE"] },
+            { category: "BOWLING TERMS", difficulty: 'blue', words: ["TURKEY", "GUTTER", "SPLIT", "STRIKE"] },
+            { category: "SOUNDS LIKE TWO LETTERS", difficulty: 'purple', words: ["ESSAY", "EXCEL", "CUTIE", "DECAY"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "WINTER OLYMPIC SPORTS", difficulty: 'yellow', words: ["BOBSLED", "CURLING", "LUGE", "BIATHLON"] },
+            { category: "THINGS IN A GOLF BAG", difficulty: 'yellow', words: ["DRIVER", "PUTTER", "WEDGE", "TEE"] },
+            { category: "FIRST GENERATION POKEMON", difficulty: 'green', words: ["PIKACHU", "BULBASAUR", "CHARMANDER", "SQUIRTLE"] },
+            { category: "PAPER ___", difficulty: 'blue', words: ["CLIP", "TRAIL", "WEIGHT", "TIGER"] },
+            { category: "SOUND LIKE DO RE MI NOTES", difficulty: 'purple', words: ["RAY", "FAR", "SEW", "ME"] },
+            { category: "RHYMES WITH TWO", difficulty: 'purple', words: ["THROUGH", "GNU", "THREW", "ADIEU"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "CANDY BARS", difficulty: 'yellow', words: ["SNICKERS", "TWIX", "KITKAT", "BUTTERFINGER"] },
+            { category: "SCIENCE LAB GEAR", difficulty: 'yellow', words: ["BEAKER", "MICROSCOPE", "GOGGLES", "PIPETTE"] },
+            { category: "PARTS OF SPEECH", difficulty: 'green', words: ["NOUN", "VERB", "ADJECTIVE", "ADVERB"] },
+            { category: "TENNIS TERMS", difficulty: 'green', words: ["DEUCE", "LOVE", "ACE", "VOLLEY"] },
+            { category: "SLANG FOR MONEY", difficulty: 'blue', words: ["BREAD", "MOOLAH", "CLAMS", "SCRATCH"] },
+            { category: "NATO ALPHABET WORDS", difficulty: 'purple', words: ["OSCAR", "LIMA", "UNIFORM", "WHISKEY"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "SHAPES", difficulty: 'yellow', words: ["CIRCLE", "OVAL", "HEXAGON", "PENTAGON"] },
+            { category: "MARIO CHARACTERS", difficulty: 'yellow', words: ["LUIGI", "PEACH", "YOSHI", "BOWSER"] },
+            { category: "AMERICAN MUSCLE CARS", difficulty: 'green', words: ["MUSTANG", "CORVETTE", "CAMARO", "CHARGER"] },
+            { category: "SHADES OF RED", difficulty: 'blue', words: ["CARDINAL", "CRIMSON", "BURGUNDY", "MAROON"] },
+            { category: "HIDE AN ANIMAL BACKWARDS", difficulty: 'purple', words: ["GUITAR", "TABLE", "PERFUME", "ATTACK"] },
+            { category: "DROP THE FIRST LETTER TO FIND A TREE", difficulty: 'purple', words: ["HELM", "SOAK", "SPINE", "CASH"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "GREEK GODS", difficulty: 'yellow', words: ["ZEUS", "POSEIDON", "HADES", "APOLLO"] },
+            { category: "SUPERHEROES", difficulty: 'yellow', words: ["BATMAN", "SUPERMAN", "SPIDERMAN", "WOLVERINE"] },
+            { category: "WOW CAPITAL CITIES", difficulty: 'green', words: ["STORMWIND", "ORGRIMMAR", "IRONFORGE", "UNDERCITY"] },
+            { category: "PARTS OF THE EAR", difficulty: 'blue', words: ["HAMMER", "ANVIL", "STIRRUP", "COCHLEA"] },
+            { category: "WAYS TO SAY NONSENSE", difficulty: 'blue', words: ["BALDERDASH", "POPPYCOCK", "HOGWASH", "MALARKEY"] },
+            { category: "STARTS WITH A FARM ANIMAL", difficulty: 'purple', words: ["PIGEON", "HENCHMAN", "GOATEE", "BULLETIN"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "MYTHICAL CREATURES", difficulty: 'yellow', words: ["DRAGON", "UNICORN", "GRIFFIN", "PHOENIX"] },
+            { category: "STATES OF MATTER", difficulty: 'yellow', words: ["SOLID", "LIQUID", "GAS", "PLASMA"] },
+            { category: "PEOPLE IN A COURTROOM", difficulty: 'green', words: ["JUDGE", "BAILIFF", "JUROR", "STENOGRAPHER"] },
+            { category: "WORLD CURRENCIES", difficulty: 'green', words: ["PESO", "RUPEE", "YEN", "KRONA"] },
+            { category: "___ CODE", difficulty: 'blue', words: ["MORSE", "ZIP", "DRESS", "CHEAT"] },
+            { category: "NAMED AFTER A PERSON", difficulty: 'purple', words: ["CARDIGAN", "BOYCOTT", "LEOTARD", "SAXOPHONE"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "PLAYGROUND EQUIPMENT", difficulty: 'yellow', words: ["SWING", "SLIDE", "SEESAW", "SANDBOX"] },
+            { category: "FURNITURE", difficulty: 'yellow', words: ["SOFA", "DRESSER", "BOOKSHELF", "RECLINER"] },
+            { category: "ROMAN EMPERORS", difficulty: 'green', words: ["NERO", "CALIGULA", "AUGUSTUS", "HADRIAN"] },
+            { category: "THINGS WITH SCALES", difficulty: 'green', words: ["PIANO", "MAP", "DRAGON", "PYTHON"] },
+            { category: "FAMOUS HORSES", difficulty: 'blue', words: ["SECRETARIAT", "SEABISCUIT", "SHADOWFAX", "TRIGGER"] },
+            { category: "INSTRUMENT PLUS ONE LETTER", difficulty: 'purple', words: ["SHARP", "BELLE", "THORN", "FLUTE"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "NFL TEAMS", difficulty: 'yellow', words: ["PATRIOTS", "COWBOYS", "PACKERS", "STEELERS"] },
+            { category: "BIRTHDAY PARTY ITEMS", difficulty: 'yellow', words: ["BALLOON", "CANDLE", "PRESENT", "CONFETTI"] },
+            { category: "GEN Z SLANG", difficulty: 'green', words: ["RIZZ", "BUSSIN", "SUS", "SKIBIDI"] },
+            { category: "STAR WARS PLANETS", difficulty: 'blue', words: ["TATOOINE", "HOTH", "ENDOR", "NABOO"] },
+            { category: "PARTS OF A BOOK", difficulty: 'blue', words: ["SPINE", "JACKET", "APPENDIX", "GLOSSARY"] },
+            { category: "NO VOWELS", difficulty: 'purple', words: ["RHYTHM", "CRYPT", "NYMPH", "TRYST"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "MUSIC GENRES", difficulty: 'yellow', words: ["COUNTRY", "REGGAE", "BLUES", "DISCO"] },
+            { category: "SEVEN DWARFS", difficulty: 'yellow', words: ["GRUMPY", "SLEEPY", "SNEEZY", "DOPEY"] },
+            { category: "NOBLE TITLES", difficulty: 'green', words: ["BARON", "EARL", "VISCOUNT", "MARQUIS"] },
+            { category: "BEATLES SONGS", difficulty: 'blue', words: ["YESTERDAY", "HELP", "SOMETHING", "MICHELLE"] },
+            { category: "CONTAINS ALL FIVE VOWELS", difficulty: 'purple', words: ["SEQUOIA", "DIALOGUE", "EUPHORIA", "AUTHORIZE"] },
+            { category: "LETTERS IN ALPHABETICAL ORDER", difficulty: 'purple', words: ["ALMOST", "BIOPSY", "CHINTZ", "GHOST"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "US STATES", difficulty: 'yellow', words: ["TEXAS", "OHIO", "FLORIDA", "MAINE"] },
+            { category: "WAYS TO SAY GOODBYE", difficulty: 'yellow', words: ["ADIOS", "CIAO", "SAYONARA", "FAREWELL"] },
+            { category: "THINGS WITH TEETH", difficulty: 'green', words: ["COMB", "SAW", "ZIPPER", "GEAR"] },
+            { category: "OLD TRADES NOW SURNAMES", difficulty: 'blue', words: ["COOPER", "FLETCHER", "THATCHER", "TANNER"] },
+            { category: "LETTERS IN REVERSE ALPHABETICAL ORDER", difficulty: 'purple', words: ["SPOON", "TROLLED", "WOLFED", "SPONGED"] },
+            { category: "ALSO MEANS STEAL", difficulty: 'purple', words: ["NICK", "PINCH", "SWIPE", "POACH"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "HALLOWEEN MONSTERS", difficulty: 'yellow', words: ["VAMPIRE", "ZOMBIE", "WEREWOLF", "MUMMY"] },
+            { category: "RESTAURANT JOBS", difficulty: 'yellow', words: ["CHEF", "WAITER", "BARTENDER", "DISHWASHER"] },
+            { category: "EGYPTIAN GODS", difficulty: 'green', words: ["RA", "ANUBIS", "OSIRIS", "HORUS"] },
+            { category: "FAMOUS SHIPS", difficulty: 'green', words: ["TITANIC", "MAYFLOWER", "BOUNTY", "LUSITANIA"] },
+            { category: "FAMOUS FICTIONAL DOGS", difficulty: 'blue', words: ["PLUTO", "LASSIE", "ODIE", "TOTO"] },
+            { category: "ADD A LETTER TO MAKE A COUNTRY", difficulty: 'purple', words: ["CAD", "CUB", "MALT", "RAN"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "CONTINENTS", difficulty: 'yellow', words: ["AFRICA", "ASIA", "EUROPE", "ANTARCTICA"] },
+            { category: "BABY ANIMALS", difficulty: 'yellow', words: ["PUPPY", "KITTEN", "CUB", "DUCKLING"] },
+            { category: "TYPES OF BREAD", difficulty: 'green', words: ["BAGUETTE", "CIABATTA", "BRIOCHE", "FOCACCIA"] },
+            { category: "STATE CAPITALS THAT ARE FIRST NAMES", difficulty: 'blue', words: ["AUSTIN", "MADISON", "HELENA", "JACKSON"] },
+            { category: "CLUE WEAPONS", difficulty: 'blue', words: ["CANDLESTICK", "REVOLVER", "WRENCH", "ROPE"] },
+            { category: "ANAGRAM OF A COUNTRY", difficulty: 'purple', words: ["PURE", "PAINS", "MAIL", "MOAN"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "HOGWARTS HOUSES", difficulty: 'yellow', words: ["GRYFFINDOR", "SLYTHERIN", "HUFFLEPUFF", "RAVENCLAW"] },
+            { category: "BREAKFAST FOODS", difficulty: 'yellow', words: ["PANCAKE", "WAFFLE", "OMELET", "BAGEL"] },
+            { category: "TEMPO MARKINGS", difficulty: 'green', words: ["ALLEGRO", "ADAGIO", "ANDANTE", "PRESTO"] },
+            { category: "MOUNTAIN RANGES", difficulty: 'green', words: ["ANDES", "ALPS", "HIMALAYAS", "ROCKIES"] },
+            { category: "CHESS TACTICS", difficulty: 'blue', words: ["FORK", "PIN", "SKEWER", "GAMBIT"] },
+            { category: "HOMOPHONES OF GREEK LETTERS", difficulty: 'purple', words: ["ROW", "PIE", "NEW", "SIGH"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "THINGS IN A TOOLBOX", difficulty: 'yellow', words: ["HAMMER", "WRENCH", "PLIERS", "SCREWDRIVER"] },
+            { category: "COFFEE DRINKS", difficulty: 'yellow', words: ["LATTE", "MOCHA", "ESPRESSO", "CAPPUCCINO"] },
+            { category: "ZODIAC SIGNS", difficulty: 'green', words: ["ARIES", "TAURUS", "GEMINI", "SCORPIO"] },
+            { category: "KNIGHTS OF THE ROUND TABLE", difficulty: 'blue', words: ["LANCELOT", "GAWAIN", "GALAHAD", "PERCIVAL"] },
+            { category: "WOW EXPANSIONS", difficulty: 'blue', words: ["LEGION", "CATACLYSM", "DRAGONFLIGHT", "SHADOWLANDS"] },
+            { category: "ANIMALS THAT MEAN PESTER", difficulty: 'purple', words: ["BADGER", "HOUND", "BUG", "NAG"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "WOW CLASSES", difficulty: 'yellow', words: ["MAGE", "ROGUE", "DRUID", "WARLOCK"] },
+            { category: "VIDEO GAME CONSOLES", difficulty: 'yellow', words: ["PLAYSTATION", "XBOX", "SWITCH", "GAMECUBE"] },
+            { category: "COCKTAILS", difficulty: 'green', words: ["MOJITO", "MARGARITA", "DAIQUIRI", "NEGRONI"] },
+            { category: "MYTHICAL MONSTERS", difficulty: 'blue', words: ["HYDRA", "CHIMERA", "CYCLOPS", "KRAKEN"] },
+            { category: "TWO PRONUNCIATIONS TWO MEANINGS", difficulty: 'purple', words: ["DOVE", "WOUND", "TEAR", "DESERT"] },
+            { category: "HOMOPHONES OF WEATHER", difficulty: 'purple', words: ["REIGN", "HALE", "MISSED", "WHETHER"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "WINTER ACCESSORIES", difficulty: 'yellow', words: ["SCARF", "MITTENS", "EARMUFFS", "GLOVES"] },
+            { category: "SOCIAL MEDIA APPS", difficulty: 'yellow', words: ["INSTAGRAM", "TIKTOK", "FACEBOOK", "SNAPCHAT"] },
+            { category: "GOLF SCORES", difficulty: 'green', words: ["BIRDIE", "EAGLE", "BOGEY", "ALBATROSS"] },
+            { category: "FAMOUS SWORDS", difficulty: 'blue', words: ["EXCALIBUR", "FROSTMOURNE", "ANDURIL", "STING"] },
+            { category: "STARTS WITH A BODY PART", difficulty: 'purple', words: ["LEGEND", "CHINCHILLA", "ARMADA", "SHINDIG"] },
+            { category: "THINGS WITH SHELLS", difficulty: 'purple', words: ["TACO", "OYSTER", "EGG", "TORTOISE"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "TYPES OF BIRD", difficulty: 'yellow', words: ["EAGLE", "ROBIN", "SPARROW", "PELICAN"] },
+            { category: "SOUTH AMERICAN CAPITALS", difficulty: 'green', words: ["LIMA", "QUITO", "SANTIAGO", "BOGOTA"] },
+            { category: "BONES", difficulty: 'green', words: ["FEMUR", "TIBIA", "ULNA", "STERNUM"] },
+            { category: "BOND FILMS", difficulty: 'blue', words: ["SKYFALL", "SPECTRE", "GOLDFINGER", "THUNDERBALL"] },
+            { category: "FRIENDS CHARACTERS", difficulty: 'blue', words: ["CHANDLER", "PHOEBE", "MONICA", "JOEY"] },
+            { category: "HIDE A CAR BRAND", difficulty: 'purple', words: ["AUDITION", "AFFORD", "MINISTER", "PROGRAM"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "CAR BRANDS", difficulty: 'yellow', words: ["TOYOTA", "HONDA", "FORD", "TESLA"] },
+            { category: "BEATLES SURNAMES", difficulty: 'green', words: ["LENNON", "MCCARTNEY", "HARRISON", "STARR"] },
+            { category: "THINGS WITH HORNS", difficulty: 'blue', words: ["RHINO", "UNICORN", "TRUCK", "IMPALA"] },
+            { category: "THINGS WITH KEYS", difficulty: 'blue', words: ["PIANO", "TYPEWRITER", "FLORIDA", "LOCKSMITH"] },
+            { category: "TWO SETS OF DOUBLE LETTERS", difficulty: 'purple', words: ["COFFEE", "BALLOON", "RACCOON", "SUCCESS"] },
+            { category: "HIDE A WOW CLASS", difficulty: 'purple', words: ["DAMAGE", "MONKEY", "BROGUE", "HEADHUNTER"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "US COINS", difficulty: 'yellow', words: ["PENNY", "NICKEL", "DIME", "QUARTER"] },
+            { category: "CAMPING GEAR", difficulty: 'yellow', words: ["TENT", "LANTERN", "COMPASS", "CANTEEN"] },
+            { category: "SINGING VOICE TYPES", difficulty: 'green', words: ["SOPRANO", "ALTO", "TENOR", "BARITONE"] },
+            { category: "STAR WARS CHARACTERS", difficulty: 'green', words: ["YODA", "CHEWBACCA", "LEIA", "VADER"] },
+            { category: "PIXAR FILMS", difficulty: 'blue', words: ["UP", "CARS", "BRAVE", "ONWARD"] },
+            { category: "SPELLED WITH ROMAN NUMERALS", difficulty: 'purple', words: ["MIMIC", "LIVID", "VIVID", "CIVIL"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "MONTHS", difficulty: 'yellow', words: ["MAY", "JUNE", "AUGUST", "MARCH"] },
+            { category: "OLD COINS", difficulty: 'green', words: ["DOUBLOON", "DUCAT", "FARTHING", "SHILLING"] },
+            { category: "SANTAS REINDEER", difficulty: 'green', words: ["DASHER", "DANCER", "PRANCER", "VIXEN"] },
+            { category: "GODS BEHIND WEEKDAY NAMES", difficulty: 'blue', words: ["TYR", "WODEN", "THOR", "FRIGG"] },
+            { category: "THINGS WITH NEEDLES", difficulty: 'blue', words: ["CACTUS", "COMPASS", "PORCUPINE", "PINE"] },
+            { category: "ALSO MEANS COMPLAIN", difficulty: 'purple', words: ["CARP", "GROUSE", "BLEAT", "WHINE"] },
+        ],
+    },
+    {
+        groups: [
+            { category: "THINGS IN A BATHROOM", difficulty: 'yellow', words: ["TOOTHBRUSH", "TOWEL", "SOAP", "BATHTUB"] },
+            { category: "THE BEATLES", difficulty: 'yellow', words: ["JOHN", "PAUL", "GEORGE", "RINGO"] },
+            { category: "GROUPS OF ANIMALS", difficulty: 'green', words: ["PRIDE", "MURDER", "GAGGLE", "PARLIAMENT"] },
+            { category: "UNITS NAMED AFTER SCIENTISTS", difficulty: 'blue', words: ["NEWTON", "WATT", "KELVIN", "HERTZ"] },
+            { category: "SOUNDS LIKE A PLURAL LETTER", difficulty: 'purple', words: ["SEIZE", "TEASE", "PEAS", "EASE"] },
+            { category: "STARTS WITH A METAL", difficulty: 'purple', words: ["TINSEL", "IRONY", "LEADER", "NICKELODEON"] },
         ],
     },
 ];
