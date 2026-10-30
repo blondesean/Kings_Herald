@@ -17,7 +17,7 @@ const helpGuides = {
         text: [
             'Once a day a threat stirs, and the herald calls for a party of 3 to 20. The foe grows to match the party\'s size.',
             '',
-            '**The threat.** Each day\'s threat is Easy, Medium or Hard, equally likely. The court\'s first Hard victory draws Extreme threats too, and its first Extreme victory draws Max. The herald names the threat before anyone joins, so thou mayest choose thy fights. The foe itself is revealed only in battle.',
+            '**The threat.** Each day\'s threat is Easy 5% of the time, Medium 15%, Hard 40% and Extreme 40%. The court\'s first Extreme victory draws Max too: then Hard is 40%, Extreme 20% and Max 20%. The herald names the threat before anyone joins, so thou mayest choose thy fights. The foe itself is revealed only in battle.',
             '',
             '**Joining.** Click **Join the party**, and thou art asked, privately, for thy stance. If thy gear is too slight for the threat, thou art turned away. Every 15 minutes the herald weighs the party, and if its odds look poor, says so and lets any who wish leave.',
             '',
@@ -38,7 +38,7 @@ const helpGuides = {
         label: 'Shop, selling and trading',
         title: 'The Merchant\'s Stalls',
         text: [
-            'Every day at 9 AM Pacific the merchant opens until 9 PM Pacific with 5 pieces of gear, a title, a class, a race and a pet. See it with `/shop`.',
+            'Every day at 9 AM Pacific the merchant opens until 9 PM Pacific with 5 pieces of gear, Rare or finer, a title, a class, a race and a pet. See it with `/shop`. Commoner gear is found through the fence, sellbacks and boss loot.',
             '',
             '**Buying.** `/buy <name>`. Each piece of gear has two copies for the whole court, and a title only one. Gear goes to thy bag, seen with `/bank`, and `/equip` puts it on. A class, race or title takes hold at once, and the one it replaces is kept for thee.',
             '',

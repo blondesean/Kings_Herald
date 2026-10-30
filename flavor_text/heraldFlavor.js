@@ -63,9 +63,10 @@ const heraldStaffLines = () => [
     'The Herald plants his staff and does not raise a weapon. For a long moment, no one in the party can bring themselves to swing.\n\n"Before you strike," he says, "tell me you were listening."',
 ];
 
-const heraldTriviaResultLines = (answer, right, total) => [
-    `"${answer}," says the Herald. "Of course." **${right} of ${total}** answered true, and their hands are steadier for it.`,
-];
+// With no one right, no line may suggest anyone gained the lore's edge.
+const heraldTriviaResultLines = (answer, right, total) => (right
+    ? [`"${answer}," says the Herald. "Of course." **${right} of ${total}** answered true, and their hands are steadier for it.`]
+    : [`"${answer}," says the Herald, almost gently. **None of ${total}** answered true. The dream must be won on steel alone.`]);
 
 // Phase two: the Horn, and the dream duels.
 const heraldHornLines = () => [

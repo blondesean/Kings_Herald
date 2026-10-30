@@ -2,7 +2,9 @@
  *
  * Once a day at noon Eastern, 9 AM Pacific (src/dailyLineup.js keeps the
  * day's games clear of that slot), the Herald opens the shop and posts its stock:
- *   - 5 gear pieces, drawn at random from the catalog
+ *   - 5 gear pieces, drawn at random from the catalog's SHOP_RARITIES: Rare,
+ *     Epic and Legendary. Common and Uncommon gear is left to the fence,
+ *     sellbacks and boss loot
  *   - 1 title, 1 class and 1 race. The title is one no member owns yet,
  *     so each title has one bearer; with every title owned, none is stocked
  *   - 1 pet, freshly generated (src/pets.js), for PET_PRICE. One buyer
@@ -47,6 +49,8 @@ const COPIES_PER_ITEM = 2;
 const COPIES_PER_TITLE = 1;
 const copiesFor = (id) => (catalog.TITLES.some((t) => t.id === id) ? COPIES_PER_TITLE : COPIES_PER_ITEM);
 const GEAR_PER_DAY = 5;
+// The rarities the daily shop stocks; the cheaper ones never appear.
+const SHOP_RARITIES = ['Rare', 'Epic', 'Legendary'];
 // The stock key for the day's pet; no catalog id looks like it.
 const PET_STOCK_KEY = 'pet';
 
@@ -82,7 +86,7 @@ const pickOne = (list, random) => list[Math.floor(random() * list.length)];
 // worn or stored, is never drawn. If every title is owned, there is none today.
 const pickDailyStock = (random = Math.random, ownedTitles = new Set()) => {
     // Only gear with a real slot can be drawn; a slot-less item would be unequippable.
-    const gearPool = catalog.GEAR.filter((e) => catalog.GEAR_SLOTS.includes(e.slot));
+    const gearPool = catalog.GEAR.filter((e) => catalog.GEAR_SLOTS.includes(e.slot) && SHOP_RARITIES.includes(catalog.rarityFor(e.price)));
     const gear = [];
     for (let i = 0; i < GEAR_PER_DAY && gearPool.length; i++) {
         const [picked] = gearPool.splice(Math.floor(random() * gearPool.length), 1);

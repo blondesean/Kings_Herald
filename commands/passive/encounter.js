@@ -2,9 +2,10 @@
  *
  * Once a day (placed by src/dailyLineup.js so it never overlaps the trivia,
  * puzzle or shop), the Herald announces that an unnamed threat stirs. Members
- * The difficulty is rolled when the threat is posted, equally likely among
- * the tiers the server has opened: Easy, Medium, Hard and Extreme to begin
- * with, then Max after its first Extreme win (see
+ * The difficulty is rolled when the threat is posted, weighted among the
+ * tiers the server has opened (TIER_WEIGHTS): Easy 5%, Medium 15%, Hard and
+ * Extreme 40% each to begin with, then Max after its first Extreme win,
+ * taking half of Extreme's share (see
  * src/campaign.js, which also starts the lore drops on the first Max win),
  * and announced up front so members
  * can decide whether to answer. They click "Join the party" (up to
@@ -160,10 +161,11 @@ const kitFitFor = (tier) => Math.round(fullKitFor(tier) * TIER_COVERAGE[tier]);
 const epicToLegendary = (share) => Math.round(fullKitFor(EXTREME_TIER) + share * (fullKitFor(MAX_TIER) - fullKitFor(EXTREME_TIER)));
 // Max sits a tenth of the way from a full Epic kit to a full Legendary one,
 // so a party mostly in Epic gear has a fair shot and Legendary gear has the
-// edge. The Herald himself (HERALD_FIT_PER_ENTRANT) sits higher, at three
-// tenths, so he is harder on paper than any Guardian.
+// edge. The Herald himself (HERALD_FIT_PER_ENTRANT) is a flat 300 per member,
+// about halfway from Epic to Legendary, so he is harder on paper than any
+// Guardian and a court in full Epic needs its dream blessings.
 const bossFitPerEntrant = (tier) => (tier === MAX_TIER ? epicToLegendary(0.1) : kitFitFor(tier));
-const HERALD_FIT_PER_ENTRANT = epicToLegendary(0.3);
+const HERALD_FIT_PER_ENTRANT = 300;
 
 // Chance (0-1) of a win, from party fit / boss fit, capped by the tier's
 // loss floor. Without a tier, the uncapped curve (reaching 100% at 140%).
@@ -172,11 +174,28 @@ const winChance = (ratio, tier = null) => {
     return tier === null ? raw : Math.min(raw, 1 - TIER_LOSS_FLOOR[tier]);
 };
 
-// The tiers every server can roll, each equally likely: Easy, Medium, Hard
-// and Extreme. The first Extreme win opens Max (see src/campaign.js); the
-// real encounter rolls from the server's open tiers.
+// The tiers every server can roll: Easy, Medium, Hard and Extreme. The first
+// Extreme win opens Max (see src/campaign.js); the real encounter rolls from
+// the server's open tiers, weighted by TIER_WEIGHTS (percent): the hard
+// fights are the common ones, and Max, once open, takes half of Extreme's
+// share. Easy and Medium stay rare either way.
 const OPEN_TIERS = [0, 1, 2, 3];
-const rollTier = (random = Math.random, tiers = OPEN_TIERS) => tiers[Math.floor(random() * tiers.length)];
+const TIER_WEIGHTS = {
+    beforeMax: [5, 15, 40, 40],
+    withMax: [5, 15, 40, 20, 20],
+};
+const rollTier = (random = Math.random, tiers = OPEN_TIERS) => {
+    const table = tiers.includes(MAX_TIER) ? TIER_WEIGHTS.withMax : TIER_WEIGHTS.beforeMax;
+    const weights = tiers.map((t) => table[t] || 0);
+    const total = weights.reduce((a, b) => a + b, 0);
+    if (!total) return tiers[Math.floor(random() * tiers.length)];
+    let roll = random() * total;
+    for (const [i, w] of weights.entries()) {
+        if (roll < w) return tiers[i];
+        roll -= w;
+    }
+    return tiers[tiers.length - 1];
+};
 
 // The party's win chance at `tier` from each member's { fit, stance } (no
 // stance yet counts as Balanced).

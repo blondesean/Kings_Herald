@@ -1,8 +1,9 @@
 /* The server's campaign: the climb through the encounter tiers to the lore
  * drops and the trials (see docs/the-last-proclamation.md).
  *
- *   - Easy, Medium, Hard and Extreme are always open, a quarter each. The
- *     first Extreme win opens Max (see openTiers/recordWin).
+ *   - Easy, Medium, Hard and Extreme are always open, at 5/15/40/40%. The
+ *     first Extreme win opens Max, making it 5/15/40/20/20% (see
+ *     openTiers/recordWin, and TIER_WEIGHTS in commands/passive/encounter.js).
  *   - The first Max win starts the lore drops: one each morning at 9 AM
  *     Eastern for seven days, from the next morning (flavor_text/loreDrops.js).
  *     The seventh opens the trials.
