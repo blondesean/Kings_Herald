@@ -35,7 +35,7 @@ const {
 } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const achievements = require('../../src/achievements');
-const { fitScore, bestKit } = require('../../src/character');
+const { totalFit, bestKit } = require('../../src/character');
 const { POSES, DEFAULT_POSE, findPose } = require('../../src/poses');
 const flavor = require('../../flavor_text');
 
@@ -240,8 +240,8 @@ const fitWinChance = (challengerFit, targetFit) => {
 // is equipped). Resolves with the fit they fight at: their best if they chose
 // it, otherwise as dressed, including when they don't answer in time.
 const promptSuitUp = async (repliable, character = {}) => {
-    const wornFit = fitScore(character.gear || {});
-    const bestFit = fitScore(bestKit(character));
+    const wornFit = totalFit(character.gear, character);
+    const bestFit = totalFit(bestKit(character), character);
     if (bestFit <= wornFit) return { fit: wornFit, suitedUp: false };
 
     const prompt = await repliable.followUp({
@@ -359,15 +359,15 @@ const duel = async function (interaction) {
                 pointsStore.getCharacter(guild.id, challengerMember.id),
                 pointsStore.getCharacter(guild.id, targetMember.id),
             ]);
-            const challengerFit = fitScore(challengerChar.gear);
-            const targetFit = fitScore(targetChar.gear);
+            const challengerFit = totalFit(challengerChar.gear, challengerChar);
+            const targetFit = totalFit(targetChar.gear, targetChar);
             // Fit scores only, never percentages.
             odds = flavor.fitDuelOddsLine(displayNameOf(challengerMember), challengerFit, displayNameOf(targetMember), targetFit);
             // Those fits are as dressed. A duelist with finer arms in their
             // bags is asked whether to suit up once the duel is accepted, so
             // the post says up front what each could field: no bait and switch.
-            const challengerBest = fitScore(bestKit(challengerChar));
-            const targetBest = fitScore(bestKit(targetChar));
+            const challengerBest = totalFit(bestKit(challengerChar), challengerChar);
+            const targetBest = totalFit(bestKit(targetChar), targetChar);
             const extras = [
                 [challengerMember, challengerFit, challengerBest],
                 [targetMember, targetFit, targetBest],

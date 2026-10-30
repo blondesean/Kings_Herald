@@ -42,11 +42,11 @@ const tradeEquippedLines = (name) => [
 ];
 
 const tradeBadOfferLines = (typed) => [
-    `**${typed}** is neither a piece of gear nor a number of points, good noble.`,
+    `**${typed}** is neither a piece of gear, a pet, nor a number of points, good noble.`,
 ];
 
 const tradeReceiverMissingLines = (to, name) => [
-    `${to} has no **${name}** in their bag to trade.`,
+    `${to} has no **${name}** to trade.`,
 ];
 
 const tradeReceiverPoorLines = (to, points) => [
@@ -54,7 +54,7 @@ const tradeReceiverPoorLines = (to, points) => [
 ];
 
 const tradeGiverMissingLines = (from, name) => [
-    `${from} no longer has **${name}** in their bag, so the trade cannot go ahead.`,
+    `${from} no longer has **${name}** to trade, so the trade cannot go ahead.`,
 ];
 
 const tradeChangedLines = () => [

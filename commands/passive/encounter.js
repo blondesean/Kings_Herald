@@ -72,7 +72,8 @@ const pointsStore = require('../../src/pointsStore');
 const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findAdventurerRole } = require('../../src/adventurerRole');
-const { fitScore, bestKit } = require('../../src/character');
+const { fitScore, totalFit, bestKit } = require('../../src/character');
+const { petBonus } = require('../../src/pets');
 const achievements = require('../../src/achievements');
 const { recordHistory } = require('../../src/historyLog');
 const catalog = require('./shopCatalog');
@@ -305,10 +306,11 @@ const joinRow = (prefix, disabled) => new ActionRowBuilder().addComponents(
 );
 
 // A member's two kits: what they wear, and the finest they own (see bestKit).
+// Both fits count the pet at their side (src/pets.js).
 const kitsOf = (character = {}) => {
     const worn = character.gear || {};
     const best = bestKit(character);
-    return { worn, best, wornFit: fitScore(worn), bestFit: fitScore(best) };
+    return { worn, best, wornFit: totalFit(worn, character), bestFit: totalFit(best, character), petFit: petBonus(character) };
 };
 // Whether the member fights in their best kit: only if they chose to, and it's
 // actually finer than what they wear.
@@ -538,7 +540,7 @@ const runEncounterIn = async (g, channel, opts) => {
         m.gear = m.suitedUp ? m.best : m.worn;
         m.title = (catalog.findEntry(character.title) || {}).name || null;
         m.className = (catalog.findEntry(character.class) || catalog.DEFAULT_CLASS).name;
-        m.fit = fitScore(m.gear);
+        m.fit = Math.max(0, fitScore(m.gear) + m.petFit);
         m.effectiveFit = m.fit * STANCES[m.stance].multiplier;
     }
 

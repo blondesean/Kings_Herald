@@ -1,5 +1,6 @@
 /* /equip <item> - put a piece of gear from your bag into its slot, or wear a
- * title, class or race you own.
+ * title, class or race you own, or bring a pet from your bank to your side
+ * by its name.
  *
  * Whatever was in that slot goes back to your bag, and a replaced title,
  * class or race back to your cosmetics, so nothing is lost. The write is
@@ -12,6 +13,7 @@
 const { ApplicationCommandOptionType } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { equipPlan, wearPlan, stashFor, cosmeticField, matchEntry } = require('../../src/character');
+const { matchPet } = require('../../src/pets');
 const achievements = require('../../src/achievements');
 const { rarityFor } = require('../passive/shopCatalog');
 const catalog = require('../passive/shopCatalog');
@@ -37,6 +39,22 @@ const wearCosmetic = async (interaction, character, entry) => {
     await achievements.checkStats(guildId, [{ userId, displayName: interaction.member.displayName }], interaction.channel);
 };
 
+// Brings a pet from the bank to the member's side; the one there goes to the bank.
+const swapPet = async (interaction, character, chosen) => {
+    const guildId = interaction.guild.id;
+    const userId = interaction.member.id;
+    const pets = character.pets.filter((p) => p !== chosen);
+    if (character.pet) pets.push(character.pet);
+    const saved = await pointsStore.setPets(guildId, userId, { pet: character.pet, pets: character.pets }, { pet: chosen, pets });
+    if (!saved) {
+        await interaction.editReply(pick(flavor.bagChangedLines()));
+        return;
+    }
+    const old = character.pet ? character.pet.name : null;
+    console.log(`Equip (guild ${guildId}): ${interaction.member.displayName} (${userId}) brought ${chosen.name} to their side${old ? `, banked ${old}` : ''}.`);
+    await interaction.editReply(pick(flavor.petSwappedLines(chosen.name, old)));
+};
+
 const equip = async function (interaction) {
     const typed = interaction.options.getString('item');
     const guildId = interaction.guild.id;
@@ -51,6 +69,14 @@ const equip = async function (interaction) {
             const cosmetic = matchEntry(owned, typed);
             if (cosmetic) {
                 await wearCosmetic(interaction, character, cosmetic);
+                return;
+            }
+            if (matchPet(character.pets, typed)) {
+                await swapPet(interaction, character, matchPet(character.pets, typed));
+                return;
+            }
+            if (character.pet && matchPet([character.pet], typed)) {
+                await interaction.editReply(pick(flavor.petAlreadyAtSideLines(character.pet.name)));
                 return;
             }
             // Tell apart "not in the bag" from "a title, class or race not owned" for a clearer reply.
@@ -85,13 +111,13 @@ const equip = async function (interaction) {
 };
 
 module.exports = {
-    description: 'Equip gear from your bag, or a title, class or race you own (visible only to you)',
+    description: 'Equip gear from your bag, a title, class or race you own, or a pet from your bank (visible only to you)',
     category: 'CHARACTER',
     ephemeral: true,
     options: [
         {
             name: 'item',
-            description: 'The exact name of the gear, title, class or race, as shown in /bank',
+            description: 'The exact name of the gear, title, class, race or pet, as shown in /bank',
             type: ApplicationCommandOptionType.String,
             required: true,
         },

@@ -1,6 +1,8 @@
-/* /trade <item> <player> <offer> - offer a piece of gear from your bag to
- * another member, in exchange for a piece of gear from their bag or a number
- * of points.
+/* /trade <item> <player> <offer> - offer a piece of gear from your bag, or a
+ * pet by its name, to another member, in exchange for a piece of gear from
+ * their bag, one of their pets, or a number of points. A pet can be traded
+ * from its owner's side or bank, keeps the item it holds, and goes to its new
+ * owner's side if none is there, otherwise to their bank.
  *
  * The Herald checks both sides first: the piece is in your bag (not worn),
  * and the other member has the asked-for piece in their bag or enough
@@ -19,6 +21,7 @@
 const { ActionRowBuilder, ApplicationCommandOptionType, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { matchEntry } = require('../../src/character');
+const { matchPet, petKind } = require('../../src/pets');
 const achievements = require('../../src/achievements');
 const catalog = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
@@ -51,9 +54,34 @@ const place = (entry, gear, bag) => {
     return false;
 };
 
+// Takes the pet with `id` from a member, from their side or their bank.
+// Returns the pet, or null if they don't have it.
+const takePet = (pets, id) => {
+    if (pets.pet && pets.pet.id === id) {
+        const taken = pets.pet;
+        pets.pet = null;
+        return taken;
+    }
+    const index = pets.pets.findIndex((p) => p.id === id);
+    return index === -1 ? null : pets.pets.splice(index, 1)[0];
+};
+
+// Puts a pet at its new owner's side if none is there, otherwise in their
+// bank. Returns true if it went to their side.
+const placePet = (pet, pets) => {
+    if (!pets.pet) {
+        pets.pet = pet;
+        return true;
+    }
+    pets.pets.push(pet);
+    return false;
+};
+
 /* Works out the trade from both members' current characters. `offer` is
  * { fromId, fromName, toId, toName, give, want, points }, where give and want
- * are catalog entries (want is null for a points offer). Returns { error } or
+ * are goods, { name, entry } for gear or { name, pet } for a pet (want is
+ * null for a points offer). A pet may be traded from its owner's side or
+ * bank, and keeps the item it holds. Returns { error } or
  * { sides, fromEquipped, toEquipped } ready for pointsStore.tradeCharacters.
  */
 const planTrade = (offer, from, to) => {
@@ -61,22 +89,55 @@ const planTrade = (offer, from, to) => {
     const toBag = [...to.bag];
     const fromGear = { ...from.gear };
     const toGear = { ...to.gear };
-    if (!removeOne(fromBag, offer.give.id)) return { error: 'giverMissing' };
-    if (offer.want && !removeOne(toBag, offer.want.id)) return { error: 'receiverMissing' };
+    const fromPets = { pet: from.pet || null, pets: [...(from.pets || [])] };
+    const toPets = { pet: to.pet || null, pets: [...(to.pets || [])] };
+    const { give, want } = offer;
+
+    const given = give.pet ? takePet(fromPets, give.pet.id) : removeOne(fromBag, give.entry.id);
+    if (!given) return { error: 'giverMissing' };
+    const wanted = want && (want.pet ? takePet(toPets, want.pet.id) : removeOne(toBag, want.entry.id));
+    if (want && !wanted) return { error: 'receiverMissing' };
     if (offer.points && to.points < offer.points) return { error: 'receiverPoor' };
 
-    const toEquipped = place(offer.give, toGear, toBag);
-    const fromEquipped = offer.want ? place(offer.want, fromGear, fromBag) : false;
+    const toEquipped = give.pet ? placePet(given, toPets) : place(give.entry, toGear, toBag);
+    let fromEquipped = false;
+    if (want) fromEquipped = want.pet ? placePet(wanted, fromPets) : place(want.entry, fromGear, fromBag);
     const points = offer.points || 0;
+    // Pets are only written when one changes hands.
+    const petsMove = Boolean(give.pet || (want && want.pet));
+    const side = (id, name, before, bag, gear, pets, gain) => ({
+        userId: id,
+        displayName: name,
+        before: { bag: before.bag, gear: before.gear, ...(petsMove && { pet: before.pet || null, pets: before.pets || [] }) },
+        bag,
+        gear,
+        ...(petsMove && pets),
+        points: gain,
+    });
     return {
         sides: [
-            { userId: offer.fromId, displayName: offer.fromName, before: { bag: from.bag, gear: from.gear }, bag: fromBag, gear: fromGear, points },
-            { userId: offer.toId, displayName: offer.toName, before: { bag: to.bag, gear: to.gear }, bag: toBag, gear: toGear, points: -points },
+            side(offer.fromId, offer.fromName, from, fromBag, fromGear, fromPets, points),
+            side(offer.toId, offer.toName, to, toBag, toGear, toPets, -points),
         ],
         fromEquipped,
         toEquipped,
     };
 };
+
+// What a member typed for one side of a trade, read against what they own:
+// gear in their bag, or a pet at their side or in their bank, by name.
+const goodsIn = (character, typed) => {
+    const inBag = [...new Set(character.bag)].map((id) => catalog.findEntry(id)).filter(Boolean);
+    const entry = matchEntry(inBag, typed);
+    if (entry) return { name: entry.name, entry };
+    const pet = matchPet([character.pet, ...character.pets].filter(Boolean), typed);
+    return pet ? { name: `${pet.name} the ${petKind(pet)}`, pet } : null;
+};
+
+// The placement line for goods arriving with `who`.
+const placedLine = (who, goods, equipped) => (goods.pet
+    ? flavor.tradePetPlacedLine(who, goods.pet.name, equipped)
+    : flavor.tradePlacedLine(who, goods.name, equipped));
 
 // The reply for a plan that can't go ahead.
 const errorLines = (error, offer) => {
@@ -120,17 +181,22 @@ const trade = async function (interaction) {
         }
 
         const giverChar = await pointsStore.getCharacter(guildId, giver.id);
-        const inBag = [...new Set(giverChar.bag)].map((id) => catalog.findEntry(id)).filter(Boolean);
-        const give = matchEntry(inBag, typedItem);
+        const give = goodsIn(giverChar, typedItem);
         if (!give) {
             const worn = matchEntry(Object.values(giverChar.gear).map((id) => catalog.findEntry(id)).filter(Boolean), typedItem);
             await interaction.editReply(pick(worn ? flavor.tradeEquippedLines(worn.name) : flavor.notInBagLines(typedItem)));
             return;
         }
 
-        // The offer is a whole number of points, or the name of a piece of gear.
+        // The offer is a whole number of points, or the name of a piece of
+        // gear or a pet the other member owns.
+        const receiverChar = await pointsStore.getCharacter(guildId, receiver.id);
         const points = /^\d+$/.test(typedOffer) ? Number(typedOffer) : null;
-        const want = points === null ? matchEntry(GEAR, typedOffer) : null;
+        let want = null;
+        if (points === null) {
+            const gear = matchEntry(GEAR, typedOffer);
+            want = gear ? { name: gear.name, entry: gear } : goodsIn(receiverChar, typedOffer);
+        }
         if (points === 0 || (points === null && !want)) {
             await interaction.editReply(pick(flavor.tradeBadOfferLines(typedOffer)));
             return;
@@ -141,7 +207,7 @@ const trade = async function (interaction) {
             toId: receiver.id, toName: receiver.displayName,
             give, want, points,
         };
-        const first = planTrade(offer, giverChar, await pointsStore.getCharacter(guildId, receiver.id));
+        const first = planTrade(offer, giverChar, receiverChar);
         if (first.error) {
             await interaction.editReply(pick(errorLines(first.error, offer)));
             return;
@@ -152,7 +218,7 @@ const trade = async function (interaction) {
             components: [buttons(false)],
             allowedMentions: { users: [receiver.id] },
         });
-        console.log(`Trade (guild ${guildId}): ${giver.displayName} (${giver.id}) offered ${give.id} to ${receiver.displayName} (${receiver.id}) for ${want ? want.id : `${points} points`}.`);
+        console.log(`Trade (guild ${guildId}): ${giver.displayName} (${giver.id}) offered ${give.name} to ${receiver.displayName} (${receiver.id}) for ${want ? want.name : `${points} points`}.`);
 
         let answer = null;
         const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: TRADE_WINDOW_MS });
@@ -193,12 +259,12 @@ const trade = async function (interaction) {
             return;
         }
 
-        console.log(`Trade (guild ${guildId}): ${receiver.displayName} accepted; ${give.id} for ${want ? want.id : `${points} points`}.`);
+        console.log(`Trade (guild ${guildId}): ${receiver.displayName} accepted; ${give.name} for ${want ? want.name : `${points} points`}.`);
         const lines = [
             pick(flavor.tradeSealedLines(giver.displayName, receiver.displayName, give.name, want && want.name, points)),
-            flavor.tradePlacedLine(receiver.displayName, give.name, plan.toEquipped),
+            placedLine(receiver.displayName, give, plan.toEquipped),
         ];
-        if (want) lines.push(flavor.tradePlacedLine(giver.displayName, want.name, plan.fromEquipped));
+        if (want) lines.push(placedLine(giver.displayName, want, plan.fromEquipped));
         await answer.editReply(lines.join('\n'));
         const traders = plan.sides.map((s) => ({ userId: s.userId, displayName: s.displayName }));
         await achievements.record(guildId, traders.map((t) => ({ ...t, counts: { trades: 1 } })), interaction.channel);
@@ -210,12 +276,12 @@ const trade = async function (interaction) {
 };
 
 module.exports = {
-    description: 'Offer a piece of gear from your bag to another member for their gear or points',
+    description: 'Offer gear from your bag, or a pet, to another member for their gear, pet or points',
     category: 'SHOP',
     options: [
         {
             name: 'item',
-            description: 'The exact name of the gear in your bag to give, as shown in /bank',
+            description: 'The exact name of the gear in your bag, or of your pet, to give',
             type: ApplicationCommandOptionType.String,
             required: true,
         },
@@ -227,7 +293,7 @@ module.exports = {
         },
         {
             name: 'offer',
-            description: 'What you want back: the name of gear in their bag, or a number of points',
+            description: 'What you want back: gear in their bag, their pet by name, or a number of points',
             type: ApplicationCommandOptionType.String,
             required: true,
         },

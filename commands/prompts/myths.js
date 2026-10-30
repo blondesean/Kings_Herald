@@ -20,7 +20,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
-const { fitScore } = require('../../src/character');
+const { totalFit } = require('../../src/character');
 
 const EMBED_COLOR = 0xd4af37;
 
@@ -78,7 +78,7 @@ const buildMyths = async (guildId) => {
         value: spenders ? `**${spenders.value}** points spent in the shop: ${joinNames(spenders.names)}` : 'The merchant has yet to make a sale.',
     });
 
-    const fits = leaders(members, (m) => fitScore(m.gear || {}), (m) => m.displayName || 'a noble');
+    const fits = leaders(members, (m) => totalFit(m.gear, m), (m) => m.displayName || 'a noble');
     fields.push({
         name: 'Finest Fit',
         value: fits ? `**${fits.value}** fit: ${joinNames(fits.names)}` : 'No noble wears a stitch of gear.',

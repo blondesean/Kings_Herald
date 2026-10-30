@@ -40,6 +40,7 @@ const { scheduleDailyLineup } = require('./dailyLineup'); // trivia, puzzle (Con
 const { scheduleWowTriviaWednesday } = require('./../commands/passive/wowTrivia');
 const { trackVoiceStateUpdate, startVoiceTracking } = require('./../commands/passive/voiceTime');
 const { scheduleBirthdays } = require('./../commands/passive/birthdays');
+const { schedulePetCalls } = require('./../commands/passive/petCalls');
 const { scheduleHalloweenTreat } = require('./../commands/passive/halloweenTreat');
 const { scheduleAchievements } = require('./achievements');
 const { scheduleSnapshots } = require('./snapshots'); // daily standings for the history log
@@ -133,6 +134,7 @@ client.on('ready', (c) => {
     scheduleWowTriviaWednesday(client);
     scheduleHalloweenTreat(client);
     scheduleBirthdays(client);
+    schedulePetCalls(client);
     startVoiceTracking(client);
     scheduleAchievements(client);
     scheduleSnapshots(client);

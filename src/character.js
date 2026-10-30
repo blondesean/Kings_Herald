@@ -8,10 +8,14 @@
  *   cosmetics - [itemId, ...] titles, classes and races owned but not worn
  *
  * Exposes:
- *   fitScore(gear) - total price of the equipped gear (the /nobility figure)
+ *   fitScore(gear) - total price of the equipped gear
+ *   totalFit(gear, character, now) - fitScore plus the fit the member's pet
+ *                                    lends (src/pets.js), never below 0: the
+ *                                    figure shown, duelled and fought with
  *   bestKit(character) - { [slot]: itemId }, the finest owned piece per slot
  *   bagBySlot(bag) - { [slot]: [entry, ...] } for /bank
- *   renderSheet({ displayName, character }) - the /flex block, as a string
+ *   renderSheet({ displayName, character }) - the /flex block, as a string,
+ *                                            with the pet at the bottom
  *   equipPlan(character, itemId) - the new { gear, bag } if the item is equipped,
  *                                  or null if it isn't in the bag
  *   cosmeticField(entry) - 'title', 'class' or 'race' for those entries, else null
@@ -23,6 +27,7 @@
 
 const { GEAR_SLOTS, DEFAULT_CLASS, TITLES, CLASSES, RACES, findEntry, rarityFor } = require('../commands/passive/shopCatalog');
 const { POSES, poseLines } = require('./poses');
+const { petBonus, petDescription, isHappy } = require('./pets');
 
 const WIDTH = 32; // width of the /flex box, in characters (kept narrow for phones)
 
@@ -41,6 +46,8 @@ const fitScore = (gear = {}) =>
         .map((id) => findEntry(id))
         .filter(Boolean)
         .reduce((total, entry) => total + entry.price, 0);
+
+const totalFit = (gear = {}, character = {}, now = Date.now()) => Math.max(0, fitScore(gear) + petBonus(character, now));
 
 const bagBySlot = (bag = []) => {
     const bySlot = {};
@@ -131,8 +138,22 @@ const renderSheet = ({ displayName, character = {} }) => {
         });
     }
     lines.push(rule());
-    lines.push(row(`Fit score: ${fitScore(character.gear)}`));
+    lines.push(row(`Fit score: ${totalFit(character.gear, character)}`));
     lines.push(rule());
+    // The pet at the member's side, under the fit score.
+    const pet = character.pet;
+    if (pet) {
+        const held = findEntry(pet.item);
+        const bonus = petBonus(character);
+        const rows = [
+            `Pet: ${pet.name}`,
+            ...wrapText(petDescription(pet), WIDTH - 4),
+            ...wrapText(`Holds: ${held ? `[${rarityFor(held.price)}] ${held.name}` : 'nothing'}`, WIDTH - 4),
+            `Mood: ${isHappy(pet) ? 'Happy' : 'Unhappy'}, ${bonus > 0 ? '+' : ''}${bonus} fit`,
+        ];
+        rows.forEach((text) => lines.push(row(text)));
+        lines.push(rule());
+    }
     // The figure goes beside the box, one figure line per sheet line.
     const figure = figureRows(character.pose, helmRow);
     // One space between the figure and the box keeps the sheet at 38 characters, phone-width.
@@ -199,4 +220,4 @@ const matchEntry = (entries, typed) => {
     ) || null;
 };
 
-module.exports = { fitScore, bestKit, bagBySlot, renderSheet, equipPlan, cosmeticField, stashFor, wearPlan, matchEntry, WIDTH };
+module.exports = { fitScore, totalFit, bestKit, bagBySlot, renderSheet, equipPlan, cosmeticField, stashFor, wearPlan, matchEntry, WIDTH };

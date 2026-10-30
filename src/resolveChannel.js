@@ -21,6 +21,7 @@ const SCOPES = {
     birthdays: 'Birthday blessing',
     treat: 'Halloween treat',
     achievements: 'Achievement summaries',
+    pets: 'Unhappy pets calling in the morning',
     all: 'All: everything above with no more specific override',
 };
 

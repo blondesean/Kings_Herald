@@ -1,10 +1,12 @@
-/* /bank - see the gear you own that isn't equipped, by slot, and the titles,
- * classes and races you own but aren't wearing. Private, so only you see it.
+/* /bank - see the gear you own that isn't equipped, by slot, the titles,
+ * classes and races you own but aren't wearing, and the pets not at your
+ * side. Private, so only you see it.
  */
 
 const pointsStore = require('../../src/pointsStore');
 const { bagBySlot, cosmeticField } = require('../../src/character');
 const { GEAR_SLOTS, rarityFor, findEntry } = require('../passive/shopCatalog');
+const { petDescription } = require('../../src/pets');
 const flavor = require('../../flavor_text');
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
@@ -17,7 +19,7 @@ const COSMETIC_LABELS = [['title', 'Titles'], ['class', 'Classes'], ['race', 'Ra
 const bank = async function (interaction) {
     try {
         const character = await pointsStore.getCharacter(interaction.guild.id, interaction.member.id);
-        if (!character.bag.length && !character.cosmetics.length) {
+        if (!character.bag.length && !character.cosmetics.length && !character.pets.length) {
             await interaction.editReply(pick(flavor.bankEmptyLines()));
             return;
         }
@@ -56,6 +58,12 @@ const bank = async function (interaction) {
         const sections = [];
         if (lines.length) sections.push(`**Thy bag**\n${lines.join('\n')}${more}`);
         if (cosmeticLines.length) sections.push(`**Thy finery**\n${cosmeticLines.join('\n')}`);
+        // Pets resting in the bank, each with what it holds.
+        const petLines = character.pets.map((pet) => {
+            const held = findEntry(pet.item);
+            return `**${pet.name}**, ${petDescription(pet)}${held ? `, holding ${held.name}` : ''}`;
+        });
+        if (petLines.length) sections.push(`**Thy pets**\n${petLines.join('\n')}`);
         await interaction.editReply(`${sections.join('\n\n')}\n\nEquip one with \`/equip <name>\`.`);
     } catch (error) {
         console.error('Error showing the bag:', error);
@@ -64,7 +72,7 @@ const bank = async function (interaction) {
 };
 
 module.exports = {
-    description: 'See the gear, titles, classes and races you own but are not wearing (visible only to you)',
+    description: 'See the gear, titles, classes, races and pets you own but are not using (visible only to you)',
     category: 'CHARACTER',
     ephemeral: true,
     run: bank,

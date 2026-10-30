@@ -13,7 +13,7 @@
 
 const pointsStore = require('../../src/pointsStore');
 const { titleFor } = require('../../src/nobilityTitle');
-const { fitScore } = require('../../src/character');
+const { totalFit } = require('../../src/character');
 
 // How many nobles to proclaim at most (also keeps a reply under Discord's
 // 2000-character message limit).
@@ -35,7 +35,7 @@ const buildNobilityChunks = (leaderboard) => {
         const rank = titleFor(entry.points);
         const points = entry.points === 1 ? 'point' : 'points';
         // The fit score is the price of everything equipped (see src/character.js).
-        return `${index + 1}. **${rank.title}** — ${entry.displayName} (${entry.points} ${points}, fit ${fitScore(entry.gear)})`;
+        return `${index + 1}. **${rank.title}** — ${entry.displayName} (${entry.points} ${points}, fit ${totalFit(entry.gear, entry)})`;
     });
 
     const header = `**THE PEERAGE OF THE REALM**\n\n` +

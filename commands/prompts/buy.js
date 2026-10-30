@@ -14,12 +14,18 @@
  * charging the buyer and paying the seller happen in one transaction.
  * Nobody can buy their own listing.
  *
+ * The day's pet is bought by typing "pet", its species or its description,
+ * and must be named with the `name` option. It goes to the buyer's side if
+ * none is there, otherwise to their bank (see src/pets.js).
+ *
  * Public, so the purchase is announced in the channel, in character.
  */
 
+const crypto = require('crypto');
 const { ApplicationCommandOptionType } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
-const { currentOpenShop, easternDay, kindOf, discountsFor, discountPrice } = require('../passive/shop');
+const { currentOpenShop, easternDay, kindOf, discountsFor, discountPrice, PET_STOCK_KEY } = require('../passive/shop');
+const { petKind, petDescription, speciesName, cleanPetName, matchPet, PET_PRICE, PET_NAME_MAX } = require('../../src/pets');
 const { matchEntry, stashFor } = require('../../src/character');
 const achievements = require('../../src/achievements');
 const catalog = require('../passive/shopCatalog');
@@ -82,6 +88,53 @@ const purchase = async (guildId, day, buyer, entry, kind, character) => {
     return { ok: true, equipped: grant.equip !== undefined, stashed: grant.stash || null };
 };
 
+// Whether `typed` names the day's pet: "pet", its species, its color and
+// species, or its full description.
+const isPetTyped = (pet, typed) => {
+    const wanted = String(typed || '').trim().toLowerCase();
+    return ['pet', speciesName(pet), petKind(pet), petDescription(pet)].some((name) => name.toLowerCase() === wanted);
+};
+
+// Adopts the day's pet: checks the name, takes the one copy, charges the
+// points and hands the pet over, giving the copy back if the payment fails.
+const adoptPet = async (interaction, record) => {
+    const guildId = interaction.guild.id;
+    const buyer = interaction.member;
+    const typedName = interaction.options.getString('name');
+    if (!typedName) {
+        await interaction.editReply(pick(flavor.petNeedsNameLines()));
+        return;
+    }
+    const name = cleanPetName(typedName);
+    if (!name) {
+        await interaction.editReply(pick(flavor.petBadNameLines(PET_NAME_MAX)));
+        return;
+    }
+    const character = await pointsStore.getCharacter(guildId, buyer.id);
+    if (matchPet([character.pet, ...character.pets].filter(Boolean), name)) {
+        await interaction.editReply(pick(flavor.petNameTakenLines(name)));
+        return;
+    }
+
+    if (!await pointsStore.takeShopStock(guildId, record.day, PET_STOCK_KEY, Date.now())) {
+        await interaction.editReply(pick(flavor.petAdoptedAlreadyLines()));
+        return;
+    }
+    const now = Date.now();
+    const pet = { ...record.pet, id: crypto.randomUUID(), name, item: null, lastPetted: now, adoptedAt: now };
+    const atSide = !character.pet;
+    if (!await pointsStore.buyWithPoints(guildId, buyer.id, buyer.displayName, PET_PRICE, { pet, equipPet: atSide })) {
+        await pointsStore.returnShopStock(guildId, PET_STOCK_KEY);
+        await interaction.editReply(pick(flavor.petCannotAffordLines(PET_PRICE)));
+        return;
+    }
+    await recordSpending(guildId, buyer, PET_PRICE);
+    console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) adopted ${petDescription(pet)} named ${name} for ${PET_PRICE}${atSide ? ', at their side' : ', to the bank'} (${easternDay()}).`);
+    await interaction.editReply(pick(flavor.petAdoptedLines(`<@${buyer.id}>`, name, petDescription(pet), atSide)));
+    await achievements.record(guildId, [{ userId: buyer.id, displayName: buyer.displayName, counts: { pets_adopted: 1 } }], interaction.channel);
+    await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
+};
+
 const buy = async function (interaction) {
     const typed = interaction.options.getString('item');
     const guildId = interaction.guild.id;
@@ -91,6 +144,11 @@ const buy = async function (interaction) {
         const record = await currentOpenShop(guildId);
         if (!record) {
             await interaction.editReply(pick(flavor.shopClosedLines()));
+            return;
+        }
+
+        if (record.pet && isPetTyped(record.pet, typed)) {
+            await adoptPet(interaction, record);
             return;
         }
 
@@ -174,9 +232,16 @@ module.exports = {
     options: [
         {
             name: 'item',
-            description: 'The exact name of the item, as shown in /shop',
+            description: 'The exact name of the item, as shown in /shop, or "pet" for the day\'s pet',
             type: ApplicationCommandOptionType.String,
             required: true,
+        },
+        {
+            name: 'name',
+            description: `A name for the pet, if you are adopting it (up to ${PET_NAME_MAX} letters)`,
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            maxLength: PET_NAME_MAX,
         },
     ],
     run: buy,

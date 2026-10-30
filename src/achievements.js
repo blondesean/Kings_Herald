@@ -31,7 +31,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const pointsStore = require('./pointsStore');
-const { fitScore } = require('./character');
+const { totalFit } = require('./character');
 const { resolveChannel } = require('./resolveChannel');
 const { findAnnounceChannel } = require('./findAnnounceChannel');
 const catalog = require('../commands/passive/shopCatalog');
@@ -82,6 +82,8 @@ const ACHIEVEMENTS = [
     { id: 'patron', name: 'Patron of the Herald', description: 'Tip the herald 25 points in all', counter: 'tipped', goal: 25 },
     { id: 'goblin_mode', name: 'Goblin Mode', description: "Plunder a piece from a boss's hoard", counter: 'plunders', goal: 1 },
     { id: 'red_handed', name: 'Caught Red-Handed', description: 'Be struck down while plundering in a lost encounter', counter: 'plunder_caught', goal: 1 },
+    { id: 'adopter', name: 'A Friend for Life', description: 'Adopt a pet from the shop', counter: 'pets_adopted', goal: 1 },
+    { id: 'good_owner', name: 'Who Is a Good Pet', description: 'Pet thy pet with /pet', counter: 'pets_petted', goal: 1 },
 ];
 
 const byId = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));
@@ -100,7 +102,7 @@ const statsFrom = (character, pose, extra = {}) => ({
     fullKit: catalog.GEAR_SLOTS.every((slot) => (character.gear || {})[slot]) ? 1 : 0,
     legendary: Object.values(character.gear || {}).some((id) => { const e = catalog.findEntry(id); return e && catalog.rarityFor(e.price) === 'Legendary'; }) ? 1 : 0,
     earned: (character.totalEarned || 0) + (character.earnedBaseline || 0),
-    fit: fitScore(character.gear || {}),
+    fit: totalFit(character.gear, character),
     posed: pose ? 1 : 0,
     hasClass: character.class && character.class !== catalog.DEFAULT_CLASS.id ? 1 : 0,
     hasRace: character.race ? 1 : 0,

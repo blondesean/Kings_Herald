@@ -179,6 +179,7 @@ const getLeaderboard = async function (guildId, limit = 10) {
             points: item.points || 0,
             pointsAtLastRecap: item.pointsAtLastRecap || 0,
             gear: item.gear || {},
+            pet: item.pet || null,
             weeklyLost: item.weeklyLost || 0,
         }))
         .sort((a, b) => b.points - a.points)
@@ -817,6 +818,9 @@ const returnShopStock = async function (guildId, itemId) {
  *   { field, value, stash }            - title, class or race, replacing the old one.
  *                                        `stash` is the old one's id, kept in the
  *                                        member's cosmetics; omitted when there is none
+ *   { pet, equipPet }                  - a pet (src/pets.js). With equipPet it goes
+ *                                        to the member's side, and only lands if no
+ *                                        pet is there; otherwise it joins `pets`
  * Returns true on success, false if the member can't afford it.
  */
 const buyWithPoints = async function (guildId, userId, displayName, price, grant) {
@@ -860,7 +864,7 @@ const fenceWithPoints = async function (guildId, userId, displayName, price, gra
 };
 
 // The item id a buyWithPoints grant hands over, for the history log.
-const grantedItem = (grant) => grant.bag || (grant.equip && grant.equip.itemId) || grant.value;
+const grantedItem = (grant) => grant.bag || (grant.equip && grant.equip.itemId) || (grant.pet && `pet:${grant.pet.species}`) || grant.value;
 
 // The update behind buyWithPoints, also used inside buyListing's transaction.
 const chargeUpdate = (guildId, userId, displayName, price, grant) => {
@@ -868,7 +872,17 @@ const chargeUpdate = (guildId, userId, displayName, price, grant) => {
     const values = { ':n': displayName || 'a noble', ':neg': -price, ':price': price, ':lost': price };
     let update;
     let condition = '#pts >= :price';
-    if (grant.bag) {
+    if (grant.pet && grant.equipPet) {
+        names['#pet'] = 'pet';
+        values[':pet'] = grant.pet;
+        condition += ' AND attribute_not_exists(#pet)';
+        update = 'SET #dn = :n, #pet = :pet ADD #pts :neg, #wl :lost';
+    } else if (grant.pet) {
+        names['#pets'] = 'pets';
+        values[':newPets'] = [grant.pet];
+        values[':empty'] = [];
+        update = 'SET #dn = :n, #pets = list_append(if_not_exists(#pets, :empty), :newPets) ADD #pts :neg, #wl :lost';
+    } else if (grant.bag) {
         names['#bag'] = 'bag';
         values[':new'] = [grant.bag];
         values[':empty'] = [];
@@ -912,10 +926,11 @@ const chargeUpdate = (guildId, userId, displayName, price, grant) => {
 };
 
 // A member's character and points: { points, displayName, gear, bag, title,
-// class, race, cosmetics }. `cosmetics` holds the titles, classes and races
-// they own but aren't wearing.
+// class, race, cosmetics, pet, pets }. `cosmetics` holds the titles, classes
+// and races they own but aren't wearing; `pet` is the pet at their side, or
+// null, and `pets` the ones in their bank (see src/pets.js).
 const getCharacter = async function (guildId, userId) {
-    const empty = { points: 0, displayName: null, gear: {}, bag: [], title: null, class: null, race: null, cosmetics: [] };
+    const empty = { points: 0, displayName: null, gear: {}, bag: [], title: null, class: null, race: null, cosmetics: [], pet: null, pets: [] };
     if (!isConfigured()) return empty;
 
     const result = await getClient().send(new GetCommand({
@@ -933,6 +948,8 @@ const getCharacter = async function (guildId, userId) {
         class: item.class || null,
         race: item.race || null,
         cosmetics: item.cosmetics || [],
+        pet: item.pet || null,
+        pets: item.pets || [],
         // Read by the achievement checks (src/achievements.js).
         duelWins: item.duelWins || 0,
         duelLosses: item.duelLosses || 0,
@@ -1382,8 +1399,10 @@ const setMythIfHigher = async function (guildId, key, value, details = {}) {
 
 /* A /trade between two members (see commands/prompts/trade.js), in one
  * transaction. Each side is
- *   { userId, displayName, before: { bag, gear }, bag, gear, points }
- * where `before` is what was read, `bag`/`gear` are what to write, and
+ *   { userId, displayName, before: { bag, gear, pet, pets }, bag, gear, pet, pets, points }
+ * where `before` is what was read, `bag`/`gear`/`pet`/`pets` are what to
+ * write (`pet` and `pets`, the pet at their side and those in their bank,
+ * only when a pet changes hands; a null pet is removed), and
  * `points` is what that member gains (negative to pay). Each write only lands
  * if that member's bag and gear are still what was read, and a payer still
  * has the points. Returns false if anything changed in between.
@@ -1400,6 +1419,26 @@ const tradeCharacters = async function (guildId, sides) {
             Object.keys(side.before.gear).length ? '#gear = :oldGear' : '(attribute_not_exists(#gear) OR #gear = :oldGear)',
         ];
         let update = 'SET #dn = :n, #bag = :bag, #gear = :gear';
+        if (side.pets) {
+            names['#pets'] = 'pets';
+            values[':pets'] = side.pets;
+            values[':oldPets'] = side.before.pets;
+            conditions.push(side.before.pets.length ? '#pets = :oldPets' : '(attribute_not_exists(#pets) OR #pets = :oldPets)');
+            update += ', #pets = :pets';
+            names['#pet'] = 'pet';
+            if (side.before.pet) {
+                values[':oldPet'] = side.before.pet;
+                conditions.push('#pet = :oldPet');
+            } else {
+                conditions.push('attribute_not_exists(#pet)');
+            }
+            if (side.pet) {
+                values[':pet'] = side.pet;
+                update += ', #pet = :pet';
+            } else {
+                update += ' REMOVE #pet';
+            }
+        }
         if (side.points) {
             names['#pts'] = 'points';
             values[':pts'] = side.points;
@@ -1772,6 +1811,56 @@ const setEquipment = async function (guildId, userId, expectedBag, gear, bag) {
     }
 };
 
+/* Change a member's pets, and their bag with them, in one write: /pet,
+ * /petequip and swapping pets with /equip. `before` and `after` each hold
+ * some of { pet, pets, bag }; every field in `after` is written (a null pet
+ * is removed), and lands only if every field in `before` is still what was
+ * read, so a stale read can't duplicate or lose a pet or an item. Returns
+ * false if anything changed.
+ */
+const setPets = async function (guildId, userId, before, after) {
+    if (!isConfigured()) return false;
+
+    const names = {};
+    const values = {};
+    const sets = [];
+    const removes = [];
+    const conditions = [];
+    for (const [field, value] of Object.entries(after)) {
+        names[`#${field}`] = field;
+        if (value === null) removes.push(`#${field}`);
+        else {
+            values[`:${field}`] = value;
+            sets.push(`#${field} = :${field}`);
+        }
+    }
+    for (const [field, value] of Object.entries(before)) {
+        names[`#${field}`] = field;
+        const empty = value === null || (Array.isArray(value) && !value.length);
+        if (value === null) {
+            conditions.push(`attribute_not_exists(#${field})`);
+            continue;
+        }
+        values[`:old_${field}`] = value;
+        conditions.push(empty ? `(attribute_not_exists(#${field}) OR #${field} = :old_${field})` : `#${field} = :old_${field}`);
+    }
+    const update = [sets.length ? `SET ${sets.join(', ')}` : '', removes.length ? `REMOVE ${removes.join(', ')}` : ''].filter(Boolean).join(' ');
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: update,
+            ConditionExpression: conditions.join(' AND ') || undefined,
+            ExpressionAttributeNames: names,
+            ExpressionAttributeValues: Object.keys(values).length ? values : undefined,
+        }));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
 /* Wear a title, class or race from the member's cosmetics: `field` becomes
  * `value` and the cosmetics list becomes `cosmetics` (the worn one taken out,
  * the old one put in). Lands only if the list is still `expectedCosmetics`
@@ -1939,6 +2028,7 @@ module.exports = {
     fenceWithPoints,
     getCharacter,
     setEquipment,
+    setPets,
     wearCosmetic,
     getBirthdays,
     setBirthday,

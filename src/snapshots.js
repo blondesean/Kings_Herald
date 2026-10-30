@@ -13,7 +13,7 @@
 
 const cron = require('node-cron');
 const pointsStore = require('./pointsStore');
-const { fitScore } = require('./character');
+const { totalFit } = require('./character');
 const { recordHistory } = require('./historyLog');
 const { easternDay } = require('../commands/passive/shop');
 
@@ -35,7 +35,7 @@ const snapshotGuild = async function (guild, day = easternDay()) {
             name: m.displayName || 'a noble',
             points: m.points || 0,
             earned: (m.totalEarned || 0) + (m.earnedBaseline || 0),
-            fit: fitScore(m.gear || {}),
+            fit: totalFit(m.gear, m),
             duelWins: m.duelWins || 0,
             duelLosses: m.duelLosses || 0,
             shopSpent: state.counters.shop_spent || 0,

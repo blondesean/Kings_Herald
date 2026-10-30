@@ -5,6 +5,8 @@
  *   - 5 gear pieces, drawn at random from the catalog
  *   - 1 title, 1 class and 1 race. The title is one no member owns yet,
  *     so each title has one bearer; with every title owned, none is stocked
+ *   - 1 pet, freshly generated (src/pets.js), for PET_PRICE. One buyer
+ *     adopts it and names it
  * Gear and titles have 2 copies (titles: 1) shared by the whole server. Once
  * they're gone, that item is sold out until the next day. Callings and kindreds
  * never run out. The shop stays open until midnight Eastern, 9 PM Pacific,
@@ -35,6 +37,7 @@ const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findShopRole } = require('../../src/shopRole');
 const catalog = require('./shopCatalog');
+const { generatePet, petDescription, PET_PRICE } = require('../../src/pets');
 const flavor = require('../../flavor_text');
 
 const TIMEZONE = 'America/New_York';
@@ -44,6 +47,8 @@ const COPIES_PER_ITEM = 2;
 const COPIES_PER_TITLE = 1;
 const copiesFor = (id) => (catalog.TITLES.some((t) => t.id === id) ? COPIES_PER_TITLE : COPIES_PER_ITEM);
 const GEAR_PER_DAY = 5;
+// The stock key for the day's pet; no catalog id looks like it.
+const PET_STOCK_KEY = 'pet';
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 
@@ -110,7 +115,9 @@ const stockRecord = (now = Date.now(), random = Math.random, ownedTitles = new S
     return {
         day: easternDay(new Date(now)),
         items,
-        stock: Object.fromEntries(items.filter(isLimited).map((id) => [id, copiesFor(id)])),
+        // The day's pet, unnamed until adopted. Its one copy is stocked as PET_STOCK_KEY.
+        pet: generatePet(random),
+        stock: { ...Object.fromEntries(items.filter(isLimited).map((id) => [id, copiesFor(id)])), [PET_STOCK_KEY]: 1 },
         openedAt: now,
         closesAt: nextEasternMidnight(now),
     };
@@ -188,12 +195,19 @@ const shopEmbed = (record, discounts = []) => {
             return `${tagFor(entry)}**${entry.name}** — ${price}, from ${listing.sellerName}`;
         });
 
+    // Shops opened before pets existed have none.
+    const adopted = record.stock && record.stock[PET_STOCK_KEY] === 0;
+    const petLines = record.pet
+        ? [`**${petDescription(record.pet)}** — ${adopted ? 'adopted' : `${PET_PRICE} pts, \`/buy item:pet name:<name>\``}`]
+        : [];
+
     const sections = [
         [`=== Armor and Arms (${COPIES_PER_ITEM} in stock) ===`, linesFor('gear')],
         [`=== Discounts (${DISCOUNT * 100}% off, 1 each) ===`, discountLines],
         ['=== Titles (unique) ===', linesFor('title')],
         ['=== Classes (no limit) ===', linesFor('class')],
         ['=== Races (no limit) ===', linesFor('race')],
+        ['=== Pet (1 to adopt) ===', petLines],
     ];
     const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
@@ -288,5 +302,5 @@ const currentOpenShop = async function (guildId, now = Date.now()) {
 
 module.exports = {
     openShopNow, closeShopNow, pickDailyStock, easternDay, nextEasternMidnight, stockRecord, shopEmbed, kindOf, currentOpenShop,
-    discountsFor, settleListings, discountPrice, unsoldRefund,
+    discountsFor, settleListings, discountPrice, unsoldRefund, PET_STOCK_KEY,
 };
