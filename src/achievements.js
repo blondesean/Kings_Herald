@@ -84,6 +84,8 @@ const ACHIEVEMENTS = [
     { id: 'red_handed', name: 'Caught Red-Handed', description: 'Be struck down while plundering in a lost encounter', counter: 'plunder_caught', goal: 1 },
     { id: 'adopter', name: 'A Friend for Life', description: 'Adopt a pet from the shop', counter: 'pets_adopted', goal: 1 },
     { id: 'good_owner', name: 'Who Is a Good Pet', description: 'Pet thy pet with /pet', counter: 'pets_petted', goal: 1 },
+    { id: 'gambler', name: 'Roll the Bones', description: "Roll the herald's dice with /gamble", counter: 'gambles', goal: 1 },
+    { id: 'lucky_roll', name: 'Fortune Favours the Bold', description: 'Win a Legendary piece with /gamble', counter: 'gamble_wins', goal: 1 },
 ];
 
 const byId = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));

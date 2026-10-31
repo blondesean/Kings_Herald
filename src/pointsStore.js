@@ -836,6 +836,31 @@ const buyWithPoints = async function (guildId, userId, displayName, price, grant
     }
 };
 
+/* Spend `amount` points on nothing in particular (a /gamble roll), in one
+ * conditional update, so two quick spends can't overdraw. Counts toward the
+ * week's losses like any spending, and is logged under `reason`. Returns true
+ * on success, false if the member can't afford it.
+ */
+const spendPoints = async function (guildId, userId, displayName, amount, reason) {
+    if (!isConfigured()) return false;
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: 'SET #dn = :n ADD #pts :neg, #wl :amount',
+            ConditionExpression: '#pts >= :amount',
+            ExpressionAttributeNames: { '#dn': 'displayName', '#pts': 'points', '#wl': 'weeklyLost' },
+            ExpressionAttributeValues: { ':n': displayName || 'a noble', ':neg': -amount, ':amount': amount },
+        }));
+        recordPoints(guildId, userId, -amount, reason);
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
 /* A /fence purchase: buyWithPoints, limited to one a day. The same update
  * also sets fencedOn to `day`, and only lands if it isn't already `day`, so
  * two quick purchases can't both get through. Returns { ok: true } or
@@ -2025,6 +2050,7 @@ module.exports = {
     restockShopItem,
     clearTitle,
     buyWithPoints,
+    spendPoints,
     fenceWithPoints,
     getCharacter,
     setEquipment,

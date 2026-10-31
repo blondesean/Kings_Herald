@@ -43,4 +43,5 @@ module.exports = {
     ...require('./weeklyRecapFlavor'),
     ...require('./halloweenTreatFlavor'),
     ...require('./petFlavor'),
+    ...require('./gambleFlavor'),
 };
