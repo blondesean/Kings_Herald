@@ -139,7 +139,9 @@ const renderSheet = ({ displayName, character = {} }) => {
         });
     }
     lines.push(rule());
-    lines.push(row(`Fit score: ${totalFit(character.gear, character)}`));
+    // As worn, and the most they could field suiting up in their finest (bestKit),
+    // the figure duels and encounters offer.
+    lines.push(row(`Fit score: ${totalFit(character.gear, character)} (max ${totalFit(bestKit(character), character)})`));
     lines.push(rule());
     // The pet at the member's side, under the fit score.
     const pet = character.pet;

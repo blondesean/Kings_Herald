@@ -69,7 +69,7 @@ const helpGuides = {
             '',
             'Every title, class and race thou buyest is thine to keep. `/bank` lists the ones thou art not wearing, and `/equip <name>` swaps one on.',
             '',
-            'Thy **fit** is the worth of the gear thou wearest, plus or minus what thy pet lends. It sways fit duels and the daily encounter, and the finest fit in the court is a myth.',
+            'Thy **fit** is the worth of the gear thou wearest, plus or minus what thy pet lends. Thy sheet also shows thy max: the fit thou couldst field in the finest gear thou ownest. It sways fit duels and the daily encounter, and the finest fit in the court is a myth.',
             '',
             'A pet may stand at thy side too. See the Pets guide.',
         ].join('\n'),
