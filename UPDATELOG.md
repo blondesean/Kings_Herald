@@ -5,8 +5,13 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-30
+
+- Connections: 30 more puzzles, 74 in all (`24b5a74`)
+
 ## 2026-10-29
 
+- Regenerate UPDATELOG.md (`1064df6`)
 - Pets: a daily shop pet to adopt, name, pet and trade (`e73f01d`)
 - Connections: 23 new puzzles with more varied categories (`bf75324`)
 - Encounter parties have three hours to form; the test defaults to one minute (`f030e0b`)
