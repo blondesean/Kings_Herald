@@ -82,6 +82,11 @@ const row = (text) => `| ${fit(text, WIDTH - 4)} |`;
 
 const rule = () => `+${'-'.repeat(WIDTH - 2)}+`;
 
+// A boxed row with a mark in the left margin, where row() leaves a space,
+// so the slot labels stay lined up.
+const UPGRADE_MARK = '*';
+const markedRow = (text) => `|${UPGRADE_MARK}${fit(text, WIDTH - 4)} |`;
+
 /* The /flex block. `displayName` is the member's name; `character` is the
  * stored character (may be empty for a brand-new member).
  */
@@ -124,9 +129,15 @@ const renderSheet = ({ displayName, character = {} }) => {
 
     const lines = [rule(), ...nameRows.map((text) => row(centred(text))), row(raceClassLine), rule()];
     const helmRow = lines.length;
+    // A slot whose finest owned piece (bestKit) isn't the one worn could be
+    // upgraded from the bag; it's marked with UPGRADE_MARK in the left margin.
+    const best = bestKit(character);
+    let marked = false;
     for (const slot of GEAR_SLOTS) {
         const item = findEntry((character.gear || {})[slot]);
         const label = slot.charAt(0).toUpperCase() + slot.slice(1);
+        const upgradable = Boolean(best[slot]) && best[slot] !== (character.gear || {})[slot];
+        marked = marked || upgradable;
         // The slot label is right-justified, so it sits right against the item name.
         // A long name wraps onto extra bordered rows under the same slot.
         // Rarity comes first, in brackets, then the full name.
@@ -135,9 +146,10 @@ const renderSheet = ({ displayName, character = {} }) => {
         chunks.forEach((chunk, i) => {
             // The colon sits after the slot label on its first row only.
             const start = i === 0 ? `${label.padStart(6)}: ` : ' '.repeat(8);
-            lines.push(row(`${start}${chunk}`));
+            lines.push(i === 0 && upgradable ? markedRow(`${start}${chunk}`) : row(`${start}${chunk}`));
         });
     }
+    if (marked) lines.push(row(`${UPGRADE_MARK} finer gear in thy bag`));
     lines.push(rule());
     // As worn, and the most they could field suiting up in their finest (bestKit),
     // the figure duels and encounters offer.
