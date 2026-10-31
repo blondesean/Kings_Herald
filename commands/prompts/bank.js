@@ -6,7 +6,7 @@
 const pointsStore = require('../../src/pointsStore');
 const { bagBySlot, cosmeticField } = require('../../src/character');
 const { GEAR_SLOTS, rarityFor, findEntry } = require('../passive/shopCatalog');
-const { petDescription } = require('../../src/pets');
+const { petDescription, petFullName } = require('../../src/pets');
 const flavor = require('../../flavor_text');
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
@@ -61,7 +61,7 @@ const bank = async function (interaction) {
         // Pets resting in the bank, each with what it holds.
         const petLines = character.pets.map((pet) => {
             const held = findEntry(pet.item);
-            return `**${pet.name}**, ${petDescription(pet)}${held ? `, holding ${held.name}` : ''}`;
+            return `**${petFullName(pet)}**, ${petDescription(pet)}${held ? `, holding ${held.name}` : ''}`;
         });
         if (petLines.length) sections.push(`**Thy pets**\n${petLines.join('\n')}`);
         await interaction.editReply(`${sections.join('\n\n')}\n\nEquip one with \`/equip <name>\`.`);

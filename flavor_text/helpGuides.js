@@ -86,6 +86,8 @@ const helpGuides = {
             '',
             '**Happiness.** A happy pet lends thee **15 fit**. Pet it with `/pet` at least once a week. A pet left longer grows unhappy, costs thee **10 fit**, and complains to the whole court every morning until petted. Pets in thy bank need no petting.',
             '',
+            '**Titles.** `/pettitle <pet> <title>` gives a pet a title of thine own choosing, as in Biscuit, the Destroyer. Leave the title out to remove it.',
+            '',
             '**Holding gear.** `/petequip <item>` gives thy pet a piece of gear from thy bag to carry, for show only. It adds no fit, and the piece it held goes back to thy bag.',
             '',
             '**Trading.** Pets are traded like gear, with `/trade`, from thy side or thy bank, and keep whatever they carry.',

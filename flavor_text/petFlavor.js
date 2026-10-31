@@ -81,6 +81,26 @@ const petSwappedLines = (name, old) => {
     ];
 };
 
+// /pettitle. `owner` is a mention; `name` the pet's name, `title` its new title.
+const petTitledLines = (owner, name, title) => [
+    `Hear ye! By decree of ${owner}, the pet **${name}** shall henceforth be known as **${name}, ${title}**.`,
+    `The heralds unroll a fresh scroll: **${name}, ${title}**. ${owner} beams with pride.`,
+    `Let it be written in the rolls of the court: **${name}, ${title}**. The pet seems to approve.`,
+];
+
+const petTitleClearedLines = (name) => [
+    `**${name}** lays down their title and is plain **${name}** once more.`,
+    `The scribes strike the title from the rolls. **${name}** is simply **${name}** again.`,
+];
+
+const petBadTitleLines = (max) => [
+    `That title will not fit on a collar. Keep it to ${max} characters, starting with a letter, using letters, numbers, spaces, apostrophes, commas and hyphens.`,
+];
+
+const petNotOwnedLines = (typed) => [
+    `Thou hast no pet named **${typed}**, good noble. Check thy side and thy \`/bank\`.`,
+];
+
 // A traded pet arriving. `atSide` is true when it went to the new owner's side.
 const tradePetPlacedLine = (who, name, atSide) => (atSide
     ? `**${name}** goes straight to ${who}'s side.`
@@ -114,6 +134,10 @@ module.exports = {
     petEquippedLines,
     petNoItemLines,
     petSwappedLines,
+    petTitledLines,
+    petTitleClearedLines,
+    petBadTitleLines,
+    petNotOwnedLines,
     tradePetPlacedLine,
     petAlreadyAtSideLines,
     petMorningLines,

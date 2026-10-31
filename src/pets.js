@@ -6,8 +6,9 @@
  * modifier, such as "stripes" made "thick" or "spots" made "four". The shop
  * stocks one each day (commands/passive/shop.js), and the buyer names it.
  * A pet is stored as
- *   { id, species, color, trait, mod, name, item, lastPetted, adoptedAt }
- * where `item` is the gear id it holds (see /petequip), or null. The pet a
+ *   { id, species, color, trait, mod, name, title, item, lastPetted, adoptedAt }
+ * where `title` is the free-text title its owner gave it with /pettitle, if
+ * any, and `item` is the gear id it holds (see /petequip), or null. The pet a
  * member keeps at their side is `pet` on their ledger item; the rest wait in
  * `pets`, shown in /bank.
  *
@@ -25,6 +26,8 @@
  *   isHappy(pet, now) - petted within PET_HAPPY_MS
  *   petBonus(character, now) - the fit the pet at their side lends, or 0
  *   cleanPetName(typed) - the name, tidied, or null if it isn't allowed
+ *   cleanPetTitle(typed) - the title, tidied, or null if it isn't allowed
+ *   petFullName(pet) - "Biscuit, the Destroyer", or "Biscuit" untitled
  *   matchPet(pets, typed) - the pet whose name matches, ignoring case, or null
  */
 
@@ -33,6 +36,7 @@ const PET_HAPPY_MS = 7 * 24 * 60 * 60 * 1000;
 const PET_HAPPY_BONUS = 15;
 const PET_UNHAPPY_PENALTY = -10;
 const PET_NAME_MAX = 20;
+const PET_TITLE_MAX = 30;
 
 // Traits, each a list of modifiers and how the pair reads.
 const trait = (mods, text) => ({ mods, text });
@@ -125,6 +129,18 @@ const cleanPetName = (typed) => {
     return name.replace(/(^|\s)([a-z])/g, (_, space, letter) => space + letter.toUpperCase());
 };
 
+// A pet's title: letters, digits, spaces, apostrophes, commas and hyphens,
+// starting with a letter, kept as typed apart from squeezed spaces, so "the
+// Destroyer" keeps its lowercase "the". Null if it isn't allowed.
+const cleanPetTitle = (typed) => {
+    const title = String(typed || '').trim().replace(/\s+/g, ' ');
+    if (!title || title.length > PET_TITLE_MAX || !/^[A-Za-z][A-Za-z0-9' ,-]*$/.test(title)) return null;
+    return title;
+};
+
+// "Biscuit, the Destroyer", or just "Biscuit" with no title.
+const petFullName = (pet) => (pet.title ? `${pet.name}, ${pet.title}` : pet.name);
+
 const matchPet = (pets = [], typed) => {
     const wanted = String(typed || '').trim().toLowerCase();
     if (!wanted) return null;
@@ -132,7 +148,7 @@ const matchPet = (pets = [], typed) => {
 };
 
 module.exports = {
-    SPECIES, TRAITS, PET_PRICE, PET_HAPPY_MS, PET_HAPPY_BONUS, PET_UNHAPPY_PENALTY, PET_NAME_MAX,
+    SPECIES, TRAITS, PET_PRICE, PET_HAPPY_MS, PET_HAPPY_BONUS, PET_UNHAPPY_PENALTY, PET_NAME_MAX, PET_TITLE_MAX,
     generatePet, speciesName, petKind, petTraitText, petDescription, petSound,
-    isHappy, petBonus, cleanPetName, matchPet,
+    isHappy, petBonus, cleanPetName, cleanPetTitle, petFullName, matchPet,
 };

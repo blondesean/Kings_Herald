@@ -27,7 +27,8 @@
 
 const { GEAR_SLOTS, DEFAULT_CLASS, TITLES, CLASSES, RACES, findEntry, rarityFor } = require('../commands/passive/shopCatalog');
 const { POSES, poseLines } = require('./poses');
-const { petBonus, petDescription, isHappy } = require('./pets');
+const { petBonus, petDescription, petFullName, isHappy } = require('./pets');
+const { petArtLines } = require('./petArt');
 
 const WIDTH = 32; // width of the /flex box, in characters (kept narrow for phones)
 
@@ -145,8 +146,14 @@ const renderSheet = ({ displayName, character = {} }) => {
     if (pet) {
         const held = findEntry(pet.item);
         const bonus = petBonus(character);
+        // The species' figure, centred as a block so its lines stay aligned.
+        const figure = petArtLines(pet.species);
+        const figureWidth = Math.max(0, ...figure.map((l) => l.length));
+        const indent = ' '.repeat(Math.max(0, Math.floor((WIDTH - 4 - figureWidth) / 2)));
+        figure.forEach((line) => lines.push(row(`${indent}${line}`)));
+        if (figure.length) lines.push(row(''));
         const rows = [
-            `Pet: ${pet.name}`,
+            ...wrapText(`Pet: ${petFullName(pet)}`, WIDTH - 4),
             ...wrapText(petDescription(pet), WIDTH - 4),
             ...wrapText(`Holds: ${held ? `[${rarityFor(held.price)}] ${held.name}` : 'nothing'}`, WIDTH - 4),
             `Mood: ${isHappy(pet) ? 'Happy' : 'Unhappy'}, ${bonus > 0 ? '+' : ''}${bonus} fit`,
