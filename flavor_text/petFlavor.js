@@ -38,7 +38,7 @@ const petAdoptedAlreadyLines = () => [
 ];
 
 const petCannotAffordLines = (price) => [
-    `A pet costs ${price} points, good noble, and thy purse falls short.`,
+    `A pet costs ${price} ${price === 1 ? 'point' : 'points'}, good noble, and thy purse falls short.`,
 ];
 
 // /pet. `wasUnhappy` is true when the pet had grown restless.
@@ -122,6 +122,44 @@ const petMorningFooterLines = () => [
     '*An unhappy pet costs its owner fit. Use `/pet` to set things right.*',
 ];
 
+// Asks the owner to confirm giving up a pet with /sell. `held` is the name of
+// the gear it holds, which goes back to the owner's bag, or null.
+const petGiveUpPromptLines = (name, kind, price, held) => {
+    const drop = held ? ` It drops the **${held}** it carries back into thy bag.` : '';
+    return [
+        `Give up **${name}**, thy ${kind}? It goes to the merchant, to be offered in the next day's shop for ${price} ${price === 1 ? 'point' : 'points'}. Thou receivest nothing for it, whether it finds a new home or not.${drop}`,
+    ];
+};
+
+const petGivenUpLines = (name) => [
+    `**${name}** is handed to the merchant with one last scratch behind the ears. Look for it among the pets in the next day's shop.`,
+    `The merchant leads **${name}** away. It looks back only once. It will be offered in the next day's shop.`,
+];
+
+// A pet given up by `seller` was adopted. `atSide` as in petAdoptedLines.
+const petRehomedLines = (mention, name, kind, seller, atSide) => {
+    const where = atSide
+        ? `${name} now stays at thy side and lends thee fit while happy.`
+        : `${name} waits in thy bank; \`/equip ${name}\` brings it to thy side.`;
+    return [
+        `${mention} gives **${name}**, ${seller}'s old ${kind}, a new home! ${where}`,
+        `**${name}** the ${kind}, once ${seller}'s, goes home with ${mention}. ${where}`,
+    ];
+};
+
+// The buyer already has a pet by that name, so the newcomer needs another.
+const petRehomeNameTakenLines = (name, typed) => [
+    `Thou already hast a pet called **${name}**. Give the newcomer another with \`/buy item:${typed} name:<name>\`.`,
+];
+
+const petOwnListingLines = (name) => [
+    `Thou gavest up **${name}** thyself, good noble. Let another give it a home.`,
+];
+
+const petRehomedGoneLines = (name) => [
+    `**${name}** has already found a new home, good noble.`,
+];
+
 module.exports = {
     petAdoptedLines,
     petNeedsNameLines,
@@ -142,4 +180,10 @@ module.exports = {
     petAlreadyAtSideLines,
     petMorningLines,
     petMorningFooterLines,
+    petGiveUpPromptLines,
+    petGivenUpLines,
+    petRehomedLines,
+    petRehomeNameTakenLines,
+    petOwnListingLines,
+    petRehomedGoneLines,
 };

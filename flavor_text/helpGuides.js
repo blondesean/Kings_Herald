@@ -44,7 +44,7 @@ const helpGuides = {
             '',
             '**Rarity.** Common 10 points, Uncommon 15 to 20, Rare 25 to 30, Epic 35 to 45, Legendary 50. What thy worn gear cost is thy fit, which sways fit duels and encounters.',
             '',
-            '**Selling.** `/sell <item>` lists a piece from thy bag in the next day\'s **Discounts**, at 25% off. If it sells, thou receivest what the buyer paid. If not, half its price comes back to thee and the piece is gone.',
+            '**Selling.** `/sell <item>` lists a piece from thy bag in the next day\'s **Discounts**, at 25% off. If it sells, thou receivest what the buyer paid. If not, half its price comes back to thee and the piece is gone. Name several, separated by commas, to sell up to 15 at once.',
             '',
             '**The fence.** `/fence` shows every piece of gear in the realm, by slot and rarity. Once a day, `/fence item` buys any one of them, shop or no shop, for its price and 50 more.',
             '',
@@ -93,6 +93,8 @@ const helpGuides = {
             '**Holding gear.** `/petequip <item>` gives thy pet a piece of gear from thy bag to carry, for show only. It adds no fit, and the piece it held goes back to thy bag.',
             '',
             '**Trading.** Pets are traded like gear, with `/trade`, from thy side or thy bank, and keep whatever they carry.',
+            '',
+            '**Giving up a pet.** `/sell <name>` hands a pet to the merchant, who offers it in the next day\'s shop for 1 point, name, title and all. Thou receivest nothing, adopted or not, and the gear it carried comes back to thy bag. Adopt such a pet with `/buy item:<name>`, adding `name:` to rename it.',
         ].join('\n'),
     },
     achievements: {

@@ -17,6 +17,9 @@
  *
  * Gear members sold back with /sell on an earlier day also goes on sale, in
  * a Discounts section shown only when there is some (see DISCOUNT below).
+ * Pets members gave up with /sell join the day's pet, name and title and
+ * all, for PET_RESALE_PRICE; their old owners are paid nothing either way,
+ * and one still unadopted at closing leaves the realm.
  *
  * Buying uses points from the ledger (see /buy in commands/prompts/buy.js).
  * Gear goes to the buyer's bag, and titles, classes and races take effect
@@ -42,7 +45,7 @@ const { findAnnounceChannel } = require('../../src/findAnnounceChannel');
 const { resolveChannel } = require('../../src/resolveChannel');
 const { findShopRole } = require('../../src/shopRole');
 const catalog = require('./shopCatalog');
-const { generatePet, petDescription, PET_PRICE } = require('../../src/pets');
+const { generatePet, petDescription, petFullName, PET_PRICE } = require('../../src/pets');
 const flavor = require('../../flavor_text');
 
 const TIMEZONE = 'America/New_York';
@@ -160,9 +163,12 @@ const settleListings = async function (guildId, now = Date.now()) {
     const listings = await pointsStore.getListings(guildId);
     for (const listing of listings) {
         if (listing.status !== 'onSale' || listing.closesAt > now) continue;
-        const refund = unsoldRefund(listing.price);
+        // A pet given up pays its old owner nothing, and unsold it leaves the realm.
+        const refund = listing.pet ? 0 : unsoldRefund(listing.price);
         if (await pointsStore.expireListing(guildId, listing, refund)) {
-            console.log(`Shop (guild ${guildId}): ${listing.sellerName}'s ${listing.itemId} went unsold; refunded ${refund}.`);
+            console.log(listing.pet
+                ? `Shop (guild ${guildId}): ${listing.sellerName}'s pet ${listing.pet.name} went unadopted and leaves the realm.`
+                : `Shop (guild ${guildId}): ${listing.sellerName}'s ${listing.itemId} went unsold; refunded ${refund}.`);
         }
     }
     return listings;
@@ -204,6 +210,7 @@ const shopEmbed = (record, discounts = []) => {
     // A struck-out full price can't nest inside the strike for a sold piece,
     // so a sold one shows only what it went for.
     const discountLines = discounts
+        .filter((listing) => !listing.pet)
         .map((listing) => ({ listing, entry: catalog.findEntry(listing.itemId) }))
         .filter(({ entry }) => entry)
         .map(({ listing, entry }) => (listing.status === 'sold'
@@ -217,6 +224,13 @@ const shopEmbed = (record, discounts = []) => {
             ? gone(`**${petDescription(record.pet)}** — ${PET_PRICE} pts`, 'adopted')
             : `**${petDescription(record.pet)}** — ${PET_PRICE} pts, \`/buy item:pet name:<name>\``]
         : [];
+    // Pets given up with /sell follow the day's own, bought by name.
+    const pts = (price) => `${price} ${price === 1 ? 'pt' : 'pts'}`;
+    const rehomed = discounts.filter((listing) => listing.pet);
+    for (const listing of rehomed) {
+        const text = `**${petFullName(listing.pet)}**, ${petDescription(listing.pet)} — ${pts(listing.price)}, from ${listing.sellerName}`;
+        petLines.push(listing.status === 'sold' ? gone(text, 'adopted') : `${text}, \`/buy item:${listing.pet.name}\``);
+    }
 
     const sections = [
         [`=== Armor and Arms (${COPIES_PER_ITEM} in stock) ===`, linesFor('gear')],
@@ -224,7 +238,7 @@ const shopEmbed = (record, discounts = []) => {
         ['=== Titles (unique) ===', linesFor('title')],
         ['=== Classes (no limit) ===', linesFor('class')],
         ['=== Races (no limit) ===', linesFor('race')],
-        ['=== Pet (1 to adopt) ===', petLines],
+        [rehomed.length ? '=== Pets (1 each to adopt) ===' : '=== Pet (1 to adopt) ===', petLines],
     ];
     const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)

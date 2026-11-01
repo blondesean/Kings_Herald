@@ -1521,6 +1521,8 @@ const tradeCharacters = async function (guildId, sides) {
 /* Sellback listings (see commands/prompts/sell.js and commands/passive/shop.js).
  * Each listing is its own item under SELL#<guildId>, keyed by listingId:
  *   { itemId, price, sellerId, sellerName, listedDay, status, saleDay, closesAt, buyerId, paid }
+ * A pet given up also carries `pet`, the whole pet (src/pets.js), with
+ * itemId "pet:<species>"; it sells for PET_RESALE_PRICE and pays nobody.
  * status moves listed -> onSale (when a shop opens on a later day) -> sold or
  * expired. Every move that pays someone is a transaction with the status
  * change, so a listing can never pay out twice.
@@ -1554,36 +1556,34 @@ const cancelledBy = (error) => error.name === 'TransactionCanceledException' || 
 const failedIndex = (error) =>
     (error.CancellationReasons || []).findIndex((reason) => reason && reason.Code === 'ConditionalCheckFailed');
 
-/* Take one copy of `listing.itemId` out of the seller's bag and list it, in
- * one transaction. `expectedBag` must match what's stored now, the same guard
- * /equip uses. Returns the listingId, or null if the bag changed.
+/* Take `listings` from the seller and list them, in one transaction. `before`
+ * and `after` each hold some of { bag, pet, pets }, as in setPets: `after` is
+ * what the seller keeps, and it lands only if `before` is still what's stored,
+ * the same guard /equip uses. Returns the listingIds, in order, or null if
+ * anything changed. A transaction holds at most 100 writes, one of them the seller.
  */
-const createListing = async function (guildId, seller, listing, expectedBag, newBag) {
+const createListings = async function (guildId, seller, listings, before, after) {
     if (!isConfigured()) return null;
 
-    const listingId = `${Date.now()}#${Math.random().toString(36).slice(2, 8)}`;
+    const now = Date.now();
+    const listingIds = [];
+    while (listingIds.length < listings.length) {
+        const id = `${now}#${Math.random().toString(36).slice(2, 8)}`;
+        if (!listingIds.includes(id)) listingIds.push(id);
+    }
     try {
         await getClient().send(new TransactWriteCommand({
             TransactItems: [
-                {
-                    Update: {
-                        TableName: TABLE_NAME,
-                        Key: { guildId, userId: seller.id },
-                        UpdateExpression: 'SET #bag = :bag',
-                        ConditionExpression: '#bag = :expected',
-                        ExpressionAttributeNames: { '#bag': 'bag' },
-                        ExpressionAttributeValues: { ':bag': newBag, ':expected': expectedBag },
-                    },
-                },
-                {
+                { Update: guardedUpdate(guildId, seller.id, before, after) },
+                ...listings.map((listing, i) => ({
                     Put: {
                         TableName: TABLE_NAME,
-                        Item: { guildId: LISTING_PREFIX + guildId, userId: listingId, status: 'listed', sellerId: seller.id, sellerName: seller.displayName || 'a noble', ...listing },
+                        Item: { guildId: LISTING_PREFIX + guildId, userId: listingIds[i], status: 'listed', sellerId: seller.id, sellerName: seller.displayName || 'a noble', ...listing },
                     },
-                },
+                })),
             ],
         }));
-        return listingId;
+        return listingIds;
     } catch (error) {
         if (cancelledBy(error)) return null;
         throw error;
@@ -1614,11 +1614,12 @@ const putListingOnSale = async function (guildId, listingId, saleDay, closesAt) 
 };
 
 /* Buy a listing, in one transaction: the listing must still be on sale today,
- * the buyer is charged `price` and given the gear (`grant`, as in
- * buyWithPoints), and the seller is paid the same `price`. Returns
+ * the buyer is charged `price` and given the gear or pet (`grant`, as in
+ * buyWithPoints), and the seller is paid `sellerPay`, the same `price`
+ * unless told otherwise (a pet given up pays its seller nothing). Returns
  * { ok: true } or { ok: false, reason: 'soldOut' | 'cannotAfford' }.
  */
-const buyListing = async function (guildId, listing, buyer, price, grant, day, now) {
+const buyListing = async function (guildId, listing, buyer, price, grant, day, now, sellerPay = price) {
     if (!isConfigured()) return { ok: false, reason: 'soldOut' };
 
     try {
@@ -1628,26 +1629,26 @@ const buyListing = async function (guildId, listing, buyer, price, grant, day, n
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { guildId: LISTING_PREFIX + guildId, userId: listing.listingId },
-                        UpdateExpression: 'SET #status = :sold, #buyer = :buyer, #paid = :price',
+                        UpdateExpression: 'SET #status = :sold, #buyer = :buyer, #paid = :paid',
                         ConditionExpression: '#status = :onSale AND #saleDay = :day AND #closes > :now',
                         ExpressionAttributeNames: { '#status': 'status', '#buyer': 'buyerId', '#paid': 'paid', '#saleDay': 'saleDay', '#closes': 'closesAt' },
-                        ExpressionAttributeValues: { ':sold': 'sold', ':onSale': 'onSale', ':buyer': buyer.id, ':price': price, ':day': day, ':now': now },
+                        ExpressionAttributeValues: { ':sold': 'sold', ':onSale': 'onSale', ':buyer': buyer.id, ':paid': sellerPay, ':day': day, ':now': now },
                     },
                 },
                 { Update: chargeUpdate(guildId, buyer.id, buyer.displayName, price, grant) },
-                {
+                ...(sellerPay ? [{
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { guildId, userId: listing.sellerId },
-                        UpdateExpression: 'ADD #pts :price, #te :price',
+                        UpdateExpression: 'ADD #pts :pay, #te :pay',
                         ExpressionAttributeNames: { '#pts': 'points', '#te': EARNED },
-                        ExpressionAttributeValues: { ':price': price },
+                        ExpressionAttributeValues: { ':pay': sellerPay },
                     },
-                },
+                }] : []),
             ],
         }));
         recordPoints(guildId, buyer.id, -price, 'shop_discount', { item: listing.itemId, listingId: listing.listingId });
-        recordPoints(guildId, listing.sellerId, price, 'sale', { item: listing.itemId, listingId: listing.listingId });
+        if (sellerPay) recordPoints(guildId, listing.sellerId, sellerPay, 'sale', { item: listing.itemId, listingId: listing.listingId });
         return { ok: true };
     } catch (error) {
         if (!cancelledBy(error)) throw error;
@@ -1655,9 +1656,9 @@ const buyListing = async function (guildId, listing, buyer, price, grant, day, n
     }
 };
 
-/* Close out a listing that didn't sell: the seller is paid `refund` and the
- * listing is marked expired, in one transaction. Returns false if it was
- * already settled.
+/* Close out a listing that didn't sell: the seller is paid `refund` (none
+ * for a pet given up) and the listing is marked expired, in one transaction.
+ * Returns false if it was already settled.
  */
 const expireListing = async function (guildId, listing, refund) {
     if (!isConfigured()) return false;
@@ -1675,7 +1676,7 @@ const expireListing = async function (guildId, listing, refund) {
                         ExpressionAttributeValues: { ':expired': 'expired', ':onSale': 'onSale', ':refund': refund },
                     },
                 },
-                {
+                ...(refund ? [{
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { guildId, userId: listing.sellerId },
@@ -1683,10 +1684,10 @@ const expireListing = async function (guildId, listing, refund) {
                         ExpressionAttributeNames: { '#pts': 'points', '#te': EARNED },
                         ExpressionAttributeValues: { ':refund': refund },
                     },
-                },
+                }] : []),
             ],
         }));
-        recordPoints(guildId, listing.sellerId, refund, 'unsold_refund', { item: listing.itemId, listingId: listing.listingId });
+        if (refund) recordPoints(guildId, listing.sellerId, refund, 'unsold_refund', { item: listing.itemId, listingId: listing.listingId });
         return true;
     } catch (error) {
         if (cancelledBy(error)) return false;
@@ -2029,6 +2030,17 @@ const setEquipment = async function (guildId, userId, expectedBag, gear, bag) {
 const setPets = async function (guildId, userId, before, after) {
     if (!isConfigured()) return false;
 
+    try {
+        await getClient().send(new UpdateCommand(guardedUpdate(guildId, userId, before, after)));
+        return true;
+    } catch (error) {
+        if (error.name === 'ConditionalCheckFailedException') return false;
+        throw error;
+    }
+};
+
+// The update behind setPets, also used inside createListings' transaction.
+const guardedUpdate = (guildId, userId, before, after) => {
     const names = {};
     const values = {};
     const sets = [];
@@ -2053,20 +2065,14 @@ const setPets = async function (guildId, userId, before, after) {
         conditions.push(empty ? `(attribute_not_exists(#${field}) OR #${field} = :old_${field})` : `#${field} = :old_${field}`);
     }
     const update = [sets.length ? `SET ${sets.join(', ')}` : '', removes.length ? `REMOVE ${removes.join(', ')}` : ''].filter(Boolean).join(' ');
-    try {
-        await getClient().send(new UpdateCommand({
-            TableName: TABLE_NAME,
-            Key: { guildId, userId },
-            UpdateExpression: update,
-            ConditionExpression: conditions.join(' AND ') || undefined,
-            ExpressionAttributeNames: names,
-            ExpressionAttributeValues: Object.keys(values).length ? values : undefined,
-        }));
-        return true;
-    } catch (error) {
-        if (error.name === 'ConditionalCheckFailedException') return false;
-        throw error;
-    }
+    return {
+        TableName: TABLE_NAME,
+        Key: { guildId, userId },
+        UpdateExpression: update,
+        ConditionExpression: conditions.join(' AND ') || undefined,
+        ExpressionAttributeNames: names,
+        ExpressionAttributeValues: Object.keys(values).length ? values : undefined,
+    };
 };
 
 /* Wear a title, class or race from the member's cosmetics: `field` becomes
@@ -2253,7 +2259,7 @@ module.exports = {
     getInjury,
     setInjury,
     getListings,
-    createListing,
+    createListings,
     putListingOnSale,
     buyListing,
     expireListing,

@@ -152,6 +152,50 @@ const listedLines = (name) => [
     `**${name}** leaves thy bag for the merchant's cart. Look for it among the discounts in the next day's shop.`,
 ];
 
+// "A", "A and B", "A, B and C", each in bold.
+const boldList = (names) => {
+    const bold = names.map((name) => `**${name}**`);
+    return bold.length > 1 ? `${bold.slice(0, -1).join(', ')} and ${bold[bold.length - 1]}` : bold.join('');
+};
+
+// Selling several things at once. `items` is [{ name, salePrice, refund }]
+// for gear and [{ name, kind, price, held, pet: true }] for a pet given up, which
+// pays nothing; `skipped` holds a line for each name that can't be sold, shown first.
+const sellManyPromptLines = (items, skipped = []) => {
+    const gear = items.filter((item) => !item.pet);
+    const total = (key) => gear.reduce((sum, item) => sum + item[key], 0);
+    const list = items.map((item) => (item.pet
+        ? `- **${item.name}**, thy ${item.kind}: offered for ${item.price} ${item.price === 1 ? 'point' : 'points'}, nothing to thee${item.held ? `. Its **${item.held}** returns to thy bag` : ''}`
+        : `- **${item.name}**: ${item.salePrice} points if it sells, ${item.refund} if not`));
+    const left = skipped.length ? `${skipped.join('\n')}\n\n` : '';
+    const rules = [
+        gear.length ? 'If another noble buys a piece, thou receivest the sale price. If none does, the merchant pays thee the lesser sum and keeps it.' : '',
+        items.length > gear.length ? 'A pet given up earns thee nothing, whether it finds a new home or not.' : '',
+    ].filter(Boolean).join(' ');
+    const totals = gear.length ? `\nIn all, ${total('salePrice')} points if every piece sells, ${total('refund')} if none do.` : '';
+    return [
+        `${left}Sell ${items.length === 1 ? 'this' : `these ${items.length}`} to the merchant? Each goes on sale in the next day's shop. ${rules}\n${list.join('\n')}${totals}`,
+    ];
+};
+
+const listedManyLines = (names) => [
+    `${boldList(names)} go to the merchant's cart. Look for them in the next day's shop.`,
+];
+
+const sellTooManyLines = (max) => [
+    `The merchant's cart holds no more than ${max} pieces at a time, good noble. Sell the rest on another trip.`,
+];
+
+// Stands in for refusals that would make the reply too long to post.
+const sellMoreRefusedLines = (count) => [
+    `And ${count} more ${count === 1 ? 'name' : 'names'} the merchant cannot take.`,
+];
+
+// More copies named than the bag holds.
+const sellNotEnoughLines = (name, count) => [
+    `Thou hast but ${count} **${name}** in thy bag to sell.`,
+];
+
 const sellEquippedLines = (name) => [
     `Thou art wearing **${name}**. Only gear in thy bag can be sold: equip another piece in its place first.`,
 ];
@@ -179,6 +223,11 @@ module.exports = {
     ownListingLines,
     sellPromptLines,
     listedLines,
+    sellManyPromptLines,
+    listedManyLines,
+    sellTooManyLines,
+    sellMoreRefusedLines,
+    sellNotEnoughLines,
     sellEquippedLines,
     notSellableLines,
     uniqueNotSellableLines,

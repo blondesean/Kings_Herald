@@ -4,7 +4,9 @@
  *
  * A pet is generated from its species: a color, and one trait with a
  * modifier, such as "stripes" made "thick" or "spots" made "four". The shop
- * stocks one each day (commands/passive/shop.js), and the buyer names it.
+ * stocks one each day (commands/passive/shop.js), and the buyer names it. A
+ * pet its owner gives up with /sell is sold on, name and all, in the next
+ * day's shop for PET_RESALE_PRICE.
  * A pet is stored as
  *   { id, species, color, trait, mod, name, title, item, lastPetted, adoptedAt }
  * where `title` is the free-text title its owner gave it with /pettitle, if
@@ -32,6 +34,9 @@
  */
 
 const PET_PRICE = 10;
+// A pet given up with /sell goes on sale in the next day's shop for this,
+// and its old owner is paid nothing, sold or not.
+const PET_RESALE_PRICE = 1;
 const PET_HAPPY_MS = 7 * 24 * 60 * 60 * 1000;
 const PET_HAPPY_BONUS = 15;
 const PET_UNHAPPY_PENALTY = -10;
@@ -148,7 +153,7 @@ const matchPet = (pets = [], typed) => {
 };
 
 module.exports = {
-    SPECIES, TRAITS, PET_PRICE, PET_HAPPY_MS, PET_HAPPY_BONUS, PET_UNHAPPY_PENALTY, PET_NAME_MAX, PET_TITLE_MAX,
+    SPECIES, TRAITS, PET_PRICE, PET_RESALE_PRICE, PET_HAPPY_MS, PET_HAPPY_BONUS, PET_UNHAPPY_PENALTY, PET_NAME_MAX, PET_TITLE_MAX,
     generatePet, speciesName, petKind, petTraitText, petDescription, petSound,
     isHappy, petBonus, cleanPetName, cleanPetTitle, petFullName, matchPet,
 };

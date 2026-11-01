@@ -16,7 +16,9 @@
  *
  * The day's pet is bought by typing "pet", its species or its description,
  * and must be named with the `name` option. It goes to the buyer's side if
- * none is there, otherwise to their bank (see src/pets.js).
+ * none is there, otherwise to their bank (see src/pets.js). A pet another
+ * member gave up with /sell is bought by its name, and keeps it unless the
+ * buyer gives a new one; its old owner is paid nothing.
  *
  * Public, so the purchase is announced in the channel, in character. After a
  * sale the day's shop post is redrawn, striking through what has sold out.
@@ -26,7 +28,7 @@ const crypto = require('crypto');
 const { ApplicationCommandOptionType } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
 const { currentOpenShop, refreshShopPost, easternDay, kindOf, discountsFor, discountPrice, PET_STOCK_KEY } = require('../passive/shop');
-const { petKind, petDescription, speciesName, cleanPetName, matchPet, PET_PRICE, PET_NAME_MAX } = require('../../src/pets');
+const { petKind, petDescription, petFullName, speciesName, cleanPetName, matchPet, PET_PRICE, PET_NAME_MAX } = require('../../src/pets');
 const { matchEntry, stashFor } = require('../../src/character');
 const achievements = require('../../src/achievements');
 const catalog = require('../passive/shopCatalog');
@@ -137,6 +139,61 @@ const adoptPet = async (interaction, record) => {
     await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
 };
 
+// Whether `typed` is a given-up pet's name, or its name with its title.
+const isNamed = (pet, typed) => {
+    const wanted = String(typed || '').trim().toLowerCase();
+    return [pet.name, petFullName(pet)].some((name) => name.toLowerCase() === wanted);
+};
+
+/* Adopts a pet given up with /sell, from `listings`, today's listings of
+ * pets by the typed name. It keeps its name and title unless the buyer gives
+ * a new name. Buying, charging and closing the listing are one transaction,
+ * which pays the old owner nothing. Moves on to the next pet by that name if
+ * one is adopted from under the buyer. Nobody can adopt back their own.
+ */
+const adoptRehomed = async (interaction, record, listings, typed) => {
+    const guildId = interaction.guild.id;
+    const buyer = interaction.member;
+    const first = listings[0].pet;
+    const onSale = listings.filter((l) => l.status === 'onSale');
+    const forSale = onSale.filter((l) => l.sellerId !== buyer.id);
+    if (!forSale.length) {
+        await interaction.editReply(pick(onSale.length ? flavor.petOwnListingLines(first.name) : flavor.petRehomedGoneLines(first.name)));
+        return;
+    }
+    const typedName = interaction.options.getString('name');
+    const name = typedName ? cleanPetName(typedName) : forSale[0].pet.name;
+    if (!name) {
+        await interaction.editReply(pick(flavor.petBadNameLines(PET_NAME_MAX)));
+        return;
+    }
+    const character = await pointsStore.getCharacter(guildId, buyer.id);
+    if (matchPet([character.pet, ...character.pets].filter(Boolean), name)) {
+        await interaction.editReply(pick(typedName ? flavor.petNameTakenLines(name) : flavor.petRehomeNameTakenLines(name, typed)));
+        return;
+    }
+
+    const atSide = !character.pet;
+    for (const listing of forSale) {
+        const now = Date.now();
+        const pet = { ...listing.pet, name, item: null, lastPetted: now, adoptedAt: now };
+        const result = await pointsStore.buyListing(guildId, listing, buyer, listing.price, { pet, equipPet: atSide }, record.day, now, 0);
+        if (result.reason === 'cannotAfford') {
+            await interaction.editReply(pick(flavor.petCannotAffordLines(listing.price)));
+            return;
+        }
+        if (!result.ok) continue;
+        await recordSpending(guildId, buyer, listing.price);
+        console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) adopted ${listing.pet.name}, ${listing.sellerName}'s ${petDescription(pet)}${name !== listing.pet.name ? `, renamed ${name}` : ''}, for ${listing.price}${atSide ? ', at their side' : ', to the bank'} (${easternDay()}).`);
+        await interaction.editReply(pick(flavor.petRehomedLines(`<@${buyer.id}>`, name, petKind(pet), listing.sellerName, atSide)));
+        refreshShopPost(interaction.guild);
+        await achievements.record(guildId, [{ userId: buyer.id, displayName: buyer.displayName, counts: { pets_adopted: 1 } }], interaction.channel);
+        await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
+        return;
+    }
+    await interaction.editReply(pick(flavor.petRehomedGoneLines(first.name)));
+};
+
 const buy = async function (interaction) {
     const typed = interaction.options.getString('item');
     const guildId = interaction.guild.id;
@@ -160,7 +217,15 @@ const buy = async function (interaction) {
         // A discounted piece is sold before a full-price copy of the same one.
         // Once every discounted copy is gone, /buy falls through to full price.
         const discounts = await discountsFor(guildId, record.day);
-        const discounted = matchEntry(discounts.map((l) => catalog.findEntry(l.itemId)).filter(Boolean), typed);
+        const discounted = matchEntry(discounts.filter((l) => !l.pet).map((l) => catalog.findEntry(l.itemId)).filter(Boolean), typed);
+
+        // A pet given up with /sell is bought by its name; gear by the same name comes first.
+        const rehomed = entry || discounted ? [] : discounts.filter((l) => l.pet && isNamed(l.pet, typed));
+        if (rehomed.length) {
+            await adoptRehomed(interaction, record, rehomed, typed);
+            return;
+        }
+
         if (discounted) {
             const listings = discounts.filter((l) => l.itemId === discounted.id && l.status === 'onSale');
             const forSale = listings.filter((l) => l.sellerId !== buyer.id);
@@ -237,13 +302,13 @@ module.exports = {
     options: [
         {
             name: 'item',
-            description: 'The exact name of the item, as shown in /shop, or "pet" for the day\'s pet',
+            description: 'The exact name of the item as shown in /shop, "pet" for the day\'s pet, or a given-up pet\'s name',
             type: ApplicationCommandOptionType.String,
             required: true,
         },
         {
             name: 'name',
-            description: `A name for the pet, if you are adopting it (up to ${PET_NAME_MAX} letters)`,
+            description: `A name for the pet you adopt (up to ${PET_NAME_MAX} letters). A given-up pet keeps its own if blank`,
             type: ApplicationCommandOptionType.String,
             required: false,
             maxLength: PET_NAME_MAX,
