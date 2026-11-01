@@ -9,7 +9,7 @@
  */
 
 const pointsStore = require('../../src/pointsStore');
-const { currentOpenShop } = require('../passive/shop');
+const { currentOpenShop, refreshShopPost } = require('../passive/shop');
 const { askConfirm } = require('../../src/confirm');
 const catalog = require('../passive/shopCatalog');
 const flavor = require('../../flavor_text');
@@ -57,6 +57,8 @@ const returnTitle = async function (interaction) {
 
         console.log(`Return title (guild ${guildId}): ${name} (${userId}) returned ${title.name}.`);
         await interaction.followUp(pick(flavor.titleReturnedLines(name, title.name)));
+        // The title is back on the shelf, so it's no longer struck through.
+        refreshShopPost(interaction.guild);
     } catch (error) {
         console.error('Error returning a title:', error);
         await interaction.followUp('Alack! The merchant\'s ledger is sealed to mine eyes at present. Pray try again anon!');

@@ -739,6 +739,25 @@ const openShop = async function (guildId, record) {
     }));
 };
 
+// Remember where today's shop was posted, { channelId, messageId }, so the
+// post can be edited as stock sells out. Only lands on the shop for `day`.
+const setShopPost = async function (guildId, day, post) {
+    if (!isConfigured()) return;
+
+    try {
+        await getClient().send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId: SHOP_PREFIX + guildId, userId: SHOP_SORT_KEY },
+            UpdateExpression: 'SET #post = :post',
+            ConditionExpression: '#day = :day',
+            ExpressionAttributeNames: { '#post': 'post', '#day': 'day' },
+            ExpressionAttributeValues: { ':post': post, ':day': day },
+        }));
+    } catch (error) {
+        if (error.name !== 'ConditionalCheckFailedException') throw error;
+    }
+};
+
 // Take one copy of `itemId` from today's stock. Succeeds only while the shop
 // is still open for `day` and that item has copies left. Returns false otherwise.
 const takeShopStock = async function (guildId, day, itemId, now) {
@@ -2209,6 +2228,7 @@ module.exports = {
     setUsedWordLadderPuzzles,
     getShop,
     openShop,
+    setShopPost,
     takeShopStock,
     returnShopStock,
     restockShopItem,

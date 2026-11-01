@@ -10,7 +10,8 @@
  *   - 1 pet, freshly generated (src/pets.js), for PET_PRICE. One buyer
  *     adopts it and names it
  * Gear and titles have 2 copies (titles: 1) shared by the whole server. Once
- * they're gone, that item is sold out until the next day. Callings and kindreds
+ * they're gone, that item is sold out until the next day, and the day's post
+ * is edited to strike it through (refreshShopPost). Callings and kindreds
  * never run out. The shop stays open until midnight Eastern, 9 PM Pacific,
  * when its stock resets and the Herald announces the closing (closeShopNow).
  *
@@ -29,6 +30,8 @@
  * Exposes:
  *   openShopNow(client, opts) - opens the shop immediately; called by
  *                            src/dailyLineup.js and the /shop_test preview command
+ *   refreshShopPost(guild) - redraws today's shop post, striking through
+ *                            what has sold out; called after /buy and /return_title
  *   pickDailyStock(random, ownedTitles) - the day's item ids, exported for the tests
  *   easternDay(date) - YYYY-MM-DD in Eastern time, exported for the tests
  */
@@ -186,23 +189,33 @@ const shopEmbed = (record, discounts = []) => {
     const tagFor = (entry) => (entry.slot
         ? `[${entry.slot[0].toUpperCase()}${entry.slot.slice(1)}] [${catalog.rarityFor(entry.price)}] `
         : '');
+    // Whatever is gone is struck through, with a word saying so after it.
+    const gone = (text, word) => `~~${text}~~ ${word}`;
+    const soldOut = (id) => isLimited(id) && (record.stock || {})[id] === 0;
     const linesFor = (kind) => record.items
         .map((id) => catalog.findEntry(id))
         .filter((entry) => entry && kindOf(entry) === kind)
-        .map((entry) => `${tagFor(entry)}**${entry.name}** — ${entry.price} pts`);
+        .map((entry) => {
+            const text = `${tagFor(entry)}**${entry.name}** — ${entry.price} pts`;
+            if (!soldOut(entry.id)) return text;
+            return gone(text, kind === 'title' ? 'claimed' : 'sold out');
+        });
 
+    // A struck-out full price can't nest inside the strike for a sold piece,
+    // so a sold one shows only what it went for.
     const discountLines = discounts
         .map((listing) => ({ listing, entry: catalog.findEntry(listing.itemId) }))
         .filter(({ entry }) => entry)
-        .map(({ listing, entry }) => {
-            const price = listing.status === 'sold' ? 'sold' : `~~${entry.price}~~ ${discountPrice(entry.price)} pts`;
-            return `${tagFor(entry)}**${entry.name}** — ${price}, from ${listing.sellerName}`;
-        });
+        .map(({ listing, entry }) => (listing.status === 'sold'
+            ? gone(`${tagFor(entry)}**${entry.name}** — ${discountPrice(entry.price)} pts, from ${listing.sellerName}`, 'sold')
+            : `${tagFor(entry)}**${entry.name}** — ~~${entry.price}~~ ${discountPrice(entry.price)} pts, from ${listing.sellerName}`));
 
     // Shops opened before pets existed have none.
     const adopted = record.stock && record.stock[PET_STOCK_KEY] === 0;
     const petLines = record.pet
-        ? [`**${petDescription(record.pet)}** — ${adopted ? 'adopted' : `${PET_PRICE} pts, \`/buy item:pet name:<name>\``}`]
+        ? [adopted
+            ? gone(`**${petDescription(record.pet)}** — ${PET_PRICE} pts`, 'adopted')
+            : `**${petDescription(record.pet)}** — ${PET_PRICE} pts, \`/buy item:pet name:<name>\``]
         : [];
 
     const sections = [
@@ -259,11 +272,13 @@ const openShopNow = async function (client, options = {}) {
             const discounts = await stockDiscounts(g.id, record, persist);
             // Only the real opening pings the shopaholics; a test shop doesn't.
             const role = ping ? findShopRole(g) : null;
-            await channel.send({
+            const message = await channel.send({
                 content: role ? `<@&${role.id}> The merchant has thrown open his stalls!` : undefined,
                 embeds: [shopEmbed(record, discounts)],
                 allowedMentions: { roles: role ? [role.id] : [] },
             });
+            // Saved so refreshShopPost can strike through what sells out.
+            if (persist) await pointsStore.setShopPost(g.id, record.day, { channelId: channel.id, messageId: message.id });
             console.log(`Shop (guild ${g.id}) opened${persist ? '' : ' (rehearsal, not saved)'}: ${record.items.join(', ')}${discounts.length ? `; discounts: ${discounts.map((l) => l.itemId).join(', ')}` : ''}.`);
         } catch (guildError) {
             console.error(`Shop failed to open for guild "${g.name}":`, guildError);
@@ -304,7 +319,27 @@ const currentOpenShop = async function (guildId, now = Date.now()) {
     return record;
 };
 
+// Redraws today's shop post from the stored stock, so whatever has sold out
+// is struck through. Refreshes for a guild run one after another, each
+// reading the stock afresh, so a slow edit can't land over a newer one.
+// Never throws: a failed edit only leaves the post as it was.
+const refreshing = new Map();
+const redrawShopPost = async function (guild) {
+    const record = await currentOpenShop(guild.id);
+    if (!record || !record.post) return;
+    const channel = guild.channels.cache.get(record.post.channelId) || await guild.channels.fetch(record.post.channelId);
+    const discounts = await discountsFor(guild.id, record.day);
+    await channel.messages.edit(record.post.messageId, { embeds: [shopEmbed(record, discounts)] });
+};
+const refreshShopPost = function (guild) {
+    const next = (refreshing.get(guild.id) || Promise.resolve())
+        .then(() => redrawShopPost(guild))
+        .catch((error) => console.error(`Shop (guild ${guild.id}): could not update the shop post:`, error));
+    refreshing.set(guild.id, next);
+    return next;
+};
+
 module.exports = {
     openShopNow, closeShopNow, pickDailyStock, easternDay, nextEasternMidnight, stockRecord, shopEmbed, kindOf, currentOpenShop,
-    discountsFor, settleListings, discountPrice, unsoldRefund, PET_STOCK_KEY,
+    refreshShopPost, discountsFor, settleListings, discountPrice, unsoldRefund, PET_STOCK_KEY,
 };

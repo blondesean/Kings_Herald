@@ -18,13 +18,14 @@
  * and must be named with the `name` option. It goes to the buyer's side if
  * none is there, otherwise to their bank (see src/pets.js).
  *
- * Public, so the purchase is announced in the channel, in character.
+ * Public, so the purchase is announced in the channel, in character. After a
+ * sale the day's shop post is redrawn, striking through what has sold out.
  */
 
 const crypto = require('crypto');
 const { ApplicationCommandOptionType } = require('discord.js');
 const pointsStore = require('../../src/pointsStore');
-const { currentOpenShop, easternDay, kindOf, discountsFor, discountPrice, PET_STOCK_KEY } = require('../passive/shop');
+const { currentOpenShop, refreshShopPost, easternDay, kindOf, discountsFor, discountPrice, PET_STOCK_KEY } = require('../passive/shop');
 const { petKind, petDescription, speciesName, cleanPetName, matchPet, PET_PRICE, PET_NAME_MAX } = require('../../src/pets');
 const { matchEntry, stashFor } = require('../../src/character');
 const achievements = require('../../src/achievements');
@@ -131,6 +132,7 @@ const adoptPet = async (interaction, record) => {
     await recordSpending(guildId, buyer, PET_PRICE);
     console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) adopted ${petDescription(pet)} named ${name} for ${PET_PRICE}${atSide ? ', at their side' : ', to the bank'} (${easternDay()}).`);
     await interaction.editReply(pick(flavor.petAdoptedLines(`<@${buyer.id}>`, name, petDescription(pet), atSide)));
+    refreshShopPost(interaction.guild);
     await achievements.record(guildId, [{ userId: buyer.id, displayName: buyer.displayName, counts: { pets_adopted: 1 } }], interaction.channel);
     await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
 };
@@ -173,6 +175,7 @@ const buy = async function (interaction) {
                 }
                 console.log(`Shop (guild ${guildId}): ${buyer.displayName} (${buyer.id}) bought ${discounted.name} from ${result.listing.sellerName} (${result.listing.sellerId}) for ${price}${result.equipped ? ', equipped' : ''} (${easternDay()}).`);
                 await interaction.editReply(pick(flavor.purchasedDiscountLines(`<@${buyer.id}>`, discounted.name, result.listing.sellerName, result.equipped)));
+                refreshShopPost(interaction.guild);
                 await achievements.record(guildId, [{ userId: result.listing.sellerId, displayName: result.listing.sellerName, counts: { sales: 1 } }], interaction.channel);
                 await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
                 return;
@@ -219,6 +222,8 @@ const buy = async function (interaction) {
         else line = pick(flavor.purchasedLines(`<@${buyer.id}>`, entry.name, kind));
         if (stashed) line += `\n${flavor.cosmeticStoredLine(stashed.name)}`;
         await interaction.editReply(line);
+        // Classes and races never run out, so only the rest change the post.
+        if (kind === 'gear' || kind === 'title') refreshShopPost(interaction.guild);
         await achievements.checkStats(guildId, [{ userId: buyer.id, displayName: buyer.displayName }], interaction.channel);
     } catch (error) {
         console.error('Error handling /buy:', error);
