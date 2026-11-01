@@ -5,6 +5,21 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-10-31
+
+- Sell several wares at once, or give up a pet for another to adopt (`3ceae93`)
+- The shop post strikes through what has sold out (`f89598a`)
+
+## 2026-10-30
+
+- Regenerate UPDATELOG.md (`856471b`)
+- Saturday gamble: 5 points for a 10% chance at a Legendary (`c975e4a`)
+- The sheet marks with * each slot your bag could upgrade (`701ed07`)
+- The sheet shows fit as worn and the max from your finest gear (`f09949e`)
+- Pets get ASCII portraits on the sheet and titles of their owner's choosing (`6b0f753`)
+- Regenerate UPDATELOG.md (`7bfd115`)
+- Connections: 30 more puzzles, 74 in all (`24b5a74`)
+
 ## 2026-10-29
 
 - Encounters lean toward harder threats; the shop stocks Rare gear and finer (`55d27f3`)
@@ -32,15 +47,6 @@ Regenerate after committing and commit the refreshed file.*
 - Old stories gather in the realm's archives, sealed for now (`0fcc2f2`)
 - Regenerate UPDATELOG.md (`2154c70`)
 - /tip and /balance_herald, word ladder step limits, shop open noon to midnight (`08c4fba`)
-
-## 2026-10-30
-
-- Saturday gamble: 5 points for a 10% chance at a Legendary (`c975e4a`)
-- The sheet marks with * each slot your bag could upgrade (`701ed07`)
-- The sheet shows fit as worn and the max from your finest gear (`f09949e`)
-- Pets get ASCII portraits on the sheet and titles of their owner's choosing (`6b0f753`)
-- Regenerate UPDATELOG.md (`7bfd115`)
-- Connections: 30 more puzzles, 74 in all (`24b5a74`)
 
 ## 2026-10-28
 
