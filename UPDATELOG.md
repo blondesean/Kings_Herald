@@ -7,6 +7,10 @@ Regenerate after committing and commit the refreshed file.*
 
 ## 2026-11-02
 
+- Ranking rounds stay open three hours (`4b0bc70`)
+- Every boss drops one finer piece besides its loot (`6b53bcf`)
+- Fighters suit up in their best by default (`df07614`)
+- Regenerate UPDATELOG.md (`94bda7d`)
 - The herald tells the foe's power for each who marches (`9f2f4fa`)
 - The encounter call tallies how many chose each stance, never who (`7993190`)
 
