@@ -13,11 +13,12 @@
  * never lands on top of one of them.
  *
  * Each game's *kind* has to be decided here, before placement, because the
- * kind decides how long its window stays open (a would-you-rather round is
- * open for 3 hours, a factual question for 30 minutes, and so on) — and the
- * placement below needs to know every window's length to keep them apart.
- * A single 9 AM Eastern cron rolls the kinds, places their windows in the
- * shared 9 AM-9 PM span with a buffer between each, then a setTimeout
+ * kind decides how long its window stays open (a would-you-rather or ranking
+ * round is open for 3 hours, a factual question for 30 minutes, and so on) —
+ * and the placement below needs to know every window's length to keep them
+ * apart. A single 9 AM Eastern cron rolls the kinds, places their windows in
+ * the shared 9 AM-9 PM span with a buffer between each (a ranking round only
+ * has to start inside it, and may run on past 9 PM), then a setTimeout
  * per game fires it at its chosen moment, passing the already-rolled kind so
  * the game doesn't roll it again.
  *
@@ -73,7 +74,10 @@ const LADDER_CHANCE = 0.5;
 
 const TRIVIA_WINDOW_MS = 30 * 60 * 1000;
 const WYR_WINDOW_MS = 3 * 60 * 60 * 1000;
-const RANKING_WINDOW_MS = 30 * 60 * 1000;
+// Mirrors rankingRound.js's ANSWER_WINDOW_MS. The round may run past 9 PM,
+// so it is placed as an overrun (see placeSlots); even one started in the
+// last slot, 8:45 PM, closes by 11:45 PM, before the shop closes at midnight.
+const RANKING_WINDOW_MS = 3 * 60 * 60 * 1000;
 const PUZZLE_WINDOW_MS = 60 * 60 * 1000;
 const ENCOUNTER_WINDOW_MS = JOIN_WINDOW_MS + LOOT_RESOLVE_MS;
 
@@ -94,7 +98,9 @@ const reservedHit = (start, end) => RESERVED_SLOTS.find((slot) => start <= slot 
 /* Picks a non-overlapping start slot (in SLOT_MINUTES units, 0-based) for
  * each duration in `durationsMs`, within a SLOT_COUNT-slot window, at least
  * BUFFER_SLOTS apart, clear of RESERVED_SLOTS, and no earlier than its entry in
- * `earliest` (a slot; missing means the window's start). Tries random placements first
+ * `earliest` (a slot; missing means the window's start). A game whose entry in
+ * `overruns` is true only has to start inside the window, and may end past it.
+ * Tries random placements first
  * (fast, and keeps every day's lineup differently shaped); if 500 random
  * tries all collide — very unlikely given how much slack the window has —
  * falls back to packing them back-to-back in a random order, stepping over
@@ -102,7 +108,7 @@ const reservedHit = (start, end) => RESERVED_SLOTS.find((slot) => start <= slot 
  * exceeds the window (logged, not thrown, since a slightly-overrun trivia
  * round is a far smaller problem than a crashed scheduler).
  */
-const placeSlots = (durationsMs, random = Math.random, earliest = []) => {
+const placeSlots = (durationsMs, random = Math.random, earliest = [], overruns = []) => {
     const lengths = durationsMs.map((ms) => Math.ceil(ms / SLOT_MS));
     const firstSlot = (i) => earliest[i] || 0;
     const order = durationsMs.map((_, i) => i).sort(() => random() - 0.5);
@@ -113,7 +119,7 @@ const placeSlots = (durationsMs, random = Math.random, earliest = []) => {
         let ok = true;
         for (const i of order) {
             const length = lengths[i];
-            const latestStart = SLOT_COUNT - length;
+            const latestStart = overruns[i] ? SLOT_COUNT - 1 : SLOT_COUNT - length;
             if (latestStart < firstSlot(i)) { ok = false; break; }
             const start = firstSlot(i) + Math.floor(random() * (latestStart - firstSlot(i) + 1));
             const end = start + length;
@@ -129,9 +135,11 @@ const placeSlots = (durationsMs, random = Math.random, earliest = []) => {
 
     // Fallback for a crowded day: lay the games out in a random order with the
     // spare slots split randomly between the gaps, so it still always fits
-    // and still lands at different times each day.
+    // and still lands at different times each day. Games that may overrun go
+    // last, needing only their start slot inside the window.
     console.log('Daily lineup: random placement kept colliding; spreading the games out instead.');
-    const used = lengths.reduce((a, b) => a + b, 0) + BUFFER_SLOTS * (lengths.length - 1) + RESERVED_SLOTS.length;
+    const packOrder = [...order.filter((i) => !overruns[i]), ...order.filter((i) => overruns[i])];
+    const used = packOrder.reduce((sum, i) => sum + (overruns[i] ? 1 : lengths[i]), 0) + BUFFER_SLOTS * (lengths.length - 1) + RESERVED_SLOTS.length;
     const slack = Math.max(0, SLOT_COUNT - used);
     if (used > SLOT_COUNT) {
         console.error('Daily lineup: the day\'s games do not fit the window even back-to-back — some will run past 9 PM.');
@@ -141,7 +149,7 @@ const placeSlots = (durationsMs, random = Math.random, earliest = []) => {
     let cursor = 0;
     let previousCut = 0;
     const starts = new Array(durationsMs.length);
-    order.forEach((i, k) => {
+    packOrder.forEach((i, k) => {
         cursor += cuts[k] - previousCut;
         previousCut = cuts[k];
         cursor = Math.max(cursor, firstSlot(i));
@@ -179,7 +187,8 @@ const scheduleDailyLineup = function (client) {
             const [triviaSlot, puzzleSlot, encounterSlot] = placeSlots(
                 [triviaWindowMs, PUZZLE_WINDOW_MS, ENCOUNTER_WINDOW_MS],
                 Math.random,
-                [0, 0, ENCOUNTER_EARLIEST_SLOT]
+                [0, 0, ENCOUNTER_EARLIEST_SLOT],
+                [subjectiveKind === 'ranking', false, false]
             );
             const windowOpenedAt = Date.now();
             const slotTime = (slot) => windowOpenedAt + slot * SLOT_MS;

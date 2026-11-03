@@ -42,8 +42,10 @@ const { resolveChannel } = require('../../src/resolveChannel');
 const { findTriviaRole } = require('../../src/triviaRole');
 const flavor = require('../../flavor_text');
 
-// Same length as the daily trivia's answer window.
-const ANSWER_WINDOW_MS = 30 * 60 * 1000;
+// As long as the would-you-rather round's, so the whole court has time to
+// rank. It may run past 9 PM Eastern; src/dailyLineup.js only makes it start
+// inside the day's window.
+const ANSWER_WINDOW_MS = 3 * 60 * 60 * 1000;
 const CLOSEST_POINTS = 5;
 const NEXT_POINTS = 2;
 // With two rankings both are always exactly as close to their own average as
@@ -179,7 +181,7 @@ const buildQuestionPost = (question, roundId) => {
         .setColor(EMBED_COLOR)
         .setTitle("The Herald's Ranking of the Court")
         .setDescription(`${pick(flavor.rankingIntroLines())}\n\n**${question.question}**\n\n${itemLines}`)
-        .setFooter({ text: `Tap "Rank these" and pick thy 1st, 2nd, and so on; it stays secret 'til the round closes (${ANSWER_WINDOW_MS / 60000} minutes), and tapping again redoes it. Rank closest to the court's average and earn ${CLOSEST_POINTS} points, or ${NEXT_POINTS} for second closest.` })
+        .setFooter({ text: `Tap "Rank these" and pick thy 1st, 2nd, and so on; it stays secret 'til the round closes (${ANSWER_WINDOW_MS / 3600000} hours), and tapping again redoes it. Rank closest to the court's average and earn ${CLOSEST_POINTS} points, or ${NEXT_POINTS} for second closest.` })
         .setTimestamp();
 
     const startRow = (disabled) => new ActionRowBuilder().addComponents(
