@@ -2,7 +2,8 @@
  *
  * BOSSES has one list per difficulty, Easy to Max, in the same order as
  * RARITIES in shopCatalog.js: a boss from tier i drops gear of rarity i (one
- * piece per 2.5 members; see dropsFor in encounter.js). The tier is rolled
+ * piece per 2.5 members; see dropsFor in encounter.js), plus one piece of
+ * rarity i + 1, or one more Legendary from Max (bonusTierFor). The tier is rolled
  * and announced when the threat is posted (OPEN_TIERS in encounter.js lists
  * which can come up); the boss itself stays hidden until it is revealed in
  * the result. `epithet` is a short flavor

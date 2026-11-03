@@ -39,7 +39,9 @@
  * On a win, one member lands the killing blow — weighted by each member's
  * effective (stance-adjusted) fit — and the boss drops one piece per
  * ADVENTURERS_PER_DROP (2.5) members, rounded down (2 for a party of 5),
- * different random pieces of gear of the tier's rarity. For each piece the
+ * different random pieces of gear of the tier's rarity, plus one piece of the
+ * next rarity up (bonusTierFor; Max drops one more Legendary, never a
+ * unique). For each piece the
  * herald rolls for the whole party, asking no one (lootChoices): Need for
  * each member it would upgrade, finer than anything they own for the slot,
  * worn or bagged, and Greed for the rest. If anyone needs, only the needers
@@ -103,6 +105,10 @@ const FULL_PARTY = 5;
 // A win drops one piece of loot per this many members, rounded down.
 const ADVENTURERS_PER_DROP = 2.5;
 const dropsFor = (partySize) => Math.floor(partySize / ADVENTURERS_PER_DROP);
+// Besides those, a win always drops one piece of the next rarity up: Uncommon
+// from Easy up to Legendary from Extreme. Max, already Legendary, drops one
+// more Legendary instead. Uniques are never dropped (they aren't in GEAR).
+const bonusTierFor = (tier) => Math.min(tier + 1, MAX_TIER);
 // While the party forms, the herald checks its odds this often, and warns
 // (with a way to leave) when they fall below WARN_CHANCE.
 const CHECK_INTERVAL_MS = 15 * 60 * 1000;
@@ -320,8 +326,9 @@ const minutesLabel = (ms) => (ms % 3600000 === 0 ? `${ms / 3600000} hour${ms ===
 
 // ---- rendering ----------------------------------------------------------------
 
-// "**Hard**, a formidable threat. Victory yields Rare loot."
-const threatLine = (tier) => `**This day's threat: ${DIFFICULTIES[tier]}**, ${THREAT_PHRASES[tier]}. Victory yields ${catalog.RARITIES[tier]} loot.`;
+// "**Hard**, a formidable threat. Victory yields Rare loot, and one Epic piece besides."
+const bonusPhrase = (tier) => (bonusTierFor(tier) > tier ? `one ${catalog.RARITIES[bonusTierFor(tier)]} piece` : `one more ${catalog.RARITIES[tier]} piece`);
+const threatLine = (tier) => `**This day's threat: ${DIFFICULTIES[tier]}**, ${THREAT_PHRASES[tier]}. Victory yields ${catalog.RARITIES[tier]} loot, and ${bonusPhrase(tier)} besides.`;
 
 const buildTeaserEmbed = (party, tier, maxParty, minParty, joinWindowMs, closed = false) => {
     const names = [...party.values()].map((m) => `${m.displayName}${m.stance ? ' - ready' : ''}`);
@@ -836,15 +843,18 @@ const runEncounterIn = async (g, channel, opts) => {
         }
     }
 
-    // Loot: dropsFor(party size) distinct random pieces of the tier's rarity, each
-    // rolled for separately but all open at once in the same loot window.
-    const rarity = catalog.RARITIES[tier];
-    const pool = catalog.GEAR.filter((e) => catalog.rarityFor(e.price) === rarity && catalog.GEAR_SLOTS.includes(e.slot));
+    // Loot: dropsFor(party size) distinct random pieces of the tier's rarity,
+    // then one of the next rarity up (bonusTierFor), rolled for last; Max's is
+    // one more Legendary, never one already dropped. Each is rolled for in turn.
+    const poolFor = (t) => catalog.GEAR.filter((e) => catalog.rarityFor(e.price) === catalog.RARITIES[t] && catalog.GEAR_SLOTS.includes(e.slot));
+    const pool = poolFor(tier);
     const items = [];
     const remaining = [...pool];
     for (let k = 0; k < dropsFor(ready.length) && remaining.length; k++) {
         items.push(remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0]);
     }
+    const bonusPool = poolFor(bonusTierFor(tier)).filter((e) => !items.includes(e));
+    if (bonusPool.length) items.push(bonusPool[Math.floor(Math.random() * bonusPool.length)]);
 
     // Plunder: each Plunder member makes off with their own piece, announced
     // before the boss's drops are rolled for.
@@ -970,4 +980,5 @@ module.exports = {
     FULL_PARTY,
     ADVENTURERS_PER_DROP,
     dropsFor,
+    bonusTierFor,
 };
