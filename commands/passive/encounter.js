@@ -11,7 +11,9 @@
  * can decide whether to answer. They click "Join the party" (up to
  * MAX_PARTY, 20) and are privately prompted for a stance: Aggressive (fit
  * x1.15), Balanced (x1), Defensive (x0.9) or Plunder (x0.8). It stays secret and can be
- * changed until the battle, which starts when JOIN_WINDOW_MS runs out, or as
+ * changed until the battle. From the first roster check (CHECK_INTERVAL_MS)
+ * the call's post tallies how many chose each stance (stanceTally), never
+ * who, kept up live after that. The battle starts when JOIN_WINDOW_MS runs out, or as
  * soon as the party is full and everyone has chosen. Everyone who joined
  * fights; a stance left unchosen is Balanced. Fewer than MIN_PARTY (3) and
  * the threat passes with no battle.
@@ -323,19 +325,37 @@ const minutesLabel = (ms) => (ms % 3600000 === 0 ? `${ms / 3600000} hour${ms ===
 // "**Hard**, a formidable threat. Victory yields Rare loot."
 const threatLine = (tier) => `**This day's threat: ${DIFFICULTIES[tier]}**, ${THREAT_PHRASES[tier]}. Victory yields ${catalog.RARITIES[tier]} loot.`;
 
-const buildTeaserEmbed = (party, tier, maxParty, minParty, joinWindowMs, closed = false) => {
+// How many in the party chose each stance, never who chose which. Once the
+// party has marched, anyone who chose none is counted Balanced, as they fight.
+const stanceTally = (party, closed = false) => {
+    const members = [...party.values()];
+    const stanceOf = (m) => m.stance || (closed ? 'balanced' : null);
+    const counts = Object.entries(STANCES).map(([key, s]) => `${s.label} ${members.filter((m) => stanceOf(m) === key).length}`);
+    const undecided = members.filter((m) => !stanceOf(m)).length;
+    if (undecided) counts.push(`undecided ${undecided}`);
+    return counts.join(', ');
+};
+
+// `teaser` is the opening line, picked once so it holds still as the post is
+// redrawn. The stance tally shows once `tally` is set, and always once the
+// party has marched; before then, a note says it is coming.
+const buildTeaserEmbed = (party, tier, maxParty, minParty, joinWindowMs, teaser, { closed = false, tally = closed } = {}) => {
     const names = [...party.values()].map((m) => `${m.displayName}${m.stance ? ' - ready' : ''}`);
     const marches = [
         `${maxParty ? `Up to ${maxParty}` : 'All who wish'} may join, and the foe grows to match the party.`,
         minParty > 1 ? `At least ${minParty} must answer the call.` : '',
         maxParty ? `The party marches when ${maxParty} are ready, or after ${minutesLabel(joinWindowMs)}.` : `The party marches after ${minutesLabel(joinWindowMs)}.`,
     ].filter(Boolean).join(' ');
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setTitle(closed ? 'The Encounter: the party has marched' : 'The Encounter: a threat stirs')
-        .setDescription(`${pick(flavor.encounterTeaserLines())}\n\n${threatLine(tier)}\n\nJoin the party and choose how thou wilt fight. ${marches} The foe's name is revealed only in battle.\n\n*Wish to be summoned the moment a threat stirs? Use /signup encounter!*`)
+        .setDescription(`${teaser}\n\n${threatLine(tier)}\n\nJoin the party and choose how thou wilt fight. ${marches} The foe's name is revealed only in battle.\n\n*Wish to be summoned the moment a threat stirs? Use /signup encounter!*`)
         .addFields({ name: `The Party (${party.size}${maxParty ? `/${maxParty}` : ''})`, value: names.length ? fieldValue(names) : '*No one yet.*' })
         .setTimestamp();
+    if (party.size) {
+        embed.addFields({ name: 'Stances', value: tally ? stanceTally(party, closed) : '*The herald will tally the stances once the party has had time to gather, but never say who chose which.*' });
+    }
+    return embed;
 };
 
 const joinRow = (prefix, disabled) => new ActionRowBuilder().addComponents(
@@ -394,9 +414,10 @@ const leaveRow = (prefix, disabled) => new ActionRowBuilder().addComponents(
 // WARN_CHANCE posts a warning with a "Leave the party" button.
 const gatherParty = (g, channel, message, prefix, opts) =>
     new Promise((resolve) => {
-        const { tier, maxParty, minParty, joinWindowMs, checkIntervalMs, persist, tag } = opts;
+        const { tier, maxParty, minParty, joinWindowMs, checkIntervalMs, persist, tag, teaser } = opts;
         const party = new Map();
-        const refresh = () => message.edit({ embeds: [buildTeaserEmbed(party, tier, maxParty, minParty, joinWindowMs)] }).catch(() => {});
+        let tallyShown = false;
+        const refresh = () => message.edit({ embeds: [buildTeaserEmbed(party, tier, maxParty, minParty, joinWindowMs, teaser, { tally: tallyShown })] }).catch(() => {});
         const allReady = () => Boolean(maxParty) && party.size >= maxParty && [...party.values()].every((m) => m.stance);
         // Re-reads a member's kits (gear may have changed) and sets their fit
         // from their suit-up choice.
@@ -430,6 +451,13 @@ const gatherParty = (g, channel, message, prefix, opts) =>
             }, at));
         }
         const warnings = [];
+        // The stance tally first shows at the herald's first weighing of the
+        // party, so the early joiners can't each be matched to a stance as they
+        // ready up; from then on it keeps up live.
+        checks.push(setTimeout(() => {
+            tallyShown = true;
+            if (party.size) refresh();
+        }, checkIntervalMs));
 
         collector.on('collect', async (interaction) => {
             if (interaction.user.bot) return;
@@ -490,7 +518,7 @@ const gatherParty = (g, channel, message, prefix, opts) =>
                 await interaction.reply({ content: 'Join the party first, good noble.', flags: MessageFlags.Ephemeral }).catch(() => {});
                 return;
             }
-            const wasReady = Boolean(member.stance);
+            const before = member.stance;
             if (action.startsWith('stance_')) member.stance = action.slice('stance_'.length);
             if (action.startsWith('kit_')) {
                 // Deferred first: the gear read can outlast Discord's 3 seconds.
@@ -501,7 +529,8 @@ const gatherParty = (g, channel, message, prefix, opts) =>
                 return;
             }
             await interaction.update(buildPrompt(prefix, member, tier)).catch(() => {});
-            if (!wasReady && member.stance) await refresh();
+            // The post tallies the stances, so any change redraws it.
+            if (member.stance !== before) await refresh();
             if (allReady()) collector.stop('ready');
         });
 
@@ -635,16 +664,17 @@ const runEncounterIn = async (g, channel, opts) => {
 
     // Only the real scheduled encounter pings the Adventurers; a rehearsal doesn't.
     const role = persist ? findAdventurerRole(g) : null;
+    const teaser = pick(flavor.encounterTeaserLines());
     const message = await channel.send({
         content: role ? `<@&${role.id}> A threat stirs! To arms!` : undefined,
-        embeds: [buildTeaserEmbed(new Map(), tier, maxParty, minParty, joinWindowMs)],
+        embeds: [buildTeaserEmbed(new Map(), tier, maxParty, minParty, joinWindowMs, teaser)],
         components: [joinRow(prefix, false)],
         allowedMentions: { roles: role ? [role.id] : [] },
     });
     console.log(`${tag}: posted, ${DIFFICULTIES[tier]}, party ${maxParty ? `up to ${maxParty}` : 'unlimited'}, join window ${joinWindowMs / 60000}m.`);
 
-    const party = await gatherParty(g, channel, message, prefix, { ...opts, tier, tag });
-    await message.edit({ embeds: [buildTeaserEmbed(party, tier, maxParty, minParty, joinWindowMs, true)], components: [joinRow(prefix, true)] }).catch(() => {});
+    const party = await gatherParty(g, channel, message, prefix, { ...opts, tier, tag, teaser });
+    await message.edit({ embeds: [buildTeaserEmbed(party, tier, maxParty, minParty, joinWindowMs, teaser, { closed: true })], components: [joinRow(prefix, true)] }).catch(() => {});
 
     // Everyone who joined fights. A stance left unchosen is Balanced.
     const ready = [...party.values()];
@@ -953,6 +983,7 @@ module.exports = {
     rollTier,
     plunderFor,
     partyChance,
+    stanceTally,
     joinFitFor,
     pickTargets,
     WARN_CHANCE,

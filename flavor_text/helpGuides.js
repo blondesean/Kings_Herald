@@ -19,7 +19,7 @@ const helpGuides = {
             '',
             '**The threat.** Each day\'s threat is Easy 5% of the time, Medium 15%, Hard 40% and Extreme 40%. The court\'s first Extreme victory draws Max too: then Hard is 40%, Extreme 20% and Max 20%. The herald names the threat before anyone joins, so thou mayest choose thy fights. The foe itself is revealed only in battle.',
             '',
-            '**Joining.** Click **Join the party**, and thou art asked, privately, for thy stance. If thy gear is too slight for the threat, thou art turned away. Every 15 minutes the herald weighs the party, and if its odds look poor, says so and lets any who wish leave.',
+            '**Joining.** Click **Join the party**, and thou art asked, privately, for thy stance. After the first 15 minutes, the call shows how many have chosen each stance, but never who. If thy gear is too slight for the threat, thou art turned away. Every 15 minutes the herald weighs the party, and if its odds look poor, says so and lets any who wish leave.',
             '',
             '**Stances.** Aggressive fights at +15% fit, but if hurt in a loss, rests two days. Balanced fights at thy true fit and rests one day if hurt. Defensive fights at -10% and fends off any blow aimed at it. Plunder fights at -20%, but on a victory thou makest off with a piece of the foe\'s hoard, of the same rarity as its drops, besides any loot thou rollest for. If a loss singles thee out, greed is punished: two days\' rest.',
             '',
