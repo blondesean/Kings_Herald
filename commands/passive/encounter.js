@@ -322,8 +322,11 @@ const minutesLabel = (ms) => (ms % 3600000 === 0 ? `${ms / 3600000} hour${ms ===
 
 // ---- rendering ----------------------------------------------------------------
 
-// "**Hard**, a formidable threat. Victory yields Rare loot."
-const threatLine = (tier) => `**This day's threat: ${DIFFICULTIES[tier]}**, ${THREAT_PHRASES[tier]}. Victory yields ${catalog.RARITIES[tier]} loot.`;
+// "**Hard**, a formidable threat. Victory yields Rare loot. The foe brings
+// **175 power** for each who marches against it." Shown in the call and the
+// private prompt: the boss's power per member, but not how it is reckoned,
+// and never the odds or the party's own power until the battle.
+const threatLine = (tier) => `**This day's threat: ${DIFFICULTIES[tier]}**, ${THREAT_PHRASES[tier]}. Victory yields ${catalog.RARITIES[tier]} loot. The foe brings **${bossFitPerEntrant(tier)} power** for each who marches against it.`;
 
 // How many in the party chose each stance, never who chose which. Once the
 // party has marched, anyone who chose none is counted Balanced, as they fight.
@@ -787,7 +790,7 @@ const runEncounterIn = async (g, channel, opts) => {
         );
 
     // The party's totals. Only totals, so each member's stance stays secret
-    // on a win, and never the boss's, so the foe's strength stays a mystery.
+    // on a win. The boss's power per member was told in the call.
     const tally = [
         `**Party fit:** ${ready.reduce((sum, m) => sum + m.fit, 0)}`,
         `**Party power:** ${Math.round(partyFit)}`,
