@@ -5,8 +5,14 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-11-02
+
+- The herald tells the foe's power for each who marches (`9f2f4fa`)
+- The encounter call tallies how many chose each stance, never who (`7993190`)
+
 ## 2026-10-31
 
+- Regenerate UPDATELOG.md (`a05b3ed`)
 - Sell several wares at once, or give up a pet for another to adopt (`3ceae93`)
 - The shop post strikes through what has sold out (`f89598a`)
 
