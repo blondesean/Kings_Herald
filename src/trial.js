@@ -12,9 +12,10 @@
  *                     adds nothing, and the road goes on either way.
  *   3. The Guardian - a solo fight at Max difficulty (bossFitPerEntrant for
  *                     one), with the encounter's stances except Plunder, and
- *                     the same "Suit up in my best" choice. Choosing a stance
- *                     starts the fight at once; no choice in time fights
- *                     Balanced, as dressed.
+ *                     the same choice of gear, suited up in the member's best
+ *                     unless they pick "Fight as I am dressed". Choosing a
+ *                     stance starts the fight at once; no choice in time
+ *                     fights Balanced, in the gear chosen.
  *
  * A win claims the relic (pointsStore.claimRelic: one owner per relic, one
  * relic per member), grants it like loot, counts toward the secret Echo of
@@ -95,15 +96,16 @@ const guardianPrompt = (prefix, trial, roadLine, kits, suitUp) => {
     ));
     const components = [stanceRow];
     let kitText = '';
-    if (kits.bestFit > kits.wornFit) {
-        kitText = `\n\n**Thy gear:** ${suitUp ? `thy finest, fit ${kits.bestFit}` : `as thou art dressed, fit ${kits.wornFit}`}\nThy bags hold finer arms than thou wearest. Shall the herald suit thee up in thy best for this fight? Thy wardrobe stays just as it is.`;
+    const kitChoice = kits.bestFit > kits.wornFit;
+    if (kitChoice) {
+        kitText = `\n\n**Thy gear:** ${suitUp ? `thy finest, fit ${kits.bestFit}` : `as thou art dressed, fit ${kits.wornFit}`}\nThy bags hold finer arms than thou wearest, so the herald suits thee up in thy best for this fight, unless thou wouldst rather fight as thou art dressed. Thy wardrobe stays just as it is.`;
         components.push(new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`${prefix}kit_best`).setLabel(`Suit up in my best${suitUp ? ' - chosen' : ''}`).setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`${prefix}kit_worn`).setLabel(`Fight as I am dressed${suitUp ? '' : ' - chosen'}`).setStyle(ButtonStyle.Secondary),
         ));
     }
     return {
-        content: `${roadLine}\n\n${pick(flavor.trialGuardianLines(trial.guardian))}\n\n${STANCE_NOTE}${kitText}\n\n**Choose thy stance to begin the fight.** If thou choosest nothing in ${STEP_MS / 60000} minutes, thou fightest Balanced, as thou art dressed.`,
+        content: `${roadLine}\n\n${pick(flavor.trialGuardianLines(trial.guardian))}\n\n${STANCE_NOTE}${kitText}\n\n**Choose thy stance to begin the fight.** If thou choosest nothing in ${STEP_MS / 60000} minutes, thou fightest Balanced${kitChoice ? ', in the gear chosen above' : ''}.`,
         components,
     };
 };
@@ -174,14 +176,13 @@ const runTrial = async function (interaction, { persist = true } = {}) {
     // ---- 3. the guardian ----
     const character = await pointsStore.getCharacter(guildId, userId).catch(() => ({}));
     const kits = { wornFit: fitScore(character.gear || {}), bestFit: fitScore(bestKit(character)) };
-    let suitUp = false;
+    let suitUp = true;
     let stance = null;
     let guardianMessage = await interaction.editReply({ ...guardianPrompt(prefix, trial, roadLine, kits, suitUp), embeds: [] });
     while (!stance) {
         const click = await nextClick(guardianMessage, userId);
         if (!click) {
             stance = 'balanced';
-            suitUp = false;
             break;
         }
         await click.deferUpdate().catch(() => {});

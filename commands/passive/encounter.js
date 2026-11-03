@@ -30,9 +30,9 @@
  *     has the edge.
  *   - Party fit = each member's equipped fit (read at battle time) x their
  *     stance multiplier, summed. A member whose bags hold finer gear than
- *     they wear is offered "Suit up in my best" in their prompt; if chosen,
- *     they fight with the finest piece they own in each slot (bestKit), and
- *     the fight is recorded that way, but their equipped gear never changes.
+ *     they wear fights with the finest piece they own in each slot (bestKit)
+ *     unless they pick "Fight as I am dressed" in their prompt, and the fight
+ *     is recorded that way, but their equipped gear never changes.
  *   - Win chance comes from the ratio party/boss (see winChance): 80% at an
  *     even match, +5% per 10% over, -20% per 10% under (0% at 60%), so
  *     100% at 140%. From Hard up it's capped so there's always some risk
@@ -372,8 +372,8 @@ const kitsOf = (character = {}) => {
     const best = bestKit(character);
     return { worn, best, wornFit: totalFit(worn, character), bestFit: totalFit(best, character), petFit: petBonus(character) };
 };
-// Whether the member fights in their best kit: only if they chose to, and it's
-// actually finer than what they wear.
+// Whether the member fights in their best kit: by default, unless they chose to
+// fight as dressed, and only if it's actually finer than what they wear.
 const suitsUp = (member) => Boolean(member.suitUp) && member.bestFit > member.wornFit;
 const fightingFit = (member) => (suitsUp(member) ? member.bestFit : member.wornFit);
 
@@ -392,7 +392,7 @@ const buildPrompt = (prefix, member, tier) => {
     let kitText = '';
     if (member.bestFit > member.wornFit) {
         const best = suitsUp(member);
-        kitText = `\n\n**Thy gear:** ${best ? `thy finest, fit ${member.bestFit}` : `as thou art dressed, fit ${member.wornFit}`}\nThy bags hold finer arms than thou wearest. Shall the herald suit thee up in thy best for this fight, fit ${member.bestFit}? Thy wardrobe stays just as it is.`;
+        kitText = `\n\n**Thy gear:** ${best ? `thy finest, fit ${member.bestFit}` : `as thou art dressed, fit ${member.wornFit}`}\nThy bags hold finer arms than thou wearest, so the herald suits thee up in thy best for this fight, fit ${member.bestFit}, unless thou wouldst rather fight as thou art dressed. Thy wardrobe stays just as it is.`;
         components.push(new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`${prefix}kit_best`).setLabel(`Suit up in my best${best ? ' - chosen' : ''}`).setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`${prefix}kit_worn`).setLabel(`Fight as I am dressed${best ? '' : ' - chosen'}`).setStyle(ButtonStyle.Secondary),
@@ -490,7 +490,7 @@ const gatherParty = (g, channel, message, prefix, opts) =>
                     return;
                 }
                 // Reserve the place before any await, so two quick clicks can't overfill the party.
-                const member = { userId, displayName: interaction.member?.displayName || interaction.user.username, stance: null, suitUp: false };
+                const member = { userId, displayName: interaction.member?.displayName || interaction.user.username, stance: null, suitUp: true };
                 party.set(userId, member);
                 // discord.js 14.13's deferReply ignores flags; only ephemeral: true hides it.
                 await interaction.deferReply({ ephemeral: true }).catch(() => {});
@@ -697,8 +697,8 @@ const runEncounterIn = async (g, channel, opts) => {
     }
 
     // Fit is read at battle time, so gear changed during the join window counts.
-    // A member who chose to suit up fights in their finest kit; their stored
-    // gear is never changed, but the fight is recorded as if they wore it.
+    // A member fights in their finest kit unless they chose otherwise; their
+    // stored gear is never changed, but the fight is recorded as if they wore it.
     for (const m of ready) {
         const character = await pointsStore.getCharacter(g.id, m.userId).catch(() => ({ gear: {} }));
         Object.assign(m, kitsOf(character));

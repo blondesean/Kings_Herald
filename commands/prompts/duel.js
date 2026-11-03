@@ -235,24 +235,25 @@ const fitWinChance = (challengerFit, targetFit) => {
     return total === 0 ? 0.5 : challengerFit / total;
 };
 
-// A Fit Duelist whose bags hold finer gear than they wear is asked, in secret,
-// whether to suit up in their best for this duel alone (see bestKit; nothing
-// is equipped). Resolves with the fit they fight at: their best if they chose
-// it, otherwise as dressed, including when they don't answer in time.
+// A Fit Duelist whose bags hold finer gear than they wear fights in their best
+// for this duel alone (see bestKit; nothing is equipped), unless they choose,
+// in secret, to fight as dressed. Resolves with the fit they fight at: as
+// dressed only if they chose it, otherwise their best, including when they
+// don't answer in time.
 const promptSuitUp = async (repliable, character = {}) => {
     const wornFit = totalFit(character.gear, character);
     const bestFit = totalFit(bestKit(character), character);
     if (bestFit <= wornFit) return { fit: wornFit, suitedUp: false };
 
     const prompt = await repliable.followUp({
-        content: `Thy bags hold finer arms than thou wearest. Shall the herald suit thee up in thy best for this duel, fit ${bestFit} rather than ${wornFit}? Thy wardrobe stays just as it is. Answer within ${SUIT_UP_WINDOW_MS / 1000} seconds, or thou fightest as thou art dressed.`,
+        content: `Thy bags hold finer arms than thou wearest, so the herald suits thee up in thy best for this duel, fit ${bestFit} rather than ${wornFit}, unless thou wouldst rather fight as thou art dressed. Thy wardrobe stays just as it is. Answer within ${SUIT_UP_WINDOW_MS / 1000} seconds, or thou fightest in thy best.`,
         components: [new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('duel_kit_best').setLabel('Suit up in my best').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId('duel_kit_worn').setLabel('Fight as I am dressed').setStyle(ButtonStyle.Secondary),
         )],
         flags: MessageFlags.Ephemeral,
     }).catch(() => null);
-    if (!prompt) return { fit: wornFit, suitedUp: false };
+    if (!prompt) return { fit: bestFit, suitedUp: true };
 
     try {
         const choice = await prompt.awaitMessageComponent({ componentType: ComponentType.Button, time: SUIT_UP_WINDOW_MS });
@@ -260,8 +261,8 @@ const promptSuitUp = async (repliable, character = {}) => {
         await choice.update({ content: suitedUp ? `Thou art suited up in thy finest, fit ${bestFit}.` : `Thou fightest as thou art dressed, fit ${wornFit}.`, components: [] }).catch(() => {});
         return suitedUp ? { fit: bestFit, suitedUp } : { fit: wornFit, suitedUp };
     } catch {
-        await prompt.edit({ content: `No answer, so thou fightest as thou art dressed, fit ${wornFit}.`, components: [] }).catch(() => {});
-        return { fit: wornFit, suitedUp: false };
+        await prompt.edit({ content: `No answer, so thou art suited up in thy finest, fit ${bestFit}.`, components: [] }).catch(() => {});
+        return { fit: bestFit, suitedUp: true };
     }
 };
 
@@ -364,15 +365,16 @@ const duel = async function (interaction) {
             // Fit scores only, never percentages.
             odds = flavor.fitDuelOddsLine(displayNameOf(challengerMember), challengerFit, displayNameOf(targetMember), targetFit);
             // Those fits are as dressed. A duelist with finer arms in their
-            // bags is asked whether to suit up once the duel is accepted, so
-            // the post says up front what each could field: no bait and switch.
+            // bags fights in their best unless they choose otherwise once the
+            // duel is accepted, so the post says up front what each will
+            // likely field: no bait and switch.
             const challengerBest = totalFit(bestKit(challengerChar), challengerChar);
             const targetBest = totalFit(bestKit(targetChar), targetChar);
             const extras = [
                 [challengerMember, challengerFit, challengerBest],
                 [targetMember, targetFit, targetBest],
             ].filter(([, worn, best]) => best > worn)
-                .map(([m, , best]) => `**${displayNameOf(m)}** has finer arms in their bags and may suit up to fit ${best}.`);
+                .map(([m, , best]) => `**${displayNameOf(m)}** has finer arms in their bags and will suit up to fit ${best}, unless they choose otherwise.`);
             if (extras.length) odds += `\n${extras.join(' ')}`;
         } catch (error) {
             console.error('duel: could not read fits for the odds:', error);
