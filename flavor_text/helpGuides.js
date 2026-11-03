@@ -27,7 +27,7 @@ const helpGuides = {
             '',
             '**The march.** The party marches when 20 are ready, or three hours after the threat stirs. Fewer than 3, and no one marches. If thou choosest no stance, thou fightest Balanced.',
             '',
-            '**Victory.** One hero lands the killing blow, and loot drops, one piece for every 2.5 in the party, rounded down: Common for Easy up to Legendary for Max. The herald rolls for thee: **Need** if the piece is finer than anything thou ownest for its slot, worn or in thy bags, **Greed** otherwise. Needers roll first.',
+            '**Victory.** One hero lands the killing blow, and loot drops, one piece for every 2.5 in the party, rounded down: Common for Easy up to Legendary for Max. Besides, the foe always drops one finer piece, of the next rarity up: Uncommon from Easy up to Legendary from Extreme, and one more Legendary from Max. The herald rolls for thee: **Need** if the piece is finer than anything thou ownest for its slot, worn or in thy bags, **Greed** otherwise. Needers roll first.',
             '',
             '**Defeat.** The foe singles out two of the party, the least geared likeliest. A Defensive fighter fends the blow off; anyone else is wounded and may not join again until they heal.',
             '',
