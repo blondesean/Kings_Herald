@@ -85,6 +85,7 @@ const SPECIES = {
     owl: species('Owl', 'hoots', ['snowy', 'brown', 'grey', 'tawny'], ['feathers', 'eyes', 'wings', 'talons']),
     chimpanzee: species('Chimpanzee', 'hollers', ['black', 'brown', 'greying'], ['grin', 'ears', 'fur', 'eyes']),
     gorilla: species('Gorilla', 'beats its chest', ['black', 'silver', 'grey'], ['back', 'fur', 'grin', 'eyes']),
+    orangutan: species('Orangutan', 'bellows', ['orange', 'russet', 'auburn'], ['cheeks', 'fur', 'grin', 'eyes']),
     snake: species('Snake', 'hisses', ['green', 'black', 'crimson', 'golden'], ['scales', 'fangs', 'stripes', 'eyes']),
     spider: species('Spider', 'taps all eight feet', ['black', 'brown', 'red', 'grey'], ['legs', 'eyeCount', 'fangs', 'stripes']),
     wolf: species('Wolf', 'howls', ['grey', 'white', 'black', 'tawny'], ['fur', 'fangs', 'eyes', 'tail', 'ears']),

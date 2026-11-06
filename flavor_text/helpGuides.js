@@ -80,7 +80,7 @@ const helpGuides = {
         label: 'Pets',
         title: 'Pets of the Court',
         text: [
-            'Every day the merchant brings one pet to the shop, never quite like any other: a cat with thick stripes, a falcon with tattered wings, a gorilla with a silver back. Cats, dogs, birds, falcons, eagles, owls, chimpanzees, gorillas, snakes, spiders, wolves, boars, cows, horses, foxes, squirrels, armadillos, kangaroos, deer and mice all turn up in time.',
+            'Every day the merchant brings one pet to the shop, never quite like any other: a cat with thick stripes, a falcon with tattered wings, a gorilla with a silver back. Cats, dogs, birds, falcons, eagles, owls, chimpanzees, gorillas, orangutans, snakes, spiders, wolves, boars, cows, horses, foxes, squirrels, armadillos, kangaroos, deer and mice all turn up in time.',
             '',
             '**Adopting.** `/buy item:pet name:<name>` adopts the day\'s pet for 10 points, and the first to do so takes it home. Every pet must be named.',
             '',
