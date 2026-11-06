@@ -97,6 +97,17 @@ const petBadTitleLines = (max) => [
     `That title will not fit on a collar. Keep it to ${max} characters, starting with a letter, using letters, numbers, spaces, apostrophes, commas and hyphens.`,
 ];
 
+// /petname. `owner` is a mention; `oldName` the pet's old name, `name` its new one.
+const petRenamedLines = (owner, oldName, name) => [
+    `Hear ye! By decree of ${owner}, the pet once called **${oldName}** shall henceforth answer to **${name}**.`,
+    `The scribes strike **${oldName}** from the rolls and write **${name}** in its place. ${owner} nods approvingly.`,
+    `A new collar for a familiar friend: **${oldName}** is now **${name}**, by the word of ${owner}.`,
+];
+
+const petSameNameLines = (name) => [
+    `Thy pet is already called **${name}**, good noble. The scribes need no fresh ink.`,
+];
+
 const petNotOwnedLines = (typed) => [
     `Thou hast no pet named **${typed}**, good noble. Check thy side and thy \`/bank\`.`,
 ];
@@ -175,6 +186,8 @@ module.exports = {
     petTitledLines,
     petTitleClearedLines,
     petBadTitleLines,
+    petRenamedLines,
+    petSameNameLines,
     petNotOwnedLines,
     tradePetPlacedLine,
     petAlreadyAtSideLines,
