@@ -85,6 +85,7 @@ const SPECIES = {
     owl: species('Owl', 'hoots', ['snowy', 'brown', 'grey', 'tawny'], ['feathers', 'eyes', 'wings', 'talons']),
     chimpanzee: species('Chimpanzee', 'hollers', ['black', 'brown', 'greying'], ['grin', 'ears', 'fur', 'eyes']),
     gorilla: species('Gorilla', 'beats its chest', ['black', 'silver', 'grey'], ['back', 'fur', 'grin', 'eyes']),
+    orangutan: species('Orangutan', 'bellows', ['orange', 'russet', 'auburn'], ['cheeks', 'fur', 'grin', 'eyes']),
     snake: species('Snake', 'hisses', ['green', 'black', 'crimson', 'golden'], ['scales', 'fangs', 'stripes', 'eyes']),
     spider: species('Spider', 'taps all eight feet', ['black', 'brown', 'red', 'grey'], ['legs', 'eyeCount', 'fangs', 'stripes']),
     wolf: species('Wolf', 'howls', ['grey', 'white', 'black', 'tawny'], ['fur', 'fangs', 'eyes', 'tail', 'ears']),
@@ -97,6 +98,11 @@ const SPECIES = {
     kangaroo: species('Kangaroo', 'thumps its tail', ['red', 'grey', 'tan'], ['pouch', 'ears', 'tail', 'paws']),
     deer: species('Deer', 'bleats', ['tawny', 'brown', 'red', 'white'], ['antlers', 'spots', 'ears', 'tail']),
     mouse: species('Mouse', 'squeaks', ['grey', 'brown', 'white', 'black'], ['whiskers', 'ears', 'tail', 'paws']),
+    rabbit: species('Rabbit', 'thumps its foot', ['white', 'brown', 'grey', 'black'], ['ears', 'fur', 'tail', 'whiskers']),
+    duck: species('Duck', 'quacks', ['white', 'brown', 'black', 'yellow'], ['feathers', 'beak', 'wings', 'eyes']),
+    frog: species('Frog', 'croaks', ['green', 'brown', 'golden', 'red'], ['spots', 'stripes', 'eyes', 'legs']),
+    pig: species('Pig', 'oinks', ['pink', 'black', 'white', 'ginger'], ['snout', 'ears', 'bristles', 'spots']),
+    bear: species('Bear', 'growls', ['brown', 'black', 'white', 'cinnamon'], ['fur', 'paws', 'ears', 'back']),
 };
 
 const pickOne = (list, random) => list[Math.floor(random() * list.length)];
