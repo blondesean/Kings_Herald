@@ -7,11 +7,16 @@ Regenerate after committing and commit the refreshed file.*
 
 ## 2026-11-05
 
+- Regenerate UPDATELOG.md (`f4ef912`)
 - Extreme and Max foes shrug off lesser gear (`389eb59`)
 - Gear fit now steps by rarity: 10, 20, 30, 40, 50 (`4ac9120`)
 - Gear shows its fit beside its name (`452d41a`)
 - Rabbits, ducks, frogs, pigs and bears join the pet shop (`f445c8c`)
 - Orangutans can now turn up in the pet shop (`76c2a89`)
+- New duel method: Tug of War (`6b8d69d`)
+- New /patchnotes shows the past week's changes (`55c8932`)
+- Pets can be renamed with /petname (`0f164a5`)
+- New ranking question: WoW starting zones (`f42cf30`)
 
 ## 2026-11-02
 
