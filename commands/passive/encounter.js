@@ -20,14 +20,10 @@
  *
  * The battle:
  *   - A random boss from the rolled tier (encounterBosses.js) is revealed.
- *   - Boss fit = (the cheapest gear price of that tier's rarity in each slot,
- *     summed over all slots) x that tier's assumed kit coverage x party
- *     size. Coverage is 3/4 for Easy (three-quarters of the slots in Common),
- *     7/8 for Medium, a full kit for Hard and 85% of an Epic kit for Extreme
- *     (see TIER_COVERAGE), since players fill slots gradually. Max is the
- *     exception: a tenth of the way from a full Epic kit to a full Legendary
- *     one, so a party mostly in Epic gear has a fair shot and Legendary gear
- *     has the edge.
+ *   - Boss fit = that tier's fixed fit per member (BOSS_FIT_PER_ENTRANT) x
+ *     party size: 53 for Easy, 92 for Medium, 175 for Hard, 208 for Extreme
+ *     and 256 for Max. They are set by hand, not worked out from gear prices,
+ *     so repricing the catalog never moves a boss.
  *   - Party fit = each member's equipped fit (read at battle time) x their
  *     stance multiplier, summed. A member whose bags hold finer gear than
  *     they wear fights with the finest piece they own in each slot (bestKit)
@@ -141,38 +137,22 @@ const pick = (lines, random = Math.random) => lines[Math.floor(random() * lines.
 
 // ---- pure rules ---------------------------------------------------------------
 
-// Sum over every slot of the cheapest item of the tier's rarity in that
-// slot (falling back to the tier's floor price for a slot with no such
-// item), scaled by how much of a kit a party at that tier is assumed to
-// have. Players build up gear slot by slot, so the low tiers are a little
-// lenient: Easy assumes three-quarters of the slots filled with Common,
-// Medium seven-eighths with Uncommon, Hard a full kit, and Extreme 85% of
-// an Epic kit, since Epic gear is slow to gather.
-const TIER_FLOOR = [10, 15, 25, 35, 50];
-const TIER_COVERAGE = [0.75, 0.875, 1, 0.85, 1];
+// Each tier's boss fit for every member who marches against it, fixed by
+// hand so repricing gear never moves a boss. Gear fit steps by rarity, 10,
+// 20, 30, 40 and 50 a slot, so a full kit is 70, 140, 210, 280 or 350.
+// Fighting Balanced, a full kit of the tier's rarity wins Medium 100% of the
+// time, Hard 90%, Extreme 97% and Max 95%, the last two at their caps.
+const BOSS_FIT_PER_ENTRANT = [53, 92, 175, 208, 256];
 
 // The chance a party always loses at each tier, however overgeared. Easy and
 // Medium have none, so a strong enough party is sure of the win; from Hard up
 // no fight is ever a sure thing, and the harder the boss the bigger the risk.
 const TIER_LOSS_FLOOR = [0, 0, 0.01, 0.03, 0.05];
-const EXTREME_TIER = 3;
 const MAX_TIER = 4;
-const fullKitFor = (tier) => {
-    const rarity = catalog.RARITIES[tier];
-    return catalog.GEAR_SLOTS.reduce((sum, slot) => {
-        const prices = catalog.GEAR.filter((e) => e.slot === slot && catalog.rarityFor(e.price) === rarity).map((e) => e.price);
-        return sum + (prices.length ? Math.min(...prices) : TIER_FLOOR[tier]);
-    }, 0);
-};
-const kitFitFor = (tier) => Math.round(fullKitFor(tier) * TIER_COVERAGE[tier]);
-// A fit `share` of the way from a full Epic kit to a full Legendary one.
-const epicToLegendary = (share) => Math.round(fullKitFor(EXTREME_TIER) + share * (fullKitFor(MAX_TIER) - fullKitFor(EXTREME_TIER)));
-// Max sits a tenth of the way from a full Epic kit to a full Legendary one,
-// so a party mostly in Epic gear has a fair shot and Legendary gear has the
-// edge. The Herald himself (HERALD_FIT_PER_ENTRANT) is a flat 300 per member,
-// about halfway from Epic to Legendary, so he is harder on paper than any
-// Guardian and a court in full Epic needs its dream blessings.
-const bossFitPerEntrant = (tier) => (tier === MAX_TIER ? epicToLegendary(0.1) : kitFitFor(tier));
+const bossFitPerEntrant = (tier) => BOSS_FIT_PER_ENTRANT[tier];
+// The Herald himself (HERALD_FIT_PER_ENTRANT) is a flat 300 per member, so
+// he is harder on paper than any Guardian and a court in full Epic needs its
+// dream blessings.
 const HERALD_FIT_PER_ENTRANT = 300;
 
 // Chance (0-1) of a win, from party fit / boss fit, capped by the tier's
@@ -991,7 +971,6 @@ module.exports = {
     bossFitPerEntrant,
     HERALD_FIT_PER_ENTRANT,
     winChance,
-    TIER_COVERAGE,
     TIER_LOSS_FLOOR,
     OPEN_TIERS,
     rollTier,
