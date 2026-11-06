@@ -1,6 +1,7 @@
 /* /duel <opponent> <method> <wager> - challenge another court member to a
- * wager of points, settled by Coin Flip, Rock Paper Scissors, Death Roll, or
- * Fit Duel (the odds follow the two duelists' equipped gear, see fitWinChance).
+ * wager of points, settled by Coin Flip, Rock Paper Scissors, Death Roll,
+ * Fit Duel (the odds follow the two duelists' equipped gear, see fitWinChance),
+ * or Tug of War.
  *
  * The challenge posts publicly, in the same thread it was declared in, with
  * three buttons — Accept, Decline with Honor, and Scoff and Decline — and
@@ -52,6 +53,9 @@ const SUIT_UP_WINDOW_MS = 30 * 1000;
 const DEATH_ROLL_START = 10000;
 const DEATH_ROLL_DELAY_MS = 5 * 1000;
 const FIT_DUEL_BEAT_MS = 5 * 1000;
+const TUG_START = 5;
+const TUG_END = 10; // the ribbon at 0 is the challenger's win, at TUG_END the target's
+const TUG_STEP_MS = 1500;
 
 // Death Roll commentary thresholds (see rollCommentary below).
 const DEATH_ROLL_LOW_ROLL = 5; // a roll under this is "a hair's breadth from oblivion"
@@ -66,6 +70,7 @@ const METHOD_COIN_FLIP = 'Coin Flip';
 const METHOD_RPS = 'Rock Paper Scissors';
 const METHOD_DEATH_ROLL = 'Death Roll';
 const METHOD_FIT = 'Fit Duel';
+const METHOD_TUG = 'Tug of War';
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const displayNameOf = (member) => member.displayName;
@@ -223,6 +228,38 @@ const resolveDeathRoll = async (channel, challenger, target) => {
         }
         value = roll;
         [current, other] = [other, current];
+    }
+};
+
+// ---- Tug of War ---------------------------------------------------------------
+
+// The rope as a code block: the challenger pulls from the left, the target
+// from the right, and the ribbon marks the counter.
+const tugRope = (challenger, target, value) => {
+    const rope = Array.from({ length: TUG_END + 1 }, (_, i) => (i === value ? 'O' : '=')).join('');
+    return `\`\`\`\n${displayNameOf(challenger)} |${rope}| ${displayNameOf(target)}\n\`\`\``;
+};
+
+// The ribbon starts at TUG_START and moves one step left or right at even
+// odds each pull, on one message edited in place so the channel isn't
+// flooded. Reaching 0 wins for the challenger, TUG_END for the target.
+const resolveTugOfWar = async (channel, challenger, target) => {
+    let value = TUG_START;
+    const message = await channel.send(`The rope is drawn taut! **${displayNameOf(challenger)}** heaves from the left, **${displayNameOf(target)}** from the right!\n${tugRope(challenger, target, value)}`);
+
+    for (;;) {
+        await delay(TUG_STEP_MS);
+        const challengerPulls = Math.random() < 0.5;
+        value += challengerPulls ? -1 : 1;
+        const puller = challengerPulls ? challenger : target;
+        await message.edit(`**${displayNameOf(puller)}** hauls the ribbon a step their way!\n${tugRope(challenger, target, value)}`);
+
+        if (value <= 0 || value >= TUG_END) {
+            const [winner, loser] = value <= 0 ? [challenger, target] : [target, challenger];
+            console.log(`duel: Tug of War ended at ${value}, ${displayNameOf(winner)} pulled ${displayNameOf(loser)} over the line.`);
+            await channel.send(`Forsooth! **${displayNameOf(winner)}** drags **${displayNameOf(loser)}** clean over the line!`);
+            return [winner, loser];
+        }
     }
 };
 
@@ -492,6 +529,8 @@ const duel = async function (interaction) {
             const suited = [[challengerMember, challengerKit], [targetMember, targetKit]].filter(([, k]) => k.suitedUp).map(([m]) => displayNameOf(m));
             if (suited.length) logDuel(guild.id, `Fit Duel: suited up in their best: ${suited.join(', ')}.`);
             [winner, loser] = await resolveFitDuel(channel, guild.id, challengerMember, targetMember, challengerKit.fit, targetKit.fit);
+        } else if (method === METHOD_TUG) {
+            [winner, loser] = await resolveTugOfWar(channel, challengerMember, targetMember);
         } else {
             [winner, loser] = await resolveDeathRoll(channel, challengerMember, targetMember);
         }
@@ -586,6 +625,7 @@ module.exports = {
                 { name: METHOD_RPS, value: METHOD_RPS },
                 { name: METHOD_DEATH_ROLL, value: METHOD_DEATH_ROLL },
                 { name: METHOD_FIT, value: METHOD_FIT },
+                { name: METHOD_TUG, value: METHOD_TUG },
             ],
         },
         {

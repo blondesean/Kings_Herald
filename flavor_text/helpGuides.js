@@ -136,6 +136,7 @@ const helpGuides = {
             '**Rock Paper Scissors.** Each chooses in secret, and a tie goes again.',
             '**Death Roll.** The first roll is from 0 to 10,000, and each roll after goes from 0 to the last one. Whoever rolls 0 loses.',
             '**Fit Duel.** Thy odds are thy share of the two fits combined, so the better armoured usually wins. Finer arms in thy bags than on thy back? Thou fightest in thy best for that duel alone, unless thou choosest, in secret, to fight as thou art dressed once the duel is accepted. The victor is shown striking their `/pose`.',
+            '**Tug of War.** The ribbon starts at 5 and moves one step toward a side with every pull. The challenger wins if it reaches 0, the challenged if it reaches 10.',
             '',
             '`/duel_stats` shows a member\'s record.',
         ].join('\n'),
