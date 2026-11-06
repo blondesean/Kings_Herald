@@ -53,6 +53,7 @@ const rankingQuestions = () => [
     { question: 'Rank these Nintendo 64 games, best to worst:', items: ['Ocarina of Time', 'Super Mario 64', 'GoldenEye 007', 'Super Smash Bros.', 'Mario Kart 64'] },
     { question: 'Rank these Minecraft mobs, coolest to least cool:', items: ['Creeper', 'Enderman', 'Warden', 'Axolotl', 'Ender Dragon'] },
     { question: 'Rank these World of Warcraft characters, best to worst:', items: ['Arthas', 'Illidan', 'Thrall', 'Sylvanas', 'Jaina'] },
+    { question: 'Rank these World of Warcraft starting zones, best to worst:', items: ['Elwynn Forest', 'Durotar', 'Dun Morogh', 'Tirisfal Glades', 'Mulgore'] },
     { question: 'Rank these classic video games, best to worst:', items: ['Pac-Man', 'Tetris', 'Super Mario Bros.', 'Street Fighter II', 'Space Invaders'] },
     { question: 'Rank these shoe brands, most comfortable to least:', items: ['Nike', 'New Balance', 'Hoka', 'Crocs', 'Birkenstock'] },
     { question: 'Rank these programming languages, best to worst:', items: ['Python', 'JavaScript', 'Java', 'C++', 'Rust'] },
