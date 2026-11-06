@@ -5,8 +5,17 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-11-05
+
+- Extreme and Max foes shrug off lesser gear (`389eb59`)
+- Gear fit now steps by rarity: 10, 20, 30, 40, 50 (`4ac9120`)
+- Gear shows its fit beside its name (`452d41a`)
+- Rabbits, ducks, frogs, pigs and bears join the pet shop (`f445c8c`)
+- Orangutans can now turn up in the pet shop (`76c2a89`)
+
 ## 2026-11-02
 
+- Regenerate UPDATELOG.md (`bed1bf6`)
 - Ranking rounds stay open three hours (`4b0bc70`)
 - Every boss drops one finer piece besides its loot (`6b53bcf`)
 - Fighters suit up in their best by default (`df07614`)
