@@ -98,6 +98,11 @@ const SPECIES = {
     kangaroo: species('Kangaroo', 'thumps its tail', ['red', 'grey', 'tan'], ['pouch', 'ears', 'tail', 'paws']),
     deer: species('Deer', 'bleats', ['tawny', 'brown', 'red', 'white'], ['antlers', 'spots', 'ears', 'tail']),
     mouse: species('Mouse', 'squeaks', ['grey', 'brown', 'white', 'black'], ['whiskers', 'ears', 'tail', 'paws']),
+    rabbit: species('Rabbit', 'thumps its foot', ['white', 'brown', 'grey', 'black'], ['ears', 'fur', 'tail', 'whiskers']),
+    duck: species('Duck', 'quacks', ['white', 'brown', 'black', 'yellow'], ['feathers', 'beak', 'wings', 'eyes']),
+    frog: species('Frog', 'croaks', ['green', 'brown', 'golden', 'red'], ['spots', 'stripes', 'eyes', 'legs']),
+    pig: species('Pig', 'oinks', ['pink', 'black', 'white', 'ginger'], ['snout', 'ears', 'bristles', 'spots']),
+    bear: species('Bear', 'growls', ['brown', 'black', 'white', 'cinnamon'], ['fur', 'paws', 'ears', 'back']),
 };
 
 const pickOne = (list, random) => list[Math.floor(random() * list.length)];
