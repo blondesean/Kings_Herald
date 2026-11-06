@@ -35,7 +35,8 @@ const bank = async function (interaction) {
             const label = slot.charAt(0).toUpperCase() + slot.slice(1);
             const names = [];
             for (const entry of bySlot[slot]) {
-                const text = `[${rarityFor(entry.price)}] ${entry.name}`;
+                // Rarity, name and fit, as on the /flex sheet.
+                const text = `[${rarityFor(entry.price)}] ${entry.name} (${entry.price})`;
                 const next = length + text.length + 2;
                 if (next > MAX_LIST_CHARS) break;
                 names.push(text);

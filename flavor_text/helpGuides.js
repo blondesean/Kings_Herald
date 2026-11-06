@@ -65,6 +65,8 @@ const helpGuides = {
             '',
             '`/flex` shows thy sheet to the court. `/wardrobe` shows it to thee alone, and `/inspect <member>` lets thee study another\'s in private.',
             '',
+            'Each piece shows its rarity before its name and its fit after. Fit differs within a rarity, so an Epic of 40 is finer than an Epic of 35. The pieces thou wearest add up to thy fit score, with whatever thy pet lends.',
+            '',
             '`/pose` chooses the figure that stands beside thy sheet. It costs nothing.',
             '',
             '`/bank` lists the gear in thy bag, and `/equip <item>` puts a piece on, sending what thou wore back to the bag.',

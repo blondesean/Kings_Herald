@@ -140,8 +140,9 @@ const renderSheet = ({ displayName, character = {} }) => {
         marked = marked || upgradable;
         // The slot label is right-justified, so it sits right against the item name.
         // A long name wraps onto extra bordered rows under the same slot.
-        // Rarity comes first, in brackets, then the full name.
-        const text = item ? `[${rarityFor(item.price)}] ${item.name}` : '(empty)';
+        // Rarity comes first, in brackets, then the full name, then its fit,
+        // as in "[Epic] Obsidian Armor (40)".
+        const text = item ? `[${rarityFor(item.price)}] ${item.name} (${item.price})` : '(empty)';
         const chunks = wrapText(text, WIDTH - 4 - 8);
         chunks.forEach((chunk, i) => {
             // The colon sits after the slot label on its first row only.
