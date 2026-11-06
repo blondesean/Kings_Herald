@@ -11,7 +11,8 @@
  *                     (15%) to the member's power for the fight; any other
  *                     adds nothing, and the road goes on either way.
  *   3. The Guardian - a solo fight at Max difficulty (bossFitPerEntrant for
- *                     one), with the encounter's stances except Plunder, and
+ *                     one, gear below Legendary cut as Max cuts it, see
+ *                     fitAgainst), with the encounter's stances except Plunder, and
  *                     the same choice of gear, suited up in the member's best
  *                     unless they pick "Fight as I am dressed". Choosing a
  *                     stance starts the fight at once; no choice in time
@@ -37,7 +38,7 @@ const campaign = require('./campaign');
 const { recordHistory } = require('./historyLog');
 const { fitScore, bestKit } = require('./character');
 const catalog = require('../commands/passive/shopCatalog');
-const { bossFitPerEntrant, winChance, STANCES, addDays } = require('../commands/passive/encounter');
+const { bossFitPerEntrant, fitAgainst, lesserGearNote, winChance, STANCES, addDays } = require('../commands/passive/encounter');
 const { easternDay } = require('../commands/passive/shop');
 const { uniqueTrials, AGES } = require('../flavor_text/uniqueTrials');
 const flavor = require('../flavor_text');
@@ -65,8 +66,9 @@ const offerRumors = (unclaimed, userId, day, count = RUMORS_OFFERED) =>
         .slice(0, count)
         .map(([, id]) => id);
 
-// The fight: the member's power against one Guardian. Returns
-// { power, guardianFit, chance }.
+// The fight: the member's power against one Guardian, a Max foe for one.
+// `fit` is their fit as the Guardian counts it (fitAgainst at GUARDIAN_TIER,
+// so gear below Legendary is cut). Returns { power, guardianFit, chance }.
 const trialOdds = (fit, stance, roadRight) => {
     const power = fit * STANCES[stance].multiplier * (roadRight ? 1 + ROAD_BONUS : 1);
     const guardianFit = bossFitPerEntrant(GUARDIAN_TIER);
@@ -105,7 +107,7 @@ const guardianPrompt = (prefix, trial, roadLine, kits, suitUp) => {
         ));
     }
     return {
-        content: `${roadLine}\n\n${pick(flavor.trialGuardianLines(trial.guardian))}\n\n${STANCE_NOTE}${kitText}\n\n**Choose thy stance to begin the fight.** If thou choosest nothing in ${STEP_MS / 60000} minutes, thou fightest Balanced${kitChoice ? ', in the gear chosen above' : ''}.`,
+        content: `${roadLine}\n\n${pick(flavor.trialGuardianLines(trial.guardian))}\n\n${STANCE_NOTE} ${lesserGearNote(GUARDIAN_TIER, 'a Guardian')}${kitText}\n\n**Choose thy stance to begin the fight.** If thou choosest nothing in ${STEP_MS / 60000} minutes, thou fightest Balanced${kitChoice ? ', in the gear chosen above' : ''}.`,
         components,
     };
 };
@@ -197,7 +199,9 @@ const runTrial = async function (interaction, { persist = true } = {}) {
 
     const suitedUp = suitUp && kits.bestFit > kits.wornFit;
     const fit = suitedUp ? kits.bestFit : kits.wornFit;
-    const { power, guardianFit, chance } = trialOdds(fit, stance, roadRight);
+    // The trial counts gear alone, no pet, as the Guardian counts it.
+    const foeFit = fitAgainst(suitedUp ? bestKit(character) : (character.gear || {}), 0, GUARDIAN_TIER);
+    const { power, guardianFit, chance } = trialOdds(foeFit, stance, roadRight);
     const won = Math.random() < chance;
     console.log(`${tag}: ${relic.name}, road ${roadRight ? 'right' : 'wrong'}, ${stance}${suitedUp ? ', suited up' : ''}, power ${Math.round(power)} vs ${guardianFit}, ${Math.round(chance * 100)}% odds, ${won ? 'won' : 'lost'}.`);
 
@@ -212,6 +216,7 @@ const runTrial = async function (interaction, { persist = true } = {}) {
         stance,
         suitedUp,
         fit,
+        foeFit,
         power: Math.round(power),
         guardianFit,
         chance: Math.round(chance * 1000) / 1000,

@@ -20,15 +20,14 @@
  *
  * The battle:
  *   - A random boss from the rolled tier (encounterBosses.js) is revealed.
- *   - Boss fit = (the cheapest gear price of that tier's rarity in each slot,
- *     summed over all slots) x that tier's assumed kit coverage x party
- *     size. Coverage is 3/4 for Easy (three-quarters of the slots in Common),
- *     7/8 for Medium, a full kit for Hard and 85% of an Epic kit for Extreme
- *     (see TIER_COVERAGE), since players fill slots gradually. Max is the
- *     exception: a tenth of the way from a full Epic kit to a full Legendary
- *     one, so a party mostly in Epic gear has a fair shot and Legendary gear
- *     has the edge.
- *   - Party fit = each member's equipped fit (read at battle time) x their
+ *   - Boss fit = that tier's fixed fit per member (BOSS_FIT_PER_ENTRANT) x
+ *     party size: 53 for Easy, 92 for Medium, 175 for Hard, 208 for Extreme
+ *     and 256 for Max. They are set by hand, not worked out from gear prices,
+ *     so repricing the catalog never moves a boss. Against Extreme and Max,
+ *     gear below the foe's rarity counts for only part of its fit
+ *     (LESSER_GEAR_SHARE), so an undergeared party is punished.
+ *   - Party power = each member's equipped fit (read at battle time), as the
+ *     foe counts it (fitAgainst, which cuts lesser gear from Extreme up), x their
  *     stance multiplier, summed. A member whose bags hold finer gear than
  *     they wear fights with the finest piece they own in each slot (bestKit)
  *     unless they pick "Fight as I am dressed" in their prompt, and the fight
@@ -141,39 +140,52 @@ const pick = (lines, random = Math.random) => lines[Math.floor(random() * lines.
 
 // ---- pure rules ---------------------------------------------------------------
 
-// Sum over every slot of the cheapest item of the tier's rarity in that
-// slot (falling back to the tier's floor price for a slot with no such
-// item), scaled by how much of a kit a party at that tier is assumed to
-// have. Players build up gear slot by slot, so the low tiers are a little
-// lenient: Easy assumes three-quarters of the slots filled with Common,
-// Medium seven-eighths with Uncommon, Hard a full kit, and Extreme 85% of
-// an Epic kit, since Epic gear is slow to gather.
-const TIER_FLOOR = [10, 15, 25, 35, 50];
-const TIER_COVERAGE = [0.75, 0.875, 1, 0.85, 1];
+// Each tier's boss fit for every member who marches against it, fixed by
+// hand so repricing gear never moves a boss. Gear fit steps by rarity, 10,
+// 20, 30, 40 and 50 a slot, so a full kit is 70, 140, 210, 280 or 350.
+// Fighting Balanced, a full kit of the tier's rarity wins Medium 100% of the
+// time, Hard 90%, Extreme 97% and Max 95%, the last two at their caps.
+const BOSS_FIT_PER_ENTRANT = [53, 92, 175, 208, 256];
+// From Extreme up, gear below the foe's rarity counts for only part of its
+// fit (gearFitAgainst): below Epic counts 75% against Extreme, and below
+// Legendary 70% against Max, as it does against the Guardian of a trial
+// (src/trial.js) and in the Herald's battle (src/heraldBattle.js). A party a
+// whole rarity short of the foe wins about 31% at Extreme and 33% at Max,
+// where it would otherwise win 80% and 85%. Hard needs no such rule: a party
+// a rarity short already wins only 40% there.
+const LESSER_GEAR_SHARE = { 3: 0.75, 4: 0.7 };
 
 // The chance a party always loses at each tier, however overgeared. Easy and
 // Medium have none, so a strong enough party is sure of the win; from Hard up
 // no fight is ever a sure thing, and the harder the boss the bigger the risk.
 const TIER_LOSS_FLOOR = [0, 0, 0.01, 0.03, 0.05];
-const EXTREME_TIER = 3;
 const MAX_TIER = 4;
-const fullKitFor = (tier) => {
-    const rarity = catalog.RARITIES[tier];
-    return catalog.GEAR_SLOTS.reduce((sum, slot) => {
-        const prices = catalog.GEAR.filter((e) => e.slot === slot && catalog.rarityFor(e.price) === rarity).map((e) => e.price);
-        return sum + (prices.length ? Math.min(...prices) : TIER_FLOOR[tier]);
-    }, 0);
-};
-const kitFitFor = (tier) => Math.round(fullKitFor(tier) * TIER_COVERAGE[tier]);
-// A fit `share` of the way from a full Epic kit to a full Legendary one.
-const epicToLegendary = (share) => Math.round(fullKitFor(EXTREME_TIER) + share * (fullKitFor(MAX_TIER) - fullKitFor(EXTREME_TIER)));
-// Max sits a tenth of the way from a full Epic kit to a full Legendary one,
-// so a party mostly in Epic gear has a fair shot and Legendary gear has the
-// edge. The Herald himself (HERALD_FIT_PER_ENTRANT) is a flat 300 per member,
-// about halfway from Epic to Legendary, so he is harder on paper than any
-// Guardian and a court in full Epic needs its dream blessings.
-const bossFitPerEntrant = (tier) => (tier === MAX_TIER ? epicToLegendary(0.1) : kitFitFor(tier));
+const bossFitPerEntrant = (tier) => BOSS_FIT_PER_ENTRANT[tier];
+// The Herald himself, the hardest foe, with Max's rule for lesser gear: a
+// court in full Legendary wins 88% of the time before any dream blessings,
+// and one in full Epic about 11%.
 const HERALD_FIT_PER_ENTRANT = 300;
+
+// A piece's rank among the rarities, Common 0 up to Legendary 4, the same
+// numbering as the tiers, with a unique above them all.
+const rarityRank = (entry) => (entry.price > 50 ? catalog.RARITIES.length : catalog.RARITIES.indexOf(catalog.rarityFor(entry.price)));
+// The fit `gear` ({ slot: itemId }) brings against a foe of `tier`: each
+// piece's fit, cut to LESSER_GEAR_SHARE when its rarity is below the tier's.
+const gearFitAgainst = (gear = {}, tier) => {
+    const share = LESSER_GEAR_SHARE[tier] || 1;
+    return Object.values(gear)
+        .map((id) => catalog.findEntry(id))
+        .filter(Boolean)
+        .reduce((sum, entry) => sum + entry.price * (rarityRank(entry) < tier ? share : 1), 0);
+};
+// A member's fit against a foe of `tier`: their gear (gearFitAgainst), plus
+// the pet at their side in full, rounded and never below 0.
+const fitAgainst = (gear, petFit, tier) => Math.max(0, Math.round(gearFitAgainst(gear, tier) + (petFit || 0)));
+// "Gear below Legendary counts for only 70% of its fit against it.", or ''
+// for a tier without the rule. `foe` names who it is against.
+const lesserGearNote = (tier, foe = 'it') => (LESSER_GEAR_SHARE[tier]
+    ? `Gear below ${catalog.RARITIES[tier]} counts for only ${Math.round(LESSER_GEAR_SHARE[tier] * 100)}% of its fit against ${foe}.`
+    : '');
 
 // Chance (0-1) of a win, from party fit / boss fit, capped by the tier's
 // loss floor. Without a tier, the uncapped curve (reaching 100% at 140%).
@@ -332,9 +344,9 @@ const minutesLabel = (ms) => (ms % 3600000 === 0 ? `${ms / 3600000} hour${ms ===
 // besides. The foe brings **175 power** for each who marches against it."
 // Shown in the call and the private prompt: the boss's power per member, but
 // not how it is reckoned, and never the odds or the party's own power until
-// the battle.
+// the battle. From Extreme up it also warns how lesser gear is counted.
 const bonusPhrase = (tier) => (bonusTierFor(tier) > tier ? `one ${catalog.RARITIES[bonusTierFor(tier)]} piece` : `one more ${catalog.RARITIES[tier]} piece`);
-const threatLine = (tier) => `**This day's threat: ${DIFFICULTIES[tier]}**, ${THREAT_PHRASES[tier]}. Victory yields ${catalog.RARITIES[tier]} loot, and ${bonusPhrase(tier)} besides. The foe brings **${bossFitPerEntrant(tier)} power** for each who marches against it.`;
+const threatLine = (tier) => `**This day's threat: ${DIFFICULTIES[tier]}**, ${THREAT_PHRASES[tier]}. Victory yields ${catalog.RARITIES[tier]} loot, and ${bonusPhrase(tier)} besides. The foe brings **${bossFitPerEntrant(tier)} power** for each who marches against it.${LESSER_GEAR_SHARE[tier] ? ` ${lesserGearNote(tier)}` : ''}`;
 
 // How many in the party chose each stance, never who chose which. Once the
 // party has marched, anyone who chose none is counted Balanced, as they fight.
@@ -383,7 +395,8 @@ const kitsOf = (character = {}) => {
 // Whether the member fights in their best kit: by default, unless they chose to
 // fight as dressed, and only if it's actually finer than what they wear.
 const suitsUp = (member) => Boolean(member.suitUp) && member.bestFit > member.wornFit;
-const fightingFit = (member) => (suitsUp(member) ? member.bestFit : member.wornFit);
+// The member's fit against a foe of `tier`, in the kit they fight in.
+const fightingFit = (member, tier) => fitAgainst(suitsUp(member) ? member.best : member.worn, member.petFit, tier);
 
 const buildPrompt = (prefix, member, tier) => {
     const stanceRow = new ActionRowBuilder().addComponents(
@@ -431,11 +444,11 @@ const gatherParty = (g, channel, message, prefix, opts) =>
         const refresh = () => message.edit({ embeds: [buildTeaserEmbed(party, tier, maxParty, minParty, joinWindowMs, teaser, { tally: tallyShown })] }).catch(() => {});
         const allReady = () => Boolean(maxParty) && party.size >= maxParty && [...party.values()].every((m) => m.stance);
         // Re-reads a member's kits (gear may have changed) and sets their fit
-        // from their suit-up choice.
+        // against this foe from their suit-up choice.
         const refreshKits = async (member) => {
             const character = await pointsStore.getCharacter(g.id, member.userId).catch(() => ({}));
             Object.assign(member, kitsOf(character));
-            member.fit = fightingFit(member);
+            member.fit = fightingFit(member, tier);
         };
 
         const collector = channel.createMessageComponentCollector({
@@ -512,11 +525,12 @@ const gatherParty = (g, channel, message, prefix, opts) =>
                     }
                 }
                 // Too little gear to help a party at this tier, even suited up
-                // in their best: turned away.
+                // in their best and counted as this foe counts it: turned away.
                 await refreshKits(member);
-                if (partyChance([{ fit: member.bestFit }], tier) < JOIN_CHANCE - 1e-9) {
+                const bestAgainst = fitAgainst(member.best, member.petFit, tier);
+                if (partyChance([{ fit: bestAgainst }], tier) < JOIN_CHANCE - 1e-9) {
                     party.delete(userId);
-                    await interaction.editReply({ content: pick(flavor.encounterTooWeakLines(member.bestFit, DIFFICULTIES[tier])) }).catch(() => {});
+                    await interaction.editReply({ content: pick(flavor.encounterTooWeakLines(bestAgainst, DIFFICULTIES[tier])) }).catch(() => {});
                     return;
                 }
                 await interaction.editReply(buildPrompt(prefix, member, tier)).catch(() => {});
@@ -715,7 +729,10 @@ const runEncounterIn = async (g, channel, opts) => {
         m.title = (catalog.findEntry(character.title) || {}).name || null;
         m.className = (catalog.findEntry(character.class) || catalog.DEFAULT_CLASS).name;
         m.fit = Math.max(0, fitScore(m.gear) + m.petFit);
-        m.effectiveFit = m.fit * STANCES[m.stance].multiplier;
+        // Their fit as this foe counts it (lesser gear cut, see
+        // LESSER_GEAR_SHARE), then their stance: their power.
+        m.foeFit = fitAgainst(m.gear, m.petFit, tier);
+        m.effectiveFit = m.foeFit * STANCES[m.stance].multiplier;
     }
 
     const boss = pick(BOSSES[tier]);
@@ -753,9 +770,9 @@ const runEncounterIn = async (g, channel, opts) => {
     // count, since the killing blow is weighted by stance-adjusted fit.
     const lines = ready.map((m) => `**${m.displayName}**${m.title ? `, ${m.title}` : ''} - ${m.className}`);
 
-    // How the party's plain gear (not stance-adjusted, so stances stay secret)
-    // measured up against the boss.
-    const gearRatio = bossFit ? ready.reduce((sum, m) => sum + m.fit, 0) / bossFit : 1;
+    // How the party's gear, as this foe counts it but before stances (so
+    // stances stay secret), measured up against the boss.
+    const gearRatio = bossFit ? ready.reduce((sum, m) => sum + m.foeFit, 0) / bossFit : 1;
     const matchup = gearRatio > 1.1 ? 'exceptional' : gearRatio >= 0.9 ? 'appropriate' : 'outmatched';
 
     // The whole fight goes into the history log (src/historyLog.js): the boss,
@@ -781,6 +798,7 @@ const runEncounterIn = async (g, channel, opts) => {
             name: m.displayName,
             stance: m.stance,
             fit: m.fit,
+            foeFit: m.foeFit,
             power: Math.round(m.effectiveFit),
             gear: m.gear,
             suitedUp: m.suitedUp,
@@ -799,9 +817,12 @@ const runEncounterIn = async (g, channel, opts) => {
 
     // The party's totals. Only totals, so each member's stance stays secret
     // on a win. The boss's power per member was told in the call.
+    // When lesser gear was cut, a note says so, since it explains why power
+    // fell short of fit by more than the stances would.
     const tally = [
         `**Party fit:** ${ready.reduce((sum, m) => sum + m.fit, 0)}`,
         `**Party power:** ${Math.round(partyFit)}`,
+        ...(ready.some((m) => m.foeFit < m.fit) ? [`*${lesserGearNote(tier, boss.name)}*`] : []),
     ].join('\n');
     const outcomeEmbed = new EmbedBuilder()
         .setColor(won ? EMBED_COLOR : DEFEAT_COLOR)
@@ -990,8 +1011,11 @@ module.exports = {
     ROLL_DELAY_MS,
     bossFitPerEntrant,
     HERALD_FIT_PER_ENTRANT,
+    LESSER_GEAR_SHARE,
+    gearFitAgainst,
+    fitAgainst,
+    lesserGearNote,
     winChance,
-    TIER_COVERAGE,
     TIER_LOSS_FLOOR,
     OPEN_TIERS,
     rollTier,
