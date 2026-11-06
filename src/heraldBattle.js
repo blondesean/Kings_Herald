@@ -15,11 +15,12 @@
  *      party, answered privately with buttons in ANSWER_WINDOW_MS. A right
  *      answer adds LORE_BONUS to that member's dream duel only.
  *   2. The Horn  - each member's dream duel against their own relic's
- *      Guardian, solo at Max difficulty like a trial: fit, plus the lore
- *      bonus, against bossFitPerEntrant(Max). A win adds DREAM_BONUS to that
+ *      Guardian, solo at Max difficulty like a trial: fit as Max counts it
+ *      (gear below Legendary cut, see fitAgainst), plus the lore bonus,
+ *      against bossFitPerEntrant(Max). A win adds DREAM_BONUS to that
  *      member's power against the Herald; a loss costs nothing.
  *   3. The Wheel - the court against the Herald at HERALD_FIT_PER_ENTRANT per
- *      member: each member's fit, times their stance, times 1 + DREAM_BONUS
+ *      member: each member's fit as Max counts it, times their stance, times 1 + DREAM_BONUS
  *      if they won their dream, summed. On the encounter curve capped like
  *      Max, except that if every member won their dream, the win is certain.
  *
@@ -58,7 +59,7 @@ const { findAdventurerRole } = require('./adventurerRole');
 const { atEastern, easternParts } = require('./easternTime');
 const catalog = require('../commands/passive/shopCatalog');
 const {
-    bossFitPerEntrant, winChance, HERALD_FIT_PER_ENTRANT, MAX_TIER, ROLL_DELAY_MS,
+    bossFitPerEntrant, fitAgainst, lesserGearNote, winChance, HERALD_FIT_PER_ENTRANT, MAX_TIER, ROLL_DELAY_MS,
     dropsFor, kitsOf, fieldValue, minutesLabel, delay, rollForLoot, itemLabel,
     STANCES, pickTargets, plunderFor, addDays,
 } = require('../commands/passive/encounter');
@@ -89,15 +90,20 @@ const num = (n) => Math.round(n).toLocaleString('en-US');
 
 // ---- pure rules ---------------------------------------------------------------
 
-// A member's dream duel against their Guardian: fit, plus the lore bonus.
+// A member's dream duel against their Guardian, a Max foe for one: `fit` is
+// their fit as Max counts it (foeFit), plus the lore bonus.
 const dreamOdds = (fit, loreRight) => {
     const power = fit * (loreRight ? 1 + LORE_BONUS : 1);
     const guardianFit = bossFitPerEntrant(MAX_TIER);
     return { power, guardianFit, chance: winChance(power / guardianFit, MAX_TIER) };
 };
 
-// A member's power against the Herald: fit, times stance, times the dream's blessing.
-const powerOf = (m) => m.fit * STANCES[m.stance || 'balanced'].multiplier * (m.dreamWon ? 1 + DREAM_BONUS : 1);
+// A member's power against the Herald: fit as Max counts it (foeFit), times
+// stance, times the dream's blessing.
+const powerOf = (m) => (m.foeFit ?? m.fit) * STANCES[m.stance || 'balanced'].multiplier * (m.dreamWon ? 1 + DREAM_BONUS : 1);
+
+// ", 196 counted" after a member's fit when lesser gear was cut, else ''.
+const counted = (m) => (m.foeFit < m.fit ? `, ${m.foeFit} counted` : '');
 
 // The court against the Herald, from each member's { fit, stance, dreamWon }.
 const heraldOdds = (members) => {
@@ -184,7 +190,7 @@ const stancePrompt = (prefix, member, persist) => {
     const ready = member.stance ? '\n\n**Thou art ready.** Change it until the court marches.' : '';
     const rehearsal = persist ? '' : '\n\n*A rehearsal: thy relic may be borrowed for the dream, and no wound is truly taken.*';
     return {
-        content: `Thou standest with the court, bearing **${relic ? relic.name : 'thy relic'}**. Thou fightest in thy finest arms, fit ${member.bestFit}.\n\n**Thy stance:** ${stance}\n${STANCE_NOTE}${ready}${rehearsal}`,
+        content: `Thou standest with the court, bearing **${relic ? relic.name : 'thy relic'}**. Thou fightest in thy finest arms, fit ${member.bestFit}. ${lesserGearNote(MAX_TIER, 'the Guardians and the Herald')}\n\n**Thy stance:** ${stance}\n${STANCE_NOTE}${ready}${rehearsal}`,
         components: [row],
     };
 };
@@ -307,7 +313,10 @@ const runHeraldBattleIn = async (g, channel, opts) => {
     for (const m of court) {
         if (!m.stance) m.stance = 'balanced';
         const character = await pointsStore.getCharacter(g.id, m.userId).catch(() => ({}));
-        m.fit = kitsOf(character).bestFit;
+        const kits = kitsOf(character);
+        m.fit = kits.bestFit;
+        // Against the Guardians and the Herald, gear below Legendary is cut, as Max cuts it.
+        m.foeFit = fitAgainst(kits.best, kits.petFit, MAX_TIER);
         m.title = (catalog.findEntry(character.title) || {}).name || null;
         m.className = (catalog.findEntry(character.class) || catalog.DEFAULT_CLASS).name;
         m.guardian = (uniqueTrials[m.relicId] || {}).guardian || { name: 'a Guardian' };
@@ -338,15 +347,15 @@ const runHeraldBattleIn = async (g, channel, opts) => {
 
     // ---- 2. the Horn: the dream duels ----
     await delay(stepMs);
-    const horn = await livePost(channel, 'The Horn', pick(flavor.heraldHornLines()));
+    const horn = await livePost(channel, 'The Horn', `${pick(flavor.heraldHornLines())}\n\n*${lesserGearNote(MAX_TIER, 'the Guardians and the Herald')}*`);
     for (const m of court) {
         await delay(stepMs);
-        const { power, guardianFit, chance } = dreamOdds(m.fit, m.loreRight);
+        const { power, guardianFit, chance } = dreamOdds(m.foeFit, m.loreRight);
         m.dreamPower = power;
         m.dreamChance = chance;
         m.dreamWon = Math.random() < chance;
         const relic = catalog.findEntry(m.relicId);
-        await horn.add(`**${m.displayName}** faces **${m.guardian.name}** on the road to ${relic ? relic.name : 'their relic'}. Fit ${m.fit}${m.loreRight ? ', +15% for the lore' : ''}: **${num(power)}** against ${guardianFit}. ${pick(m.dreamWon ? flavor.heraldDreamWinLines(m.displayName) : flavor.heraldDreamLossLines(m.displayName))}`);
+        await horn.add(`**${m.displayName}** faces **${m.guardian.name}** on the road to ${relic ? relic.name : 'their relic'}. Fit ${m.fit}${counted(m)}${m.loreRight ? ', +15% for the lore' : ''}: **${num(power)}** against ${guardianFit}. ${pick(m.dreamWon ? flavor.heraldDreamWinLines(m.displayName) : flavor.heraldDreamLossLines(m.displayName))}`);
     }
     const blessed = court.filter((m) => m.dreamWon).length;
     await delay(stepMs);
@@ -362,7 +371,7 @@ const runHeraldBattleIn = async (g, channel, opts) => {
         running += m.power;
         const who = `**${m.displayName}**${m.title ? `, ${m.title},` : ''}`;
         // How they take him on, by stance, then their numbers.
-        await wheel.add(`${pick(flavor.heraldStanceLines[m.stance](who))}\n${m.className}. Fit ${m.fit}, ${STANCES[m.stance].label}${m.dreamWon ? ', dream-blessed' : ''}: **${num(m.power)}**. *The court: ${num(running)}*`);
+        await wheel.add(`${pick(flavor.heraldStanceLines[m.stance](who))}\n${m.className}. Fit ${m.fit}${counted(m)}, ${STANCES[m.stance].label}${m.dreamWon ? ', dream-blessed' : ''}: **${num(m.power)}**. *The court: ${num(running)}*`);
     }
     const { power, heraldFit, perfect, chance } = heraldOdds(court);
     await delay(stepMs);
@@ -388,6 +397,7 @@ const runHeraldBattleIn = async (g, channel, opts) => {
             relic: m.relicId,
             stance: m.stance,
             fit: m.fit,
+            foeFit: m.foeFit,
             loreRight: m.loreRight,
             dreamPower: Math.round(m.dreamPower),
             dreamChance: Math.round(m.dreamChance * 1000) / 1000,
