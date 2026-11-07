@@ -49,7 +49,7 @@ Rule of thumb: if a human triggers it with `/`, it's a prompt command; if the bo
 | --- | --- |
 | `/ping` | Health check — replies "Pong!". |
 | `/whois <member>` | Announces a member's titles (roles) in herald style. The member is picked from Discord's user selector. |
-| `/nobility` | Lists everyone with weekly-recap points, top to bottom, with the noble title their points have earned (ranks run from 5 up to 1900, with the gaps between rungs widening as you climb — see `flavor_text/nobilityRanks.js` for the ladder). Each entry also shows a fit score in brackets: the total price of the gear you have equipped (`(N points, fit F)`). |
+| `/nobility` | Lists everyone with weekly-recap points, ordered by points plus fit score, with the noble title their points have earned (ranks run from 5 up to 1900, with the gaps between rungs widening as you climb — see `flavor_text/nobilityRanks.js` for the ladder). Each entry also shows a fit score in brackets: the total price of the gear you have equipped (`(N points, fit F)`). |
 | `/balance` | Checks your own point balance and current title. Ephemeral — only you see the reply. |
 | `/trial` | Hidden, and sealed for now. The herald will say when it opens. |
 | `/tip <amount>` | Gives some of your points to the herald to show your appreciation. The points are spent for good. The herald thanks you publicly, more grandly for bigger tips, then tells his running total and how much you have given in all. Your first tip and 25 points given in all each earn an achievement. Admins can see every giver with `/balance_herald`, which only members with Manage Server can see and which replies privately. Tips live under their own `TIP#<guildId>` partition, so the herald never appears on `/nobility`. |

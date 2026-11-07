@@ -1,8 +1,8 @@
 /* /nobility - proclaim the realm's nobles, highest station first.
  *
  * Reads the weekly-recap points ledger (DynamoDB via ../../src/pointsStore)
- * and lists every member with points, top to bottom, with their earned title
- * and current tally. Titles come from the ladder in
+ * and lists every member with points, ordered by points plus fit score, with
+ * their earned title and current tally. Titles come from the ladder in
  * flavor_text/nobilityRanks.js: Peasant at 0 points, then a new rank starting
  * at 5 points, with the step between rungs widening as the ladder climbs
  * (see that file for the breakdown).
@@ -56,11 +56,23 @@ const buildNobilityChunks = (leaderboard) => {
     return chunks;
 };
 
+/* Order nobles by points plus fit score, highest first, ties broken by
+ * points. Takes the whole ledger, since a high fit can lift a member above
+ * others with more points, and keeps the top MAX_NOBLES.
+ */
+const rankByStanding = (members) => members
+    .map((entry) => ({ entry, standing: entry.points + totalFit(entry.gear, entry) }))
+    .sort((a, b) => b.standing - a.standing || b.entry.points - a.entry.points)
+    .slice(0, MAX_NOBLES)
+    .map(({ entry }) => entry);
+
 const nobility = function (interaction) {
     const guild = interaction.guild;
 
-    return pointsStore.getLeaderboard(guild.id, MAX_NOBLES)
-        .then((leaderboard) => {
+    return pointsStore.getLeaderboard(guild.id, Infinity)
+        .then((members) => {
+            const leaderboard = rankByStanding(members);
+            console.log(`Nobility: ranking ${leaderboard.length} of ${members.length} members by points plus fit in guild ${guild.id}.`);
             const chunks = buildNobilityChunks(leaderboard);
             if (!chunks) {
                 return interaction.editReply('Hark! The royal ledger names no nobles yet. Win the weekly chronicle to earn thy first station!');
