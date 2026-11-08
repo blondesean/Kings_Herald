@@ -17,8 +17,10 @@
  *
  * Both duelists must already hold at least the wagered amount (checked at
  * challenge time and re-checked at acceptance, in case either side's
- * balance moved in between). Once resolved, the wager moves from loser to
- * winner via pointsStore — no separate "pot" is held server-side.
+ * balance moved in between), on top of whatever they already have staked in
+ * other duels not yet settled (see heldStakes). Once resolved, the wager
+ * moves from loser to winner via pointsStore — no separate "pot" is held
+ * server-side.
  *
  * Dueling yourself is blocked, except in a guild listed in the
  * TEST_GUILD_IDS env var — there it's allowed (points wash out net zero),
@@ -352,7 +354,49 @@ const resolveFitDuel = async (channel, guildId, challenger, target, challengerFi
 // history (which anyone could delete).
 const logDuel = (guildId, message) => console.log(`Duel (guild ${guildId}): ${message}`);
 
+// ---- stakes held across active duels --------------------------------------
+
+// Points each member has staked in duels not yet settled, so no one can
+// wager more than they own across all of them at once. The challenger's
+// stake is held from the challenge post, the target's only from acceptance
+// (so a challenge can't freeze someone else's purse). In memory only: the
+// bot is a single process, and a restart ends every duel in flight anyway.
+const heldStakes = new Map(); // `${guildId}:${userId}` -> points held
+const stakeKey = (guildId, userId) => `${guildId}:${userId}`;
+const heldBy = (guildId, userId) => heldStakes.get(stakeKey(guildId, userId)) || 0;
+
+// The stakes one duel holds, released together when it ends however it ends.
+const createStakes = (guildId, wager) => {
+    const holders = [];
+    return {
+        hold(userId) {
+            const key = stakeKey(guildId, userId);
+            heldStakes.set(key, (heldStakes.get(key) || 0) + wager);
+            holders.push(userId);
+            console.log(`duel: holding ${wager} for ${userId} in guild ${guildId}, now ${heldStakes.get(key)} held.`);
+        },
+        releaseAll() {
+            for (const userId of holders.splice(0)) {
+                const key = stakeKey(guildId, userId);
+                const left = (heldStakes.get(key) || 0) - wager;
+                if (left > 0) heldStakes.set(key, left);
+                else heldStakes.delete(key);
+                console.log(`duel: released ${wager} for ${userId} in guild ${guildId}, now ${Math.max(left, 0)} held.`);
+            }
+        },
+    };
+};
+
 const duel = async function (interaction) {
+    const stakes = createStakes(interaction.guild.id, interaction.options.getInteger('wager'));
+    try {
+        await runDuel(interaction, stakes);
+    } finally {
+        stakes.releaseAll();
+    }
+};
+
+const runDuel = async function (interaction, stakes) {
     const guild = interaction.guild;
     const channel = interaction.channel;
     const challengerMember = interaction.member;
@@ -389,6 +433,21 @@ const duel = async function (interaction) {
         await interaction.editReply(`${displayNameOf(targetMember)} cannot match a wager of ${wager} ${pointsWord(wager)} — they hold but ${targetPoints}.`);
         return;
     }
+
+    // Points already staked in other duels yet unsettled can't be wagered again.
+    const challengerHeld = heldBy(guild.id, challengerMember.id);
+    if (challengerPoints - challengerHeld < wager) {
+        console.log(`duel: ${displayNameOf(challengerMember)} has ${challengerPoints} with ${challengerHeld} held in other duels, cannot wager ${wager}.`);
+        await interaction.editReply(`Forsooth, Milord, ${challengerHeld} of thy ${challengerPoints} ${pointsWord(challengerPoints)} are already staked in duels yet unsettled, leaving thee but ${Math.max(challengerPoints - challengerHeld, 0)} to wager.`);
+        return;
+    }
+    const targetHeld = heldBy(guild.id, targetMember.id);
+    if (targetMember.id !== challengerMember.id && targetPoints - targetHeld < wager) {
+        console.log(`duel: ${displayNameOf(targetMember)} has ${targetPoints} with ${targetHeld} held in other duels, cannot match ${wager}.`);
+        await interaction.editReply(`${displayNameOf(targetMember)} cannot match a wager of ${wager} ${pointsWord(wager)}, Milord, for much of their purse is already staked in duels yet unsettled.`);
+        return;
+    }
+    stakes.hold(challengerMember.id);
 
     let odds = null;
     if (method === METHOD_FIT) {
@@ -504,11 +563,21 @@ const duel = async function (interaction) {
         await channel.send('Alack! The royal ledger is sealed to mine eyes, Milord — the duel is called off.');
         return;
     }
-    if (freshChallengerPoints < wager || freshTargetPoints < wager) {
-        logDuel(guild.id, 'Duel result: called off — a side could no longer cover the wager at acceptance. No points change hands.');
-        await channel.send('Alack! The stakes have shifted since the challenge was made, and one side can no longer cover the wager. The duel is called off.');
+    // Both purses are measured net of stakes held in other duels: this duel's
+    // own hold on the challenger is let go first, then both sides are held
+    // until it settles. No await between the check and the hold, so two
+    // acceptances can't both spend the same points.
+    stakes.releaseAll();
+    const selfDuel = targetMember.id === challengerMember.id;
+    const challengerFree = freshChallengerPoints - heldBy(guild.id, challengerMember.id);
+    const targetFree = freshTargetPoints - heldBy(guild.id, targetMember.id);
+    if (challengerFree < wager || targetFree < wager) {
+        logDuel(guild.id, `Duel result: called off — a side could no longer cover the wager at acceptance (free to wager: challenger ${challengerFree}, target ${targetFree}). No points change hands.`);
+        await channel.send('Alack! The stakes have shifted since the challenge was made, and one side can no longer cover the wager beside what they have staked in other duels. The duel is called off.');
         return;
     }
+    stakes.hold(challengerMember.id);
+    if (!selfDuel) stakes.hold(targetMember.id);
 
     let winner, loser;
     try {

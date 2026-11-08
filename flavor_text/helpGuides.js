@@ -134,7 +134,7 @@ const helpGuides = {
         label: 'Duels',
         title: 'Duels',
         text: [
-            '`/duel <opponent> <method> <wager>` challenges a member of the court. Both must hold the wager, and the challenged has five minutes to accept or decline. The winner takes the wager.',
+            '`/duel <opponent> <method> <wager>` challenges a member of the court. Both must hold the wager, beyond what they have already staked in other duels not yet settled, and the challenged has five minutes to accept or decline. The winner takes the wager.',
             '',
             '**Coin Flip.** Even odds.',
             '**Rock Paper Scissors.** Each chooses in secret, and a tie goes again.',
