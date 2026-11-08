@@ -5,8 +5,16 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-11-07
+
+- Nobility shows each noble's standing (`4f5ab82`)
+- Biggest Spender counts only what the shop keeps (`5636db2`)
+- Nobility list is ordered by points plus fit (`8f54334`)
+- Duel wagers count stakes in other open duels (`27ea8b0`)
+
 ## 2026-11-05
 
+- Regenerate UPDATELOG.md (`baaf23a`)
 - Regenerate UPDATELOG.md (`f4ef912`)
 - Extreme and Max foes shrug off lesser gear (`389eb59`)
 - Gear fit now steps by rarity: 10, 20, 30, 40, 50 (`4ac9120`)
