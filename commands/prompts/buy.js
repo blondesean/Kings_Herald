@@ -12,7 +12,8 @@
  * A piece in the Discounts section (sold back by a member with /sell) is
  * bought before a full-price copy of the same piece. Taking the listing,
  * charging the buyer and paying the seller happen in one transaction.
- * Nobody can buy their own listing.
+ * Nobody can buy their own listing, and it doesn't count as shop spending
+ * (see recordSpending).
  *
  * The day's pet is bought by typing "pet", its species or its description,
  * and must be named with the `name` option. It goes to the buyer's side if
@@ -53,11 +54,16 @@ const cosmeticGrant = (entry, kind, character) => {
 };
 
 // Adds to the buyer's lifetime shop spending, the Biggest Spender myth (/myths).
+// Only points the shop keeps count. A member's listing pays its seller what
+// the buyer paid, so counting it would let a piece be bought and relisted, or
+// passed between friends, to climb the myth at little or no cost. A pet given
+// up pays its old owner nothing, so adopting one still counts.
 const recordSpending = (guildId, buyer, price) =>
     achievements.record(guildId, [{ userId: buyer.id, displayName: buyer.displayName, counts: { shop_spent: price } }]);
 
 /* Buys the first of `listings` (all the same piece) still on sale, paying its
- * seller. Moves on to the next if one sells out from under the buyer.
+ * seller. Moves on to the next if one sells out from under the buyer. Not
+ * shop spending, since the seller gets the points (see recordSpending).
  * Returns { ok, listing, equipped } or { ok: false, reason }.
  */
 const purchaseDiscount = async (guildId, day, buyer, entry, listings, character) => {
@@ -65,7 +71,6 @@ const purchaseDiscount = async (guildId, day, buyer, entry, listings, character)
     for (const listing of listings) {
         const result = await pointsStore.buyListing(guildId, listing, buyer, discountPrice(entry.price), grant, day, Date.now());
         if (result.ok) {
-            await recordSpending(guildId, buyer, discountPrice(entry.price));
             return { ok: true, listing, equipped: grant.equip !== undefined };
         }
         if (result.reason === 'cannotAfford') return result;

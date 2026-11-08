@@ -94,8 +94,10 @@ const parseLogs = (text) => {
             if (m[2]) for (const a of wyr.get(m[1]) || []) if (a.pred === m[2]) bump(m[1], a.id, a.name, 'wyr_predictions');
             wyr.delete(m[1]);
         } else if ((m = msg.match(/^Shop \(guild (\d+)\): (.+?) bought .+ for (\d+)/))) {
+            // Buying another member's listing ("bought X from Seller (id) for
+            // N") pays the seller, so it isn't shop spending (see /buy).
             const id = lastId(m[2]);
-            if (id) bump(m[1], id, nameBefore(m[2], id), 'shop_spent', Number(m[3]));
+            if (id && !/ bought .+ from .+ \(\d+\) for \d+/.test(msg)) bump(m[1], id, nameBefore(m[2], id), 'shop_spent', Number(m[3]));
         } else if ((m = msg.match(/^Shop \(guild (\d+)\): (.+?) swapped .+ for (.+) \(\d{4}-\d{2}-\d{2}\)\.$/))) {
             // A title swap logs no price, so it comes from the catalog.
             const id = lastId(m[2]);
