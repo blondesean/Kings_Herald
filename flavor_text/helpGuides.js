@@ -125,7 +125,7 @@ const helpGuides = {
             '**Mightiest Party.** The greatest average power per member any encounter party has brought to battle, win or lose.',
             '**Most Duels Won.** The most duels won, ever.',
             '**Longest Week in Voice.** The most hours spent in voice in a single week, Sunday to Sunday.',
-            '**Biggest Spender.** The most points ever spent at the merchant\'s stalls.',
+            '**Biggest Spender.** The most points ever spent at the merchant\'s stalls. Wares bought from another noble count not, for that coin goes to them.',
             '**Finest Fit.** The highest fit worn right now.',
             '**Greatest Duel.** The richest wager ever won, and who was beaten.',
         ].join('\n'),

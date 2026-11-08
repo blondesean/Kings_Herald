@@ -3,7 +3,8 @@
  * Read live from data the bot already keeps:
  *   - Most Duels Won: duelWins on the ledger
  *   - Biggest Spender: lifetime shop spending, the shop_spent achievement
- *     counter (src/achievements.js; /buy adds to it)
+ *     counter (src/achievements.js; /buy and /fence add to it, but not
+ *     buying another member's listing, which pays them back)
  *   - Finest Fit: the highest fit worn right now
  *   - Greatest Duel: the biggest wager won, from the duel history
  * Kept as records when they happen (pointsStore.setMythIfHigher):
