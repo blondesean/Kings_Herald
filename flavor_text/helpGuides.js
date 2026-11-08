@@ -149,7 +149,7 @@ const helpGuides = {
         label: 'Earning points',
         title: 'Earning Points',
         text: [
-            'Points raise thee up the `/nobility` ladder and buy thee gear. `/balance` shows thine. The peerage is ordered by thy points and thy fit together.',
+            'Points raise thee up the `/nobility` ladder and buy thee gear. `/balance` shows thine. The peerage is ordered by thy standing, thy points and thy fit together.',
             '',
             '**Daily trivia.** 2 for a right answer. Some days bring a would-you-rather instead, 2 for guessing the court\'s choice, or a ranking, 5 for the closest and 2 for the next.',
             '**Daily puzzle.** 1 to everyone who helped, if the puzzle is solved.',

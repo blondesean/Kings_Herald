@@ -1,14 +1,11 @@
 /* /nobility - proclaim the realm's nobles, highest station first.
  *
  * Reads the weekly-recap points ledger (DynamoDB via ../../src/pointsStore)
- * and lists every member with points, ordered by points plus fit score, with
- * their earned title and current tally. Titles come from the ladder in
- * flavor_text/nobilityRanks.js: Peasant at 0 points, then a new rank starting
- * at 5 points, with the step between rungs widening as the ladder climbs
- * (see that file for the breakdown).
- *
- * buildNobilityChunks is also called directly by weeklyRecap.js, which
- * proclaims the peerage right after posting each week's recap.
+ * and lists every member with points, ordered by their standing, points plus
+ * fit score, with their earned title, the standing, and its points and fit.
+ * Titles come from the ladder in flavor_text/nobilityRanks.js: Peasant at 0
+ * points, then a new rank starting at 5 points, with the step between rungs
+ * widening as the ladder climbs (see that file for the breakdown).
  */
 
 const pointsStore = require('../../src/pointsStore');
@@ -35,11 +32,12 @@ const buildNobilityChunks = (leaderboard) => {
         const rank = titleFor(entry.points);
         const points = entry.points === 1 ? 'point' : 'points';
         // The fit score is the price of everything equipped (see src/character.js).
-        return `${index + 1}. **${rank.title}** — ${entry.displayName} (${entry.points} ${points}, fit ${totalFit(entry.gear, entry)})`;
+        const fit = totalFit(entry.gear, entry);
+        return `${index + 1}. **${rank.title}** — ${entry.displayName}: ${entry.points + fit} standing (${entry.points} ${points}, fit ${fit})`;
     });
 
     const header = `**THE PEERAGE OF THE REALM**\n\n` +
-        `*Hear ye! The Herald proclaims the standing nobility, from the loftiest station to the humblest:*\n\n`;
+        `*Hear ye! The Herald proclaims the standing nobility, ranked by points and fit together:*\n\n`;
     const footer = `\n\n*Rise in station through the weekly chronicle: podium finishes and marks of favor both earn points, and a new title awaits at every rung.*`;
 
     const chunks = [];
