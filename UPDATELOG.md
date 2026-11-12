@@ -5,8 +5,13 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-11-08
+
+- Duel stats now show net points won or lost (`ab7683f`)
+
 ## 2026-11-07
 
+- Regenerate UPDATELOG.md (`88cce5e`)
 - Nobility shows each noble's standing (`4f5ab82`)
 - Biggest Spender counts only what the shop keeps (`5636db2`)
 - Nobility list is ordered by points plus fit (`8f54334`)
