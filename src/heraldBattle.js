@@ -15,14 +15,15 @@
  *      party, answered privately with buttons in ANSWER_WINDOW_MS. A right
  *      answer adds LORE_BONUS to that member's dream duel only.
  *   2. The Horn  - each member's dream duel against their own relic's
- *      Guardian, solo at Max difficulty like a trial: fit as Max counts it
- *      (gear below Legendary cut, see fitAgainst), plus the lore bonus,
- *      against bossFitPerEntrant(Max). A win adds DREAM_BONUS to that
+ *      Guardian, solo like a trial: fit as Max counts it (gear below
+ *      Legendary cut, see fitAgainst), plus the lore bonus, against
+ *      GUARDIAN_FIT, capped as a trial is. A win adds DREAM_BONUS to that
  *      member's power against the Herald; a loss costs nothing.
  *   3. The Wheel - the court against the Herald at HERALD_FIT_PER_ENTRANT per
  *      member: each member's fit as Max counts it, times their stance, times 1 + DREAM_BONUS
- *      if they won their dream, summed. On the encounter curve capped like
- *      Max, except that if every member won their dream, the win is certain.
+ *      if they won their dream, summed. On the encounter curve, capped at
+ *      1 - HERALD_LOSS_FLOOR (80%) however strong the court, so the last
+ *      fight is never a sure thing.
  *
  * Unlike the daily encounter, every member's fit and power are shown: it is
  * the finale. A win names the age the first time (campaign field
@@ -59,7 +60,7 @@ const { findAdventurerRole } = require('./adventurerRole');
 const { atEastern, easternParts } = require('./easternTime');
 const catalog = require('../commands/passive/shopCatalog');
 const {
-    bossFitPerEntrant, fitAgainst, lesserGearNote, winChance, HERALD_FIT_PER_ENTRANT, MAX_TIER, ROLL_DELAY_MS,
+    GUARDIAN_FIT, GUARDIAN_LOSS_FLOOR, HERALD_FIT_PER_ENTRANT, HERALD_LOSS_FLOOR, fitAgainst, lesserGearNote, chanceAgainst, MAX_TIER, ROLL_DELAY_MS,
     dropsFor, kitsOf, fieldValue, minutesLabel, delay, rollForLoot, itemLabel,
     STANCES, pickTargets, plunderFor, addDays,
 } = require('../commands/passive/encounter');
@@ -90,12 +91,11 @@ const num = (n) => Math.round(n).toLocaleString('en-US');
 
 // ---- pure rules ---------------------------------------------------------------
 
-// A member's dream duel against their Guardian, a Max foe for one: `fit` is
+// A member's dream duel against their Guardian, as in a trial: `fit` is
 // their fit as Max counts it (foeFit), plus the lore bonus.
 const dreamOdds = (fit, loreRight) => {
     const power = fit * (loreRight ? 1 + LORE_BONUS : 1);
-    const guardianFit = bossFitPerEntrant(MAX_TIER);
-    return { power, guardianFit, chance: winChance(power / guardianFit, MAX_TIER) };
+    return { power, guardianFit: GUARDIAN_FIT, chance: chanceAgainst(power / GUARDIAN_FIT, GUARDIAN_LOSS_FLOOR) };
 };
 
 // A member's power against the Herald: fit as Max counts it (foeFit), times
@@ -106,11 +106,13 @@ const powerOf = (m) => (m.foeFit ?? m.fit) * STANCES[m.stance || 'balanced'].mul
 const counted = (m) => (m.foeFit < m.fit ? `, ${m.foeFit} counted` : '');
 
 // The court against the Herald, from each member's { fit, stance, dreamWon }.
+// `perfect` is whether every member won their dream, which the herald remarks
+// on; the blessings already count in the power.
 const heraldOdds = (members) => {
     const power = members.reduce((sum, m) => sum + powerOf(m), 0);
     const heraldFit = HERALD_FIT_PER_ENTRANT * members.length;
     const perfect = members.length > 0 && members.every((m) => m.dreamWon);
-    return { power, heraldFit, perfect, chance: perfect ? 1 : winChance(power / heraldFit, MAX_TIER) };
+    return { power, heraldFit, perfect, chance: chanceAgainst(power / heraldFit, HERALD_LOSS_FLOOR) };
 };
 
 // When each step of a named day falls: reminders a week and a day before,

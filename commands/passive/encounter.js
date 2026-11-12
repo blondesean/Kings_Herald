@@ -21,8 +21,8 @@
  * The battle:
  *   - A random boss from the rolled tier (encounterBosses.js) is revealed.
  *   - Boss fit = that tier's fixed fit per member (BOSS_FIT_PER_ENTRANT) x
- *     party size: 53 for Easy, 92 for Medium, 175 for Hard, 208 for Extreme
- *     and 256 for Max. They are set by hand, not worked out from gear prices,
+ *     party size: 53 for Easy, 92 for Medium, 175 for Hard, 250 for Extreme
+ *     and 300 for Max. They are set by hand, not worked out from gear prices,
  *     so repricing the catalog never moves a boss. Against Extreme and Max,
  *     gear below the foe's rarity counts for only part of its fit
  *     (LESSER_GEAR_SHARE), so an undergeared party is punished.
@@ -35,7 +35,7 @@
  *   - Win chance comes from the ratio party/boss (see winChance): 80% at an
  *     even match, +5% per 10% over, -20% per 10% under (0% at 60%), so
  *     100% at 140%. From Hard up it's capped so there's always some risk
- *     (TIER_LOSS_FLOOR: Hard 99%, Extreme 97%, Max 95%); Easy and Medium
+ *     (TIER_LOSS_FLOOR: Hard 99%, Extreme 95%, Max 85%); Easy and Medium
  *     have no cap.
  * On a win, one member lands the killing blow — weighted by each member's
  * effective (stance-adjusted) fit — and the boss drops one piece per
@@ -61,8 +61,9 @@
  *     equals under JOIN_CHANCE (10%) is turned away, without being told the
  *     fit it takes (joinFitFor works it out, for the docs and tests).
  *   - Every CHECK_INTERVAL_MS (15 minutes) the herald reckons the party's
- *     odds from current gear and chosen stances; under WARN_CHANCE (75%) it
- *     posts a warning with a "Leave the party" button.
+ *     odds from current gear and chosen stances; under WARN_CHANCE (50%) it
+ *     posts a warning with a "Leave the party" button, not repeated unless
+ *     the odds fall further, or recover and fall back.
  * Injuries persist in DynamoDB (pointsStore.getInjury/setInjury); the
  * encounter itself lives in memory, like the other games.
  *
@@ -111,9 +112,10 @@ const dropsFor = (partySize) => Math.floor(partySize / ADVENTURERS_PER_DROP);
 // more Legendary instead. Uniques are never dropped (they aren't in GEAR).
 const bonusTierFor = (tier) => Math.min(tier + 1, MAX_TIER);
 // While the party forms, the herald checks its odds this often, and warns
-// (with a way to leave) when they fall below WARN_CHANCE.
+// (with a way to leave) when they fall below WARN_CHANCE. Close fights are
+// the rule from Extreme up, so only a party likelier to lose is warned.
 const CHECK_INTERVAL_MS = 15 * 60 * 1000;
-const WARN_CHANCE = 0.75;
+const WARN_CHANCE = 0.5;
 // A member whose fit alone, fighting Balanced, would give a party of their
 // equals less than this chance is turned away at the door.
 const JOIN_CHANCE = 0.10;
@@ -144,27 +146,38 @@ const pick = (lines, random = Math.random) => lines[Math.floor(random() * lines.
 // hand so repricing gear never moves a boss. Gear fit steps by rarity, 10,
 // 20, 30, 40 and 50 a slot, so a full kit is 70, 140, 210, 280 or 350.
 // Fighting Balanced, a full kit of the tier's rarity wins Medium 100% of the
-// time, Hard 90%, Extreme 97% and Max 95%, the last two at their caps.
-const BOSS_FIT_PER_ENTRANT = [53, 92, 175, 208, 256];
+// time, Hard 90%, Extreme 86% and Max 85%, the last at its cap. Extreme and
+// Max are set so the court's best stay in a close fight: in full Legendary,
+// Plunder wins Max only about two thirds of the time.
+const BOSS_FIT_PER_ENTRANT = [53, 92, 175, 250, 300];
 // From Extreme up, gear below the foe's rarity counts for only part of its
 // fit (gearFitAgainst): below Epic counts 75% against Extreme, and below
 // Legendary 70% against Max, as it does against the Guardian of a trial
 // (src/trial.js) and in the Herald's battle (src/heraldBattle.js). A party a
-// whole rarity short of the foe wins about 31% at Extreme and 33% at Max,
-// where it would otherwise win 80% and 85%. Hard needs no such rule: a party
+// whole rarity short of the foe wins about 6% at Extreme and 11% at Max,
+// where it would otherwise win 48% and 67%. Hard needs no such rule: a party
 // a rarity short already wins only 40% there.
 const LESSER_GEAR_SHARE = { 3: 0.75, 4: 0.7 };
 
 // The chance a party always loses at each tier, however overgeared. Easy and
 // Medium have none, so a strong enough party is sure of the win; from Hard up
 // no fight is ever a sure thing, and the harder the boss the bigger the risk.
-const TIER_LOSS_FLOOR = [0, 0, 0.01, 0.03, 0.05];
+const TIER_LOSS_FLOOR = [0, 0, 0.01, 0.05, 0.15];
 const MAX_TIER = 4;
 const bossFitPerEntrant = (tier) => BOSS_FIT_PER_ENTRANT[tier];
+// Each relic's Guardian, faced alone in a trial (src/trial.js) and in the
+// Herald's dream duels, with Max's rule for lesser gear: full Legendary gear
+// wins 80% of the time, its cap, in any stance, and full Epic about 11%, or
+// about half fighting Aggressive with the road's blessing.
+const GUARDIAN_FIT = 300;
+const GUARDIAN_LOSS_FLOOR = 0.2;
 // The Herald himself, the hardest foe, with Max's rule for lesser gear: a
-// court in full Legendary wins 88% of the time before any dream blessings,
-// and one in full Epic about 11%.
-const HERALD_FIT_PER_ENTRANT = 300;
+// court in full Legendary fighting Balanced wins 80% of the time, his cap,
+// without any dream blessings, but only 60% fighting Defensive. A court in
+// full Epic can't win without blessings, and wins about 9% if every member
+// is blessed.
+const HERALD_FIT_PER_ENTRANT = 350;
+const HERALD_LOSS_FLOOR = 0.2;
 
 // A piece's rank among the rarities, Common 0 up to Legendary 4, the same
 // numbering as the tiers, with a unique above them all.
@@ -187,12 +200,14 @@ const lesserGearNote = (tier, foe = 'it') => (LESSER_GEAR_SHARE[tier]
     ? `Gear below ${catalog.RARITIES[tier]} counts for only ${Math.round(LESSER_GEAR_SHARE[tier] * 100)}% of its fit against ${foe}.`
     : '');
 
-// Chance (0-1) of a win, from party fit / boss fit, capped by the tier's
-// loss floor. Without a tier, the uncapped curve (reaching 100% at 140%).
-const winChance = (ratio, tier = null) => {
+// Chance (0-1) of a win, from power / foe fit, capped at 1 - lossFloor.
+// Without a floor, the uncapped curve (reaching 100% at 140%).
+const chanceAgainst = (ratio, lossFloor = 0) => {
     const raw = ratio >= 1 ? Math.min(1, 0.8 + 0.5 * (ratio - 1)) : Math.max(0, 0.8 - 2 * (1 - ratio));
-    return tier === null ? raw : Math.min(raw, 1 - TIER_LOSS_FLOOR[tier]);
+    return Math.min(raw, 1 - lossFloor);
 };
+// The same against a boss of `tier`, capped by the tier's loss floor.
+const winChance = (ratio, tier = null) => chanceAgainst(ratio, tier === null ? 0 : TIER_LOSS_FLOOR[tier]);
 
 // The tiers every server can roll: Easy, Medium, Hard and Extreme. The first
 // Extreme win opens Max (see src/campaign.js); the real encounter rolls from
@@ -457,8 +472,11 @@ const gatherParty = (g, channel, message, prefix, opts) =>
             time: joinWindowMs,
         });
 
-        // The roster checks, at each interval strictly inside the window.
+        // The roster checks, at each interval strictly inside the window. A
+        // warning isn't repeated while the odds hold: only if they fall
+        // further, or recover past WARN_CHANCE and fall back.
         const checks = [];
+        let warnBelow = WARN_CHANCE;
         for (let at = checkIntervalMs; at < joinWindowMs; at += checkIntervalMs) {
             checks.push(setTimeout(async () => {
                 if (!party.size) return;
@@ -466,7 +484,9 @@ const gatherParty = (g, channel, message, prefix, opts) =>
                 for (const m of members) await refreshKits(m);
                 const chance = partyChance(members, tier);
                 console.log(`${tag}: roster check, ${members.length} in the party, ${percent(chance)} odds.`);
-                if (chance >= WARN_CHANCE) return;
+                if (chance >= WARN_CHANCE) warnBelow = WARN_CHANCE;
+                if (chance >= warnBelow) return;
+                warnBelow = chance;
                 const warning = await channel.send({
                     content: pick(flavor.encounterOutmatchedLines()),
                     components: [leaveRow(prefix, false)],
@@ -1010,11 +1030,15 @@ module.exports = {
     MAX_TIER,
     ROLL_DELAY_MS,
     bossFitPerEntrant,
+    GUARDIAN_FIT,
+    GUARDIAN_LOSS_FLOOR,
     HERALD_FIT_PER_ENTRANT,
+    HERALD_LOSS_FLOOR,
     LESSER_GEAR_SHARE,
     gearFitAgainst,
     fitAgainst,
     lesserGearNote,
+    chanceAgainst,
     winChance,
     TIER_LOSS_FLOOR,
     OPEN_TIERS,
