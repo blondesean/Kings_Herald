@@ -5,6 +5,11 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-11-11
+
+- Extreme, Max, the Guardians and the Herald fight harder (`9382eac`)
+- Regenerate UPDATELOG.md (`b40fad5`)
+
 ## 2026-11-08
 
 - Duel stats now show net points won or lost (`ab7683f`)
