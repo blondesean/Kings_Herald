@@ -142,7 +142,7 @@ const helpGuides = {
             '**Fit Duel.** Thy odds are thy share of the two fits combined, so the better armoured usually wins. Finer arms in thy bags than on thy back? Thou fightest in thy best for that duel alone, unless thou choosest, in secret, to fight as thou art dressed once the duel is accepted. The victor is shown striking their `/pose`.',
             '**Tug of War.** The ribbon starts at 5 and moves one step toward a side with every pull. The challenger wins if it reaches 0, the challenged if it reaches 10.',
             '',
-            '`/duel_stats` shows a member\'s record.',
+            '`/duel_stats` shows a member\'s record and how many points they have won or lost in duels all told.',
         ].join('\n'),
     },
     points: {
