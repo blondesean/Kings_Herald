@@ -10,8 +10,8 @@
  *                     lore question. The legend's own choice adds ROAD_BONUS
  *                     (15%) to the member's power for the fight; any other
  *                     adds nothing, and the road goes on either way.
- *   3. The Guardian - a solo fight at Max difficulty (bossFitPerEntrant for
- *                     one, gear below Legendary cut as Max cuts it, see
+ *   3. The Guardian - a solo fight against GUARDIAN_FIT (300), capped at
+ *                     80%, with gear below Legendary cut as Max cuts it (see
  *                     fitAgainst), with the encounter's stances except Plunder, and
  *                     the same choice of gear, suited up in the member's best
  *                     unless they pick "Fight as I am dressed". Choosing a
@@ -38,12 +38,12 @@ const campaign = require('./campaign');
 const { recordHistory } = require('./historyLog');
 const { fitScore, bestKit } = require('./character');
 const catalog = require('../commands/passive/shopCatalog');
-const { bossFitPerEntrant, fitAgainst, lesserGearNote, winChance, STANCES, addDays } = require('../commands/passive/encounter');
+const { GUARDIAN_FIT, GUARDIAN_LOSS_FLOOR, fitAgainst, lesserGearNote, chanceAgainst, STANCES, addDays } = require('../commands/passive/encounter');
 const { easternDay } = require('../commands/passive/shop');
 const { uniqueTrials, AGES } = require('../flavor_text/uniqueTrials');
 const flavor = require('../flavor_text');
 
-const GUARDIAN_TIER = 4; // Max
+const GUARDIAN_TIER = 4; // Max, whose rule for lesser gear the Guardian keeps
 const RUMORS_OFFERED = 5;
 const ROAD_BONUS = 0.15;
 const STEP_MS = 2 * 60 * 1000; // each round's time to answer
@@ -66,13 +66,12 @@ const offerRumors = (unclaimed, userId, day, count = RUMORS_OFFERED) =>
         .slice(0, count)
         .map(([, id]) => id);
 
-// The fight: the member's power against one Guardian, a Max foe for one.
+// The fight: the member's power against one Guardian (GUARDIAN_FIT).
 // `fit` is their fit as the Guardian counts it (fitAgainst at GUARDIAN_TIER,
 // so gear below Legendary is cut). Returns { power, guardianFit, chance }.
 const trialOdds = (fit, stance, roadRight) => {
     const power = fit * STANCES[stance].multiplier * (roadRight ? 1 + ROAD_BONUS : 1);
-    const guardianFit = bossFitPerEntrant(GUARDIAN_TIER);
-    return { power, guardianFit, chance: winChance(power / guardianFit, GUARDIAN_TIER) };
+    return { power, guardianFit: GUARDIAN_FIT, chance: chanceAgainst(power / GUARDIAN_FIT, GUARDIAN_LOSS_FLOOR) };
 };
 
 // Fisher-Yates, so the legend's choice isn't always first.
