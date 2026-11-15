@@ -42,6 +42,7 @@ module.exports = {
     ...require('./encounterFlavor'),
     ...require('./trialFlavor'),
     ...require('./heraldFlavor'),
+    ...require('./heraldFinalBlowFlavor'),
     ...require('./revealMornings'),
     ...require('./weeklyRecapFlavor'),
     ...require('./halloweenTreatFlavor'),

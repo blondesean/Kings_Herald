@@ -1,5 +1,6 @@
-/* Flavor text for the Herald's battle (src/heraldBattle.js) and its
- * proclamations (commands/prompts/herald_challenge.js). The speeches follow
+/* Flavor text for the Herald's battle (src/heraldBattle.js), its
+ * proclamations (commands/prompts/herald_challenge.js) and the roll call of
+ * Echoes (commands/prompts/echoes.js). The speeches follow
  * docs/the-last-proclamation.md.
  *
  * HERALD_QUESTIONS are the lore question of the first phase. Each is easy for
@@ -37,6 +38,28 @@ const heraldChallengeMovedLines = (when) => [
 
 const heraldChallengeCancelledLines = () => [
     'Hear ye! The herald rolls his scroll back up. The challenge will wait for another day, and he will name it when it comes.',
+];
+
+// /echoes, the roll call. Nothing before the reveal speaks of the challenge.
+const heraldEchoesClosedLines = () => [
+    'The herald looks up from his scroll. "Echoes? An old word, good noble, and there is no one yet to call by it."',
+];
+
+const heraldEchoesNoneLines = () => [
+    'Hear ye! The old arms are awake, but not one has yet found its Echo. The roads are open to any who would walk them, with /trial.',
+];
+
+const heraldEchoesIntroLines = () => [
+    'Hear ye, hear ye! The herald unrolls a short scroll and reads each name on it slowly, as names ought to be read. These are the Echoes of this court, the ones the old arms knew.',
+    'Hear ye! Let the court hear the names of its Echoes, the ones the old arms recognized when they woke.',
+];
+
+const heraldEchoesChallengeLines = (count, needed, when) => [
+    `Only ${count === 1 ? 'this Echo' : `these ${count} Echoes`} may answer the herald's challenge, ${when ? `named for **${when}**` : 'on a day not yet named'}, and at least ${needed} must.`,
+];
+
+const heraldEchoesLeftLines = (left) => [
+    `${left === 1 ? 'One relic still sleeps, waiting for its Echo' : `${left} relics still sleep, each waiting for its Echo`}. The old roads are open, with /trial.`,
 ];
 
 const heraldReminderLines = {
@@ -144,6 +167,11 @@ module.exports = {
     heraldChallengeSetLines,
     heraldChallengeMovedLines,
     heraldChallengeCancelledLines,
+    heraldEchoesClosedLines,
+    heraldEchoesNoneLines,
+    heraldEchoesIntroLines,
+    heraldEchoesChallengeLines,
+    heraldEchoesLeftLines,
     heraldReminderLines,
     heraldChallengeLines,
     heraldTooFewLines,
