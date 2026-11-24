@@ -103,6 +103,7 @@ const SPECIES = {
     frog: species('Frog', 'croaks', ['green', 'brown', 'golden', 'red'], ['spots', 'stripes', 'eyes', 'legs']),
     pig: species('Pig', 'oinks', ['pink', 'black', 'white', 'ginger'], ['snout', 'ears', 'bristles', 'spots']),
     bear: species('Bear', 'growls', ['brown', 'black', 'white', 'cinnamon'], ['fur', 'paws', 'ears', 'back']),
+    hippo: species('Hippo', 'yawns wide', ['grey', 'pink', 'slate', 'muddy'], ['tusks', 'ears', 'eyes', 'tail']),
 };
 
 const pickOne = (list, random) => list[Math.floor(random() * list.length)];

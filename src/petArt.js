@@ -189,6 +189,13 @@ o_(")(")
  \  \_/  /
   '-----'
 `,
+    hippo: art`
+   n_____n
+  ( o   o )
+ /  _____  \
+|  (o   o)  |
+ \_________/
+`,
 };
 
 const petArtLines = (species) => ART[species] || [];
