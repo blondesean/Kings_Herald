@@ -26,8 +26,12 @@
  *      fight is never a sure thing.
  *
  * Unlike the daily encounter, every member's fit and power are shown: it is
- * the finale. A win names the age the first time (campaign field
- * heraldDefeatedAt), earns everyone The Age Is Named (counter herald_wins),
+ * the finale. A win first posts the Final Blow, a line every STEP_MS for each
+ * member in a random order, showing them wielding a unique in their kit, their
+ * relic first, or else their finest piece (finalBlowPiece), with lines from
+ * flavor_text/heraldFinalBlowFlavor.js. It then names the age the first
+ * time (campaign field heraldDefeatedAt), earns everyone The Age Is Named
+ * (counter herald_wins),
  * and drops Legendary gear, one piece per 2.5 members, rolled for like
  * encounter loot (rollForLoot); each Plunder member also makes off with a
  * Legendary piece of their own (plunderFor). A loss singles out two members,
@@ -47,8 +51,8 @@
  *     dreams of a random one, and nothing is written
  *   setDuel / cancelDuel / getDuel - for /herald_challenge
  *   scheduleHeraldChallenge(client) - loads named days and starts the ticker
- *   and, pure, for the tests: dreamOdds, heraldOdds, duelSteps, stepTime,
- *   formatWhen
+ *   and, pure, for the tests: dreamOdds, heraldOdds, finalBlowPiece,
+ *   duelSteps, stepTime, formatWhen
  */
 
 const crypto = require('crypto');
@@ -101,6 +105,28 @@ const dreamOdds = (fit, loreRight) => {
 // A member's power against the Herald: fit as Max counts it (foeFit), times
 // stance, times the dream's blessing.
 const powerOf = (m) => (m.foeFit ?? m.fit) * STANCES[m.stance || 'balanced'].multiplier * (m.dreamWon ? 1 + DREAM_BONUS : 1);
+
+// The piece a member is shown wielding in the Final Blow, from `kit` ({ slot:
+// itemId }): a unique, their relic first, else their finest piece, picked at
+// random among ties. null if they wear nothing.
+const finalBlowPiece = (kit = {}, relicId = null, random = Math.random) => {
+    const pieces = Object.values(kit).map((id) => catalog.findEntry(id)).filter(Boolean);
+    const uniques = pieces.filter((e) => e.unique);
+    if (uniques.length) return uniques.find((e) => e.id === relicId) || uniques[Math.floor(random() * uniques.length)];
+    const top = Math.max(...pieces.map((e) => e.price));
+    const finest = pieces.filter((e) => e.price === top);
+    return finest.length ? finest[Math.floor(random() * finest.length)] : null;
+};
+
+// A member's line in the Final Blow, by the piece they wield: the unique's own
+// lines, else its slot's.
+const finalBlowLine = (m) => {
+    const who = `**${m.displayName}**`;
+    const piece = finalBlowPiece(m.best, m.relicId);
+    if (!piece) return pick(flavor.heraldFinalBlowBareLines(who));
+    const own = flavor.heraldFinalBlowUniqueLines[piece.id];
+    return pick(own ? own(who) : flavor.heraldFinalBlowGearLines[piece.slot](who, piece.name));
+};
 
 // ", 196 counted" after a member's fit when lesser gear was cut, else ''.
 const counted = (m) => (m.foeFit < m.fit ? `, ${m.foeFit} counted` : '');
@@ -317,6 +343,7 @@ const runHeraldBattleIn = async (g, channel, opts) => {
         const character = await pointsStore.getCharacter(g.id, m.userId).catch(() => ({}));
         const kits = kitsOf(character);
         m.fit = kits.bestFit;
+        m.best = kits.best;
         // Against the Guardians and the Herald, gear below Legendary is cut, as Max cuts it.
         m.foeFit = fitAgainst(kits.best, kits.petFit, MAX_TIER);
         m.title = (catalog.findEntry(character.title) || {}).name || null;
@@ -441,6 +468,14 @@ const runHeraldBattleIn = async (g, channel, opts) => {
         }
         return;
     }
+
+    // ---- the Final Blow: each member's part, a line every stepMs ----
+    const blow = await livePost(channel, 'The Final Blow', pick(flavor.heraldFinalBlowIntroLines()));
+    for (const m of shuffled(court)) {
+        await delay(stepMs);
+        await blow.add(finalBlowLine(m));
+    }
+    await delay(stepMs);
 
     // The age is named only the first time the court wins.
     const named = persist
@@ -622,6 +657,7 @@ module.exports = {
     dreamOdds,
     heraldOdds,
     powerOf,
+    finalBlowPiece,
     duelSteps,
     stepTime,
     formatWhen,
