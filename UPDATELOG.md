@@ -7,12 +7,17 @@ Regenerate after committing and commit the refreshed file.*
 
 ## 2026-11-24
 
+- Regenerate UPDATELOG.md (`9743d2f`)
 - Hippos join the pet shop (`5557394`)
 - The weekly recap has a podium for boss encounters won (`9b73219`)
 
 ## 2026-11-16
 
 - Elytra is now worn as a cape (`122ef9b`)
+
+## 2026-11-15
+
+- The Final Blow before the Herald falls, and /echoes names the Echoes (`1abf29b`)
 
 ## 2026-11-11
 
