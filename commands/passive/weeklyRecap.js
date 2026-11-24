@@ -32,6 +32,12 @@
  * podium: a bonus on top of points already earned continuously as puzzles
  * are solved (see pointsStore.addPuzzlePoints), not a replacement for them.
  *
+ * A seventh, the encounter podium (5/3/1), goes to the members who won the
+ * most daily boss encounters that week (weeklyEncounterWins, counted by
+ * commands/passive/encounter.js on each win and reset here after each recap).
+ * A win pays no points by itself, so unlike voice and puzzles this podium is
+ * the only reward it carries in points.
+ *
  * Exposes:
  *   scheduleWeeklyRecap(client) - registers the cron job (call once, on ready)
  *   runWeeklyRecap(client, opts) - runs one recap; reused by the !recap preview
@@ -99,6 +105,12 @@ const BUDDY_PAIRS_SIZE = 3;
 // resetWeeklyPuzzlePoints). Same shape as the voice podium: a bonus on top
 // of points already earned continuously, not a replacement for them.
 const PUZZLE_POINTS_BY_RANK = [5, 3, 1];
+
+// Sixth, independent points scale: podium points for the members who won the
+// most daily boss encounters this week (weeklyEncounterWins, counted on each
+// win by commands/passive/encounter.js and reset here after each recap — see
+// pointsStore.getWeeklyEncounterStats/resetWeeklyEncounterWins).
+const ENCOUNTER_POINTS_BY_RANK = [5, 3, 1];
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
 
@@ -315,6 +327,16 @@ const topPuzzleOf = (puzzleStats) =>
         PUZZLE_POINTS_BY_RANK.length
     );
 
+// The week's top boss encounter winners with competition ranks;
+// `encounterStats` is pointsStore.getWeeklyEncounterStats's [{ userId,
+// displayName, weeklyEncounterWins }].
+const topEncounterOf = (encounterStats) =>
+    rankWithTies(
+        [...encounterStats].sort((a, b) => b.weeklyEncounterWins - a.weeklyEncounterWins),
+        (entry) => entry.weeklyEncounterWins,
+        ENCOUNTER_POINTS_BY_RANK.length
+    );
+
 const formatHours = (seconds) => `${(seconds / 3600).toFixed(1)}h`;
 
 // Unlike the other categories, "closest companions" isn't a real podium —
@@ -337,21 +359,22 @@ const buddyRumorTextOf = (topPairs) => {
 
 const displayNameOf = (message) => message.member?.displayName || message.author.username;
 
-/* Merge the five independent points scales into one award per member:
+/* Merge the six independent points scales into one award per member:
  *   - podium points (5/3/1) for authoring the week's most-reacted posts,
  *   - reaction points: floor(distinct reactors received / REACTIONS_PER_POINT),
  *   - chatter points (5/3/1) for sending the most messages,
  *   - voice podium points (5/3/1) for the most time spent in voice channels,
- *   - puzzle podium points (5/3/1) for the most puzzle points earned this week.
+ *   - puzzle podium points (5/3/1) for the most puzzle points earned this week,
+ *   - encounter podium points (5/3/1) for the most boss encounters won.
  * Podium entries carry a competition rank (see rankWithTies): tied members
  * each get that rank's full points, and the tie consumes the ranks below.
- * A member can earn from all five (or hold two podium spots); everything sums.
+ * A member can earn from all six (or hold two podium spots); everything sums.
  * Members whose combined award is 0 are dropped. Exported for the tests.
  */
 // The award sources that come from placing on a podium (see computeAwards).
-const PODIUM_SOURCES = ['podium', 'chatter', 'voice', 'puzzle'];
+const PODIUM_SOURCES = ['podium', 'chatter', 'voice', 'puzzle', 'encounter'];
 
-const computeAwards = (topPosts, reactionsByAuthor, messagesByAuthor = new Map(), voiceStats = [], puzzleStats = []) => {
+const computeAwards = (topPosts, reactionsByAuthor, messagesByAuthor = new Map(), voiceStats = [], puzzleStats = [], encounterStats = []) => {
     const awards = new Map();
 
     // breakdown entries record *why* each point was awarded so the run can be
@@ -412,6 +435,16 @@ const computeAwards = (topPosts, reactionsByAuthor, messagesByAuthor = new Map()
             PUZZLE_POINTS_BY_RANK[entry.rank - 1],
             'puzzle',
             `rank ${entry.rank} most puzzle points this week (${entry.weeklyPuzzlePoints} earned)`
+        );
+    });
+
+    topEncounterOf(encounterStats).forEach((entry) => {
+        addAward(
+            entry.userId,
+            entry.displayName,
+            ENCOUNTER_POINTS_BY_RANK[entry.rank - 1],
+            'encounter',
+            `rank ${entry.rank} most boss encounters won this week (${entry.weeklyEncounterWins} won)`
         );
     });
 
@@ -506,13 +539,14 @@ const fitFieldLines = (lines) => {
 
 // `weeklyPoints` maps userId -> points earned by THIS run (from computeAwards),
 // shown as a (+X) delta beside each member's running total.
-const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = [], weeklyPoints = new Map(), topVoice = [], topPairs = [], topPuzzle = []) => {
-    // All six weekly categories crown winners — proclamations, voices,
-    // favor, time in voice chat, companionship, and puzzling alike — so
-    // everyone who topped any of them gets pinged. Each is already
+const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = [], weeklyPoints = new Map(), topVoice = [], topPairs = [], topPuzzle = [], topEncounter = []) => {
+    // All seven weekly categories crown winners — proclamations, voices,
+    // favor, time in voice chat, companionship, puzzling and boss slaying
+    // alike — so everyone who topped any of them gets pinged. Each is already
     // @mentioned in their own podium line below (see postsText / chattersText
-    // / favoredText / voiceText / buddiesText / puzzleText), so the intro
-    // stays a short, generic ping — it doesn't re-narrate who won what.
+    // / favoredText / voiceText / buddiesText / puzzleText / encounterText),
+    // so the intro stays a short, generic ping — it doesn't re-narrate who
+    // won what.
     const winnerIds = [...new Set([
         ...topPosts.map((post) => post.message.author.id),
         ...topChatters.map((entry) => entry.userId),
@@ -520,6 +554,7 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
         ...topVoice.map((entry) => entry.userId),
         ...topPairs.flatMap((entry) => [entry.userIdA, entry.userIdB]),
         ...topPuzzle.map((entry) => entry.userId),
+        ...topEncounter.map((entry) => entry.userId),
     ])];
 
     const content = winnerIds.length
@@ -568,6 +603,15 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
           )
         : 'No riddle was solved by the court this past sennight.';
 
+    const encounterText = topEncounter.length
+        ? fitFieldLines(
+              topEncounter.map((entry) => {
+                  const foes = entry.weeklyEncounterWins === 1 ? 'foe' : 'foes';
+                  return `**${rankWordOf(entry.rank)}:** <@${entry.userId}> — ${entry.weeklyEncounterWins} ${foes} felled`;
+              })
+          )
+        : 'No foe fell to the court this past sennight.';
+
     const boardText = leaderboard.length
         ? fitFieldLines(
               leaderboard.map((entry, index) => {
@@ -598,6 +642,7 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
         { name: 'Most Showered in Favor', value: favoredText },
         { name: 'Longest Time Spent in Council', value: voiceText },
         { name: 'Sharpest Wits at the Riddle Board', value: puzzleText },
+        { name: 'Boldest Blades Against the Foe', value: encounterText },
         { name: 'Running Tally of Honor', value: boardText },
     ];
 
@@ -615,7 +660,7 @@ const buildRecapPost = (topPosts, leaderboard, topChatters = [], topReacted = []
         .setTitle("The King's Weekly Herald")
         .setDescription('A chronicle of the realm\'s most celebrated words this past sennight, and the standings of honor.')
         .addFields(...fields)
-        .setFooter({ text: `Points each Sunday: 5/3/1 for the top proclamations, 5/3/1 for the most messages, 5/3/1 for the most time in voice, 5/3/1 for the most puzzle points, plus 1 per ${REACTIONS_PER_POINT} marks of favor received. Voice chat itself earns ${pointsStore.VOICE_POINTS_PER_HOUR} point(s) per hour as it happens, per other member sharing the call. Ties share a rank and consume the next.` })
+        .setFooter({ text: `Points each Sunday: 5/3/1 for the top proclamations, 5/3/1 for the most messages, 5/3/1 for the most time in voice, 5/3/1 for the most puzzle points, 5/3/1 for the most boss encounters won, plus 1 per ${REACTIONS_PER_POINT} marks of favor received. Voice chat itself earns ${pointsStore.VOICE_POINTS_PER_HOUR} point(s) per hour as it happens, per other member sharing the call. Ties share a rank and consume the next.` })
         .setTimestamp();
 
     return {
@@ -678,7 +723,15 @@ const runWeeklyRecap = async function (client, options = {}) {
             }
             const topPuzzle = topPuzzleOf(puzzleStats);
 
-            const awards = computeAwards(topPosts, reactionsByAuthor, messagesByAuthor, voiceStats, puzzleStats);
+            let encounterStats = [];
+            try {
+                encounterStats = await pointsStore.getWeeklyEncounterStats(g.id);
+            } catch (storeError) {
+                console.error('Weekly recap: failed to load encounter stats:', storeError.message);
+            }
+            const topEncounter = topEncounterOf(encounterStats);
+
+            const awards = computeAwards(topPosts, reactionsByAuthor, messagesByAuthor, voiceStats, puzzleStats, encounterStats);
             logAwardBreakdown(g.id, awards, runLabel);
 
             // userId -> points from THIS run's podium/reaction awards, for
@@ -745,6 +798,16 @@ const runWeeklyRecap = async function (client, options = {}) {
                 }
             }
 
+            // Same for the encounter podium: zero everyone who won a fight,
+            // not just those who placed.
+            if (persist && encounterStats.length) {
+                try {
+                    await pointsStore.resetWeeklyEncounterWins(g.id, encounterStats.map((entry) => entry.userId));
+                } catch (storeError) {
+                    console.error('Weekly recap: failed to reset encounter stats:', storeError.message);
+                }
+            }
+
             let leaderboard = [];
             try {
                 leaderboard = await pointsStore.getLeaderboard(g.id, LEADERBOARD_SIZE);
@@ -752,10 +815,11 @@ const runWeeklyRecap = async function (client, options = {}) {
                 console.error('Weekly recap: failed to load leaderboard:', storeError.message);
             }
 
-            await channel.send(buildRecapPost(topPosts, leaderboard, topChatters, topReacted, weeklyPoints, topVoice, topPairs, topPuzzle));
+            await channel.send(buildRecapPost(topPosts, leaderboard, topChatters, topReacted, weeklyPoints, topVoice, topPairs, topPuzzle, topEncounter));
 
-            // Anyone who placed on a podium this week (posts, chatter, voice or
-            // puzzles; reaction points aren't a podium) is On the Podium.
+            // Anyone who placed on a podium this week (posts, chatter, voice,
+            // puzzles or encounters; reaction points aren't a podium) is On
+            // the Podium.
             if (persist) {
                 const placed = awards.filter((award) => award.breakdown.some((line) => PODIUM_SOURCES.includes(line.source)));
                 await achievements.record(g.id, placed.map((award) => ({ userId: award.userId, displayName: award.displayName, counts: { podiums: 1 } })), channel);
@@ -809,4 +873,4 @@ const scheduleWeeklyRecap = function (client) {
     console.log(`Weekly recap scheduled: "${CRON_EXPRESSION}" (${TIMEZONE}) — Sundays at noon Eastern.`);
 };
 
-module.exports = { scheduleWeeklyRecap, runWeeklyRecap, computeAwards, findRecapChannel, rankWithTies, topVoiceOf, topPairsOf, topPuzzleOf, buildRecapPost };
+module.exports = { scheduleWeeklyRecap, runWeeklyRecap, computeAwards, findRecapChannel, rankWithTies, topVoiceOf, topPairsOf, topPuzzleOf, topEncounterOf, buildRecapPost };
