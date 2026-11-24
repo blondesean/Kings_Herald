@@ -891,8 +891,11 @@ const runEncounterIn = async (g, channel, opts) => {
     await channel.send({ embeds: [battleEmbed, outcomeEmbed] });
 
     // Achievements: everyone in the party won at this tier, maybe as the
-    // underdogs or as a full party; the killer was the hero.
+    // underdogs or as a full party; the killer was the hero. The win also
+    // counts toward the weekly recap's encounter podium.
     if (persist) {
+        await pointsStore.addWeeklyEncounterWins(g.id, ready)
+            .catch((error) => console.error(`${tag}: failed to count the weekly encounter wins:`, error.message));
         const shared = {
             encounter_wins: 1,
             [achievements.tierCounter(DIFFICULTIES[tier])]: 1,

@@ -155,7 +155,7 @@ const helpGuides = {
             '**Daily puzzle.** 1 to everyone who helped, if the puzzle is solved.',
             '**WoW Trivia Wednesdays.** 2 to the champion of the evening.',
             '**Voice.** For every hour, one point fewer than the number in the channel, so two earn 1 an hour each.',
-            '**Sunday recap.** 5, 3 and 1 for the top posts, chatter, voice and puzzles of the week, and 1 for every ten members who reacted to thy posts.',
+            '**Sunday recap.** 5, 3 and 1 for the week\'s top posts, chatter, voice, puzzles and boss encounters won, and 1 for every ten members who reacted to thy posts.',
             '**Duels.** The wager, if thou winnest.',
             '**Achievements.** 5 each.',
             '**Selling.** What a buyer pays for thy gear.',

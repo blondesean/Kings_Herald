@@ -519,6 +519,79 @@ const resetWeeklyPuzzlePoints = async function (guildId, userIds) {
     }
 };
 
+/* Count one boss encounter win for each member of a winning party, in
+ * `weeklyEncounterWins` (reset after each weekly recap). Pays no points by
+ * itself: it only powers the recap's encounter podium
+ * (commands/passive/weeklyRecap.js). `members` is [{ userId, displayName }].
+ */
+const addWeeklyEncounterWins = async function (guildId, members) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; skipping encounter win persistence.');
+        return;
+    }
+
+    const client = getClient();
+
+    for (const { userId, displayName } of members) {
+        await client.send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: 'SET #dn = :n ADD #wew :one',
+            ExpressionAttributeNames: { '#dn': 'displayName', '#wew': 'weeklyEncounterWins' },
+            ExpressionAttributeValues: { ':n': displayName || 'a noble', ':one': 1 },
+        }));
+    }
+};
+
+/* Return every member with a boss encounter win since the last weekly reset,
+ * as [{ userId, displayName, weeklyEncounterWins }]. Backs the weekly recap's
+ * encounter podium.
+ */
+const getWeeklyEncounterStats = async function (guildId) {
+    if (!isConfigured()) {
+        console.log('POINTS_TABLE_NAME not set; returning empty encounter stats.');
+        return [];
+    }
+
+    const client = getClient();
+
+    const result = await client.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: '#g = :g',
+        ExpressionAttributeNames: { '#g': 'guildId' },
+        ExpressionAttributeValues: { ':g': guildId },
+    }));
+
+    const items = result.Items || [];
+    return items
+        .filter((item) => !String(item.userId).startsWith(DUEL_HISTORY_PREFIX) && !String(item.userId).startsWith(PAIR_PREFIX))
+        .filter((item) => (item.weeklyEncounterWins || 0) > 0)
+        .map((item) => ({
+            userId: item.userId,
+            displayName: item.displayName || 'a noble',
+            weeklyEncounterWins: item.weeklyEncounterWins,
+        }));
+};
+
+/* Zero out weeklyEncounterWins for the given members. Called by the weekly
+ * recap right after it reads and displays the encounter podium.
+ */
+const resetWeeklyEncounterWins = async function (guildId, userIds) {
+    if (!isConfigured() || !userIds.length) return;
+
+    const client = getClient();
+
+    for (const userId of userIds) {
+        await client.send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { guildId, userId },
+            UpdateExpression: 'SET #wew = :zero',
+            ExpressionAttributeNames: { '#wew': 'weeklyEncounterWins' },
+            ExpressionAttributeValues: { ':zero': 0 },
+        }));
+    }
+};
+
 /* Return the trivia question texts already asked during the current
  * no-repeat cycle, as a string array (empty if no cycle is in progress, or
  * the table isn't configured — in which case the cycle tracks in-memory only
@@ -2221,6 +2294,9 @@ module.exports = {
     addPuzzlePoints,
     getWeeklyPuzzleStats,
     resetWeeklyPuzzlePoints,
+    addWeeklyEncounterWins,
+    getWeeklyEncounterStats,
+    resetWeeklyEncounterWins,
     VOICE_POINTS_PER_HOUR,
     getUsedTriviaQuestions,
     setUsedTriviaQuestions,
