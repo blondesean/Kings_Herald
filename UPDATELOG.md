@@ -5,8 +5,18 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-11-24
+
+- Hippos join the pet shop (`5557394`)
+- The weekly recap has a podium for boss encounters won (`9b73219`)
+
+## 2026-11-16
+
+- Elytra is now worn as a cape (`122ef9b`)
+
 ## 2026-11-11
 
+- Regenerate UPDATELOG.md (`5284f7f`)
 - Extreme, Max, the Guardians and the Herald fight harder (`9382eac`)
 - Regenerate UPDATELOG.md (`b40fad5`)
 
