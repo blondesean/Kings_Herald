@@ -1596,7 +1596,7 @@ const tradeCharacters = async function (guildId, sides) {
  *   { itemId, price, sellerId, sellerName, listedDay, status, saleDay, closesAt, buyerId, paid }
  * A pet given up also carries `pet`, the whole pet (src/pets.js), with
  * itemId "pet:<species>"; it sells for PET_RESALE_PRICE and pays nobody.
- * status moves listed -> onSale (when a shop opens on a later day) -> sold or
+ * status moves listed -> onSale (when the next shop opens) -> sold or
  * expired. Every move that pays someone is a transaction with the status
  * change, so a listing can never pay out twice.
  */
