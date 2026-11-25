@@ -145,11 +145,11 @@ const ownListingLines = (name) => [
 
 // Asks the seller to confirm listing a piece, with what each outcome pays.
 const sellPromptLines = (name, salePrice, refund) => [
-    `Sell **${name}** back to the merchant? It goes on sale in the next day's shop for ${salePrice} points. If another noble buys it, thou receivest ${salePrice}. If none does, the merchant pays thee ${refund} and keeps it.`,
+    `Sell **${name}** back to the merchant? It goes on sale in the next shop to open, for ${salePrice} points. If another noble buys it, thou receivest ${salePrice}. If none does, the merchant pays thee ${refund} and keeps it.`,
 ];
 
 const listedLines = (name) => [
-    `**${name}** leaves thy bag for the merchant's cart. Look for it among the discounts in the next day's shop.`,
+    `**${name}** leaves thy bag for the merchant's cart. Look for it among the discounts in the next shop to open.`,
 ];
 
 // "A", "A and B", "A, B and C", each in bold.
@@ -174,12 +174,12 @@ const sellManyPromptLines = (items, skipped = []) => {
     ].filter(Boolean).join(' ');
     const totals = gear.length ? `\nIn all, ${total('salePrice')} points if every piece sells, ${total('refund')} if none do.` : '';
     return [
-        `${left}Sell ${items.length === 1 ? 'this' : `these ${items.length}`} to the merchant? Each goes on sale in the next day's shop. ${rules}\n${list.join('\n')}${totals}`,
+        `${left}Sell ${items.length === 1 ? 'this' : `these ${items.length}`} to the merchant? Each goes on sale in the next shop to open. ${rules}\n${list.join('\n')}${totals}`,
     ];
 };
 
 const listedManyLines = (names) => [
-    `${boldList(names)} go to the merchant's cart. Look for them in the next day's shop.`,
+    `${boldList(names)} go to the merchant's cart. Look for them in the next shop to open.`,
 ];
 
 const sellTooManyLines = (max) => [

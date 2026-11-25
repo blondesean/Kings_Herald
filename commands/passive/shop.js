@@ -15,7 +15,7 @@
  * never run out. The shop stays open until midnight Eastern, 9 PM Pacific,
  * when its stock resets and the Herald announces the closing (closeShopNow).
  *
- * Gear members sold back with /sell on an earlier day also goes on sale, in
+ * Gear members sold back with /sell before the shop opened also goes on sale, in
  * a Discounts section shown only when there is some (see DISCOUNT below).
  * Pets members gave up with /sell join the day's pet, name and title and
  * all, for PET_RESALE_PRICE; their old owners are paid nothing either way,
@@ -141,9 +141,10 @@ const kindOf = (entry) => {
     return 'gear';
 };
 
-/* Sellback discounts (see /sell in commands/prompts/sell.js). Gear listed on
- * one day goes on sale at the next shop to open on a later day, one copy,
- * at DISCOUNT off. A sale pays the seller what the buyer paid; a listing
+/* Sellback discounts (see /sell in commands/prompts/sell.js). Gear listed
+ * goes on sale at the next shop to open, one copy, at DISCOUNT off: the same
+ * day's if it was listed between midnight and the noon opening, else the
+ * next day's. A sale pays the seller what the buyer paid; a listing
  * still unsold when that shop closes pays the seller UNSOLD_REFUND of the
  * full price instead, and the piece leaves the realm.
  */
@@ -174,12 +175,18 @@ const settleListings = async function (guildId, now = Date.now()) {
     return listings;
 };
 
-// Moves every listing from an earlier day onto this shop's shelves, and
+// When a listing was made: its listingId starts with the time in ms (see
+// pointsStore.createListings).
+const listedAt = (listing) => Number(String(listing.listingId).split('#')[0]);
+
+// Moves every listing made before this shop opened onto its shelves, and
 // returns today's discounts. A rehearsal only shows what would go on sale.
+// A sale after midnight Eastern but before the noon opening goes into that
+// day's shop, not the next one: 9 PM Pacific is already the next Eastern day.
 const stockDiscounts = async function (guildId, record, persist) {
     const listings = persist ? await settleListings(guildId, record.openedAt) : await pointsStore.getListings(guildId);
     const ready = listings.filter((l) =>
-        (l.status === 'listed' && l.listedDay < record.day) ||
+        (l.status === 'listed' && (l.listedDay < record.day || listedAt(l) < record.openedAt)) ||
         (l.status === 'onSale' && l.saleDay === record.day && l.closesAt > record.openedAt));
     const onSale = [];
     for (const listing of ready) {

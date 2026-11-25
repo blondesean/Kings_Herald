@@ -138,13 +138,13 @@ const petMorningFooterLines = () => [
 const petGiveUpPromptLines = (name, kind, price, held) => {
     const drop = held ? ` It drops the **${held}** it carries back into thy bag.` : '';
     return [
-        `Give up **${name}**, thy ${kind}? It goes to the merchant, to be offered in the next day's shop for ${price} ${price === 1 ? 'point' : 'points'}. Thou receivest nothing for it, whether it finds a new home or not.${drop}`,
+        `Give up **${name}**, thy ${kind}? It goes to the merchant, to be offered in the next shop to open, for ${price} ${price === 1 ? 'point' : 'points'}. Thou receivest nothing for it, whether it finds a new home or not.${drop}`,
     ];
 };
 
 const petGivenUpLines = (name) => [
-    `**${name}** is handed to the merchant with one last scratch behind the ears. Look for it among the pets in the next day's shop.`,
-    `The merchant leads **${name}** away. It looks back only once. It will be offered in the next day's shop.`,
+    `**${name}** is handed to the merchant with one last scratch behind the ears. Look for it among the pets in the next shop to open.`,
+    `The merchant leads **${name}** away. It looks back only once. It will be offered in the next shop to open.`,
 ];
 
 // A pet given up by `seller` was adopted. `atSide` as in petAdoptedLines.

@@ -34,7 +34,7 @@
  */
 
 const PET_PRICE = 10;
-// A pet given up with /sell goes on sale in the next day's shop for this,
+// A pet given up with /sell goes on sale in the next shop to open, for this,
 // and its old owner is paid nothing, sold or not.
 const PET_RESALE_PRICE = 1;
 const PET_HAPPY_MS = 7 * 24 * 60 * 60 * 1000;

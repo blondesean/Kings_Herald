@@ -1,13 +1,13 @@
 /* /sell <item> - sell gear from your bag back to the merchant, or give up a pet.
  *
- * The piece leaves your bag at once and goes on sale in the next day's shop,
+ * The piece leaves your bag at once and goes on sale in the next shop to open,
  * in its Discounts section, one copy at 25% off. If another member buys it,
  * you're paid what they paid; if it's still unsold when that shop closes,
  * you're paid half its full price and the piece is gone for good. The rules
  * and payouts live in commands/passive/shop.js.
  *
  * A pet, at your side or in the bank, is named by its name or its full name
- * with its title. It goes on sale in the next day's shop, name and title and
+ * with its title. It goes on sale in the next shop to open, name and title and
  * all, for PET_RESALE_PRICE, and you're paid nothing, sold or not. Unsold, it
  * leaves the realm. The gear it holds comes back to your bag.
  *
