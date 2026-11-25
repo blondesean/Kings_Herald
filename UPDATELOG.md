@@ -7,6 +7,8 @@ Regenerate after committing and commit the refreshed file.*
 
 ## 2026-11-24
 
+- Put a sale in the next shop to open, not the next day's (`3a32b05`)
+- Regenerate UPDATELOG.md (`c4c06b5`)
 - Regenerate UPDATELOG.md (`9743d2f`)
 - Hippos join the pet shop (`5557394`)
 - The weekly recap has a podium for boss encounters won (`9b73219`)
