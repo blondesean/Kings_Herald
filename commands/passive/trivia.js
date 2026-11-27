@@ -19,11 +19,12 @@
  * once the round's over and answers are being revealed anyway, unlike
  * mid-round where they're kept secret.
  *
- * Seasonal reskin: during Halloween season, a round may draw from a separate
- * spooky question bank (flavor_text/halloweenTriviaQuestions.js) instead of
- * the usual one, with a matching in-character reskin of the question/results
- * posts (see flavor_text/halloweenTriviaFlavor.js and SEASONAL_CHANCE_BY_MONTH
- * below for the odds by month). Same rules, same points, just spookier.
+ * Seasonal reskins: in some months a round draws from a seasonal question
+ * bank instead of the usual one, with a matching in-character reskin of the
+ * question/results posts (see SEASONS below). Halloween season has a spooky
+ * bank (flavor_text/halloweenTriviaQuestions.js, odds by month in
+ * SEASON_BY_MONTH), and December has a winter one
+ * (flavor_text/winterTriviaQuestions.js). Same rules, same points.
  *
  * Subjective days: about half of all days (SUBJECTIVE_CHANCE), the slot goes
  * to a subjective round instead of a factual question: either a "would you
@@ -32,14 +33,14 @@
  * Those are different games with their own rules and scoring, so runTrivia
  * just hands off to them. This is rolled first,
  * so it applies in September and early October too; the Halloween-bank odds
- * below then only decide the other, factual, days. The exception is the last
- * stretch of October (SPOOKY_STRETCH_START_DAY through the 31st), which is
- * always the Halloween bank and never subjective — see rollToday.
+ * below then only decide the other, factual, days. The exceptions are the
+ * SEASONAL_STRETCHES (October 21-31 and all of December), which are always
+ * their seasonal bank and never subjective — see rollToday.
  *
  * Exposes:
  *   runTrivia(client, opts) - runs one round; called by src/dailyLineup.js
  *                            and reused by the /trivia preview command
- *   rollToday(date) - today's { seasonal, subjective } roll; src/dailyLineup.js
+ *   rollToday(date) - today's { season, subjective } roll; src/dailyLineup.js
  *                            rolls once and passes the result to runTrivia,
  *                            rather than letting runTrivia roll again
  */
@@ -63,15 +64,36 @@ const LETTERS = ['A', 'B', 'C', 'D'];
 const BUTTON_PREFIX = 'trivia_answer_';
 
 const EMBED_COLOR = 0xd4af37; // heraldic gold
-const HALLOWEEN_EMBED_COLOR = 0xff7518; // jack-o'-lantern orange
 
-// Chance a factual round draws from the Halloween bank instead of the usual
-// one, keyed by Date#getMonth() (0-indexed: 8 = September, 9 = October). Any
-// month not listed here never rolls seasonal. This is rolled AFTER the
-// subjective roll below, so it's the chance among the non-subjective days:
-// September is roughly 33% of the factual half, October is all of it (except
-// that the last stretch of the month skips the subjective roll entirely).
-const SEASONAL_CHANCE_BY_MONTH = { 8: 0.33, 9: 1 };
+// The seasonal banks, by name: each swaps in its own questions and reskins
+// the question and results posts.
+const SEASONS = {
+    halloween: {
+        questions: () => flavor.halloweenTriviaQuestions(),
+        introLines: () => flavor.halloweenTriviaIntroLines(),
+        closingLines: () => flavor.halloweenTriviaClosingLines(),
+        title: "The Herald's All Hallows' Trivia",
+        color: 0xff7518, // jack-o'-lantern orange
+    },
+    winter: {
+        questions: () => flavor.winterTriviaQuestions(),
+        introLines: () => flavor.winterTriviaIntroLines(),
+        closingLines: () => flavor.winterTriviaClosingLines(),
+        title: "The Herald's Midwinter Trivia",
+        color: 0x2e7d32, // evergreen
+    },
+};
+
+// Chance a factual round draws from a seasonal bank instead of the usual
+// one, keyed by Eastern month (1-12). Any month not listed here never rolls
+// seasonal. This is rolled AFTER the subjective roll below, so it's the
+// chance among the non-subjective days: September is roughly 33% of the
+// factual half, October is all of it (except that the last stretch of the
+// month skips the subjective roll entirely).
+const SEASON_BY_MONTH = {
+    9: { season: 'halloween', chance: 0.33 },
+    10: { season: 'halloween', chance: 1 },
+};
 
 // Chance a given day's round is a "would you rather" round instead of a
 // factual question, in any month.
@@ -79,9 +101,13 @@ const SUBJECTIVE_CHANCE = 0.5;
 // Chance that a subjective day is the ranking round rather than would-you-rather.
 const RANKED_SHARE = 0.5;
 
-// From this day of October through the 31st, every round is the Halloween
-// bank: no subjective roll, no chance of a normal question.
-const SPOOKY_STRETCH_START_DAY = 21;
+// From each stretch's start day through the end of its month, every round is
+// that season's bank: no subjective roll, no chance of a normal question.
+// The winter bank holds 31 questions, one for each day of December.
+const SEASONAL_STRETCHES = [
+    { month: 10, fromDay: 21, season: 'halloween' },
+    { month: 12, fromDay: 1, season: 'winter' },
+];
 
 // Month (1-12) and day of month in Eastern time. The daily window is
 // Eastern-anchored but the container clock is UTC, whose date is already
@@ -94,17 +120,20 @@ const easternMonthDay = (date = new Date()) => {
     };
 };
 
-// Today's roll: { seasonal, subjective }. In the spooky stretch it's always a
-// Halloween-bank factual round. Otherwise subjective is rolled first, and only
-// a non-subjective day goes on to roll the Halloween bank. Takes the date so
-// the odds can be tested for any day of the year.
+// Today's roll: { season, subjective }, season being a SEASONS name or null
+// for the usual bank. In a seasonal stretch it's always that season's
+// factual round. Otherwise subjective is rolled first, and only a
+// non-subjective day goes on to roll the month's seasonal bank, if any.
+// Takes the date so the odds can be tested for any day of the year.
 const rollToday = (date = new Date()) => {
     const { month, day } = easternMonthDay(date);
-    if (month === 10 && day >= SPOOKY_STRETCH_START_DAY) return { seasonal: true, subjective: false };
+    const stretch = SEASONAL_STRETCHES.find((s) => s.month === month && day >= s.fromDay);
+    if (stretch) return { season: stretch.season, subjective: false };
 
     const subjective = Math.random() < SUBJECTIVE_CHANCE;
-    const seasonal = !subjective && Math.random() < (SEASONAL_CHANCE_BY_MONTH[month - 1] || 0);
-    return { seasonal, subjective };
+    const odds = SEASON_BY_MONTH[month];
+    const season = !subjective && odds && Math.random() < odds.chance ? odds.season : null;
+    return { season, subjective };
 };
 
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
@@ -126,8 +155,8 @@ const pick = (lines) => lines[Math.floor(Math.random() * lines.length)];
 // cost a read; `null` means "not yet loaded from persistence".
 let usedQuestions = null;
 
-const nextQuestion = async (consumeBag, seasonal) => {
-    const allQuestions = seasonal ? flavor.halloweenTriviaQuestions() : flavor.triviaQuestions();
+const nextQuestion = async (consumeBag, season) => {
+    const allQuestions = season ? SEASONS[season].questions() : flavor.triviaQuestions();
     if (!consumeBag) {
         return allQuestions[Math.floor(Math.random() * allQuestions.length)];
     }
@@ -138,8 +167,12 @@ const nextQuestion = async (consumeBag, seasonal) => {
 
     let candidates = allQuestions.filter((q) => !usedQuestions.includes(q.question));
     if (candidates.length === 0) {
-        // Whole bank asked through since the last reset — start a fresh cycle.
-        usedQuestions = [];
+        // This whole bank asked through since its last reset: start it on a
+        // fresh cycle, leaving the other banks' cycles where they are. (The
+        // winter bank runs out every December 31, which would otherwise
+        // reset the main bank's cycle the next December.)
+        const bank = new Set(allQuestions.map((q) => q.question));
+        usedQuestions = usedQuestions.filter((q) => !bank.has(q));
         candidates = allQuestions;
     }
 
@@ -172,12 +205,13 @@ const buildOptionRow = (disabled = false) =>
         )
     );
 
-const buildQuestionPost = (question, seasonal) => {
+const buildQuestionPost = (question, season) => {
+    const theme = season ? SEASONS[season] : null;
     const optionLines = LETTERS.map((letter) => `**${letter}.** ${question.options[letter]}`).join('\n');
-    const introLine = seasonal ? pick(flavor.halloweenTriviaIntroLines()) : 'Hear ye! A test of knowledge for the court:';
+    const introLine = theme ? pick(theme.introLines()) : 'Hear ye! A test of knowledge for the court:';
     const embed = new EmbedBuilder()
-        .setColor(seasonal ? HALLOWEEN_EMBED_COLOR : EMBED_COLOR)
-        .setTitle(seasonal ? "The Herald's All Hallows' Trivia" : "The Herald's Daily Trivia")
+        .setColor(theme ? theme.color : EMBED_COLOR)
+        .setTitle(theme ? theme.title : "The Herald's Daily Trivia")
         .setDescription(`${introLine}\n\n**${question.question}**\n\n${optionLines}`)
         .setFooter({ text: `Click the button matching thy answer within ${ANSWER_WINDOW_MS / 60000} minutes — thy choice stays secret 'til the round closes, and thou mayest change it 'til then. Scrying the Great Web for answers is known to invite a curse upon thy house name!` })
         .setTimestamp();
@@ -265,11 +299,11 @@ const lambastFor = (participants, correctLetter) => {
     return `\n\n${pick(flavor.triviaLambastLines(mentions, losers.length))}`;
 };
 
-const buildResultsPost = (question, winners, participants, persist, seasonal) => {
+const buildResultsPost = (question, winners, participants, persist, season) => {
     const answerLine = `The correct answer was **${question.correct}. ${question.options[question.correct]}**.`;
     const previewNote = persist ? '' : '\n*(This be but a rehearsal — no points were truly bestowed.)*';
     const lambastLine = lambastFor(participants, question.correct);
-    const closingLine = seasonal ? `\n\n*${pick(flavor.halloweenTriviaClosingLines())}*` : '';
+    const closingLine = season ? `\n\n*${pick(SEASONS[season].closingLines())}*` : '';
 
     if (winners.length === 0) {
         return `${answerLine}\n\nAlas, none of the court answered true and true alone. Sharper wits next time!${lambastLine}${previewNote}${closingLine}${SIGNUP_NOTE}`;
@@ -290,11 +324,12 @@ const buildResultsPost = (question, winners, participants, persist, seasonal) =>
  *   consumeBag    - whether this round draws from (and advances) the
  *                    no-repeat shuffle bag, vs. a plain random pick
  *                    (default: same as persist)
- *   seasonal      - force this round to draw from the Halloween bank (true)
- *                    or the usual one (false); omit to use today's roll
+ *   season        - force this round to draw from a seasonal bank (a SEASONS
+ *                    name, e.g. 'winter') or the usual one (null); omit to
+ *                    use today's roll
  *   subjective    - force this to be a subjective round (true) or a factual
  *                    one (false); omit to use today's roll (see rollToday).
- *                    True wins over `seasonal` if both are forced.
+ *                    True wins over `season` if both are forced.
  *   subjectiveKind - 'wouldYouRather' or 'ranking': which subjective game to
  *                    run; omit to flip a coin (RANKED_SHARE). Only matters
  *                    when the round is subjective.
@@ -308,7 +343,7 @@ const runTrivia = async function (client, options = {}) {
         targetChannel,
         persist = false,
         consumeBag = persist,
-        seasonal = roll.seasonal,
+        season = roll.season,
         subjective = roll.subjective,
         subjectiveKind = Math.random() < RANKED_SHARE ? 'ranking' : 'wouldYouRather',
         runLabel = persist ? 'scheduled' : 'preview',
@@ -322,8 +357,8 @@ const runTrivia = async function (client, options = {}) {
         return;
     }
 
-    const question = await nextQuestion(consumeBag, seasonal);
-    if (seasonal) console.log(`Trivia: today's round is seasonal (Halloween bank) [${runLabel}].`);
+    const question = await nextQuestion(consumeBag, season);
+    if (season) console.log(`Trivia: today's round is seasonal (${season} bank) [${runLabel}].`);
 
     for (const g of guilds) {
         try {
@@ -335,7 +370,7 @@ const runTrivia = async function (client, options = {}) {
 
             // Only the real scheduled round pings signed-up members
             // (/signup trivia) — preview runs shouldn't spam them.
-            const post = buildQuestionPost(question, seasonal);
+            const post = buildQuestionPost(question, season);
             if (persist) {
                 const role = findTriviaRole(g);
                 if (role) post.content = `<@&${role.id}>`;
@@ -359,7 +394,7 @@ const runTrivia = async function (client, options = {}) {
                 }
             }
 
-            await channel.send(buildResultsPost(question, winners, participants, persist, seasonal));
+            await channel.send(buildResultsPost(question, winners, participants, persist, season));
             if (persist && winners.length) {
                 await achievements.record(g.id, winners.map((w) => ({ userId: w.userId, displayName: w.displayName, counts: { trivia: 1 } })), channel);
             }

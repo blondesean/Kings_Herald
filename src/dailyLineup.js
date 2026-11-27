@@ -198,7 +198,7 @@ const scheduleDailyLineup = function (client) {
             fireTimes.shop = new Date(slotTime(SHOP_SLOT));
             fireTimes.encounter = new Date(slotTime(encounterSlot));
 
-            const triviaKindLabel = !roll.subjective ? `factual${roll.seasonal ? ', seasonal' : ''}` : subjectiveKind;
+            const triviaKindLabel = !roll.subjective ? `factual${roll.season ? `, ${roll.season} bank` : ''}` : subjectiveKind;
             console.log(
                 `Daily lineup: trivia (${triviaKindLabel}) at ~${fireTimes.trivia.toISOString()}, ` +
                 `puzzle (${ladder ? 'Word Ladder' : 'Connections'}) at ~${fireTimes.puzzle.toISOString()}, ` +
@@ -207,7 +207,7 @@ const scheduleDailyLineup = function (client) {
 
             setTimeout(() => {
                 fireTimes.trivia = null;
-                runTrivia(client, { persist: true, seasonal: roll.seasonal, subjective: roll.subjective, subjectiveKind }).catch((error) =>
+                runTrivia(client, { persist: true, season: roll.season, subjective: roll.subjective, subjectiveKind }).catch((error) =>
                     console.error('Scheduled trivia round failed:', error)
                 );
             }, slotTime(triviaSlot) - Date.now());

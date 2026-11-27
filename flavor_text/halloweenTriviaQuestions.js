@@ -1,6 +1,6 @@
 /* Seasonal Halloween trivia bank for the Herald's daily trivia
  * (commands/passive/trivia.js). Only ever drawn from during the Halloween
- * season — see SEASONAL_CHANCE_BY_MONTH in trivia.js (a 33% chance per round
+ * season — see SEASON_BY_MONTH in trivia.js (a 33% chance per round
  * in September, guaranteed in October, never otherwise).
  *
  * Each entry is { question, options: { A, B, C, D }, correct }, same shape as
