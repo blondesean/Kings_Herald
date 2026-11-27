@@ -42,6 +42,7 @@ const { trackVoiceStateUpdate, startVoiceTracking } = require('./../commands/pas
 const { scheduleBirthdays } = require('./../commands/passive/birthdays');
 const { schedulePetCalls } = require('./../commands/passive/petCalls');
 const { scheduleHalloweenTreat } = require('./../commands/passive/halloweenTreat');
+const { scheduleChristmasGift } = require('./../commands/passive/christmasGift');
 const { scheduleAchievements } = require('./achievements');
 const { scheduleLoreDrops } = require('./campaign'); // the lore drops after the first Max win
 const { scheduleHeraldChallenge } = require('./heraldBattle'); // the named day of the last challenge
@@ -135,6 +136,7 @@ client.on('ready', (c) => {
     scheduleDailyLineup(client);
     scheduleWowTriviaWednesday(client);
     scheduleHalloweenTreat(client);
+    scheduleChristmasGift(client);
     scheduleBirthdays(client);
     schedulePetCalls(client);
     startVoiceTracking(client);
