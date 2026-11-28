@@ -5,8 +5,14 @@ A chronicle of the Herald's own history: every change to the realm, by date.
 *Generated from git history by `npm run updatelog` — do not edit by hand.
 Regenerate after committing and commit the refreshed file.*
 
+## 2026-11-26
+
+- Add a Christmas morning gift from the Herald as Santa (`28b546d`)
+- Add a winter trivia bank for every day of December (`e6a7018`)
+
 ## 2026-11-24
 
+- Regenerate UPDATELOG.md (`6bcfff5`)
 - Put a sale in the next shop to open, not the next day's (`3a32b05`)
 - Regenerate UPDATELOG.md (`c4c06b5`)
 - Regenerate UPDATELOG.md (`9743d2f`)
