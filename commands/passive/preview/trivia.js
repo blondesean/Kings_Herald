@@ -10,9 +10,9 @@
  * any points — handy for checking the format and the reaction-tallying logic
  * without waiting for the random daily slot or inflating the leaderboard.
  *
- * The `seasonal` option overrides the Halloween-bank odds (see
- * SEASONAL_CHANCE_BY_MONTH in trivia.js) so the spooky reskin can be tested
- * any time of year, not just during its actual September/October window.
+ * The `season` option picks the question bank outright (Halloween, winter,
+ * or the usual one; see SEASONS in trivia.js) so a seasonal reskin can be
+ * tested any time of year, not just in its own months.
  * The `subjective` option does the same for the "would you rather" round
  * (see commands/passive/wouldYouRather.js), and `ranked` for the five-item
  * ranking round (commands/passive/rankingRound.js); `ranked: true` implies a
@@ -25,10 +25,10 @@ const { ApplicationCommandOptionType } = require('discord.js');
 const { runTrivia } = require('../trivia');
 
 const triviaPreview = async function (interaction) {
-    const seasonalOverride = interaction.options.getBoolean('seasonal');
+    const seasonOverride = interaction.options.getString('season');
     const subjectiveOverride = interaction.options.getBoolean('subjective');
     const rankedOverride = interaction.options.getBoolean('ranked');
-    const forced = seasonalOverride !== null || subjectiveOverride !== null || rankedOverride !== null;
+    const forced = seasonOverride !== null || subjectiveOverride !== null || rankedOverride !== null;
 
     await interaction.editReply('Hark! I shall pose a question of trivia to test the waters, good sir!');
 
@@ -38,7 +38,7 @@ const triviaPreview = async function (interaction) {
             targetChannel: interaction.channel,
             persist: false,
             ...(forced ? {
-                seasonal: Boolean(seasonalOverride),
+                season: seasonOverride && seasonOverride !== 'none' ? seasonOverride : null,
                 subjective: Boolean(subjectiveOverride) || Boolean(rankedOverride),
                 subjectiveKind: rankedOverride ? 'ranking' : 'wouldYouRather',
             } : {}),
@@ -56,10 +56,15 @@ module.exports = {
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
     options: [
         {
-            name: 'seasonal',
-            description: 'Force the Halloween-themed bank on/off (default: roll the odds for today)',
-            type: ApplicationCommandOptionType.Boolean,
+            name: 'season',
+            description: 'Force a question bank (default: roll the odds for today)',
+            type: ApplicationCommandOptionType.String,
             required: false,
+            choices: [
+                { name: 'Halloween', value: 'halloween' },
+                { name: 'Winter', value: 'winter' },
+                { name: 'None (the usual bank)', value: 'none' },
+            ],
         },
         {
             name: 'subjective',
