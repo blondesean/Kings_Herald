@@ -19,7 +19,7 @@ const SCOPES = {
     recap: 'Weekly recap',
     wow_trivia: 'WoW Trivia Wednesdays',
     birthdays: 'Birthday blessing',
-    treat: 'Halloween treat',
+    treat: 'Holiday treats (Halloween treat, Christmas gift)',
     achievements: 'Achievement summaries',
     pets: 'Unhappy pets calling in the morning',
     lore: 'Lore and the herald\'s proclamations',

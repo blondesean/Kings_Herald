@@ -2,7 +2,7 @@
  *
  * One admin command for all the daily timers: trivia, the puzzle slot
  * (Connections or Word Ladder, whichever is armed), the shop and the encounter are placed
- * without overlap by src/dailyLineup.js; birthdays and the Halloween treat
+ * without overlap by src/dailyLineup.js; birthdays, the Halloween treat and the Christmas gift
  * fire at their own fixed clock times and aren't part of that coordination.
  * adminOnly + hidden, and ephemeral, so only the admin who ran it sees the
  * answer. The times are the in-memory fire times set at each window open, so
@@ -17,6 +17,7 @@ const { ApplicationCommandOptionType } = require('discord.js');
 const { getFireTime } = require('../../../src/dailyLineup');
 const { getScheduledFireTime: getBirthdayFireTime } = require('../birthdays');
 const { getScheduledFireTime: getTreatFireTime } = require('../halloweenTreat');
+const { getScheduledFireTime: getGiftFireTime } = require('../christmasGift');
 
 const TIMEZONE = 'America/New_York';
 
@@ -27,6 +28,7 @@ const GAMES = {
     encounter: { label: "today's encounter", fireAt: () => getFireTime('encounter'), unarmed: "No encounter is armed at present" },
     birthdays: { label: "today's birthday check", fireAt: getBirthdayFireTime, unarmed: "The birthday check has already run today" },
     treat: { label: "today's Halloween treat", fireAt: getTreatFireTime, unarmed: "No Halloween treat is armed at present (it runs at noon Eastern in October)" },
+    christmas: { label: "the Christmas gift", fireAt: getGiftFireTime, unarmed: "No Christmas gift is armed at present (it runs at 11 AM Eastern on December 25)" },
 };
 
 const formatEastern = (date) =>
@@ -52,7 +54,7 @@ const haroldTime = async function (interaction) {
 };
 
 module.exports = {
-    description: "Report when today's trivia, puzzle, shop, birthday check or treat is set to fire (visible only to you)",
+    description: "Report when a daily game, birthday check, treat or Christmas gift is set to fire (only you see it)",
     category: 'UTILITY',
     hidden: true, // out of the generated /help
     adminOnly: true, // registered with Discord, but only members with Manage Server can see/run it
@@ -70,6 +72,7 @@ module.exports = {
                 { name: 'Encounter', value: 'encounter' },
                 { name: 'Birthdays', value: 'birthdays' },
                 { name: 'Halloween treat', value: 'treat' },
+                { name: 'Christmas gift', value: 'christmas' },
             ],
         },
     ],
